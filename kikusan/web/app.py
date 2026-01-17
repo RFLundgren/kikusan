@@ -93,6 +93,7 @@ async def api_download(request: DownloadRequest):
             video_id=request.video_id,
             output_dir=config.download_dir,
             audio_format=config.audio_format,
+            filename_template=config.filename_template,
             fetch_lyrics=True,
         )
 

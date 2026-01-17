@@ -48,7 +48,8 @@ main.add_command(search_cmd, name="search")
 
 @main.command()
 @click.argument("video_id", required=False)
-@click.option("--url", "-u", help="YouTube or YouTube Music URL")
+@click.option("--url", "-u", help="YouTube or YouTube Music URL (supports playlists)")
+@click.option("--query", "-q", help="Search query (downloads first match)")
 @click.option("--output", "-o", type=click.Path(), help="Output directory")
 @click.option(
     "--format",
@@ -58,37 +59,90 @@ main.add_command(search_cmd, name="search")
     type=click.Choice(["opus", "mp3", "flac"]),
     help="Audio format (default: opus)",
 )
+@click.option(
+    "--filename",
+    "-n",
+    "filename_template",
+    default=None,
+    help="Filename template (default: '%(artist,uploader)s - %(title)s')",
+)
 @click.option("--no-lyrics", is_flag=True, help="Skip fetching lyrics")
 def download_cmd(
     video_id: str | None,
     url: str | None,
+    query: str | None,
     output: str | None,
     audio_format: str | None,
+    filename_template: str | None,
     no_lyrics: bool,
 ):
-    """Download a track by video ID or URL."""
-    if not video_id and not url:
-        raise click.UsageError("Either VIDEO_ID or --url is required")
+    """Download a track by video ID, URL, or search query.
+
+    Examples:
+
+      kikusan download VIDEO_ID
+
+      kikusan download --url "https://music.youtube.com/watch?v=..."
+
+      kikusan download --url "https://music.youtube.com/playlist?list=..."
+
+      kikusan download --query "Bohemian Rhapsody Queen"
+    """
+    if not video_id and not url and not query:
+        raise click.UsageError("One of VIDEO_ID, --url, or --query is required")
 
     config = get_config()
     output_dir = Path(output) if output else config.download_dir
     fmt = audio_format or config.audio_format
+    template = filename_template or config.filename_template
 
     try:
+        # Search and download first match
+        if query:
+            results = search(query, limit=1)
+            if not results:
+                raise click.ClickException(f"No results found for: {query}")
+
+            track = results[0]
+            click.echo(f"Found: {track.title} - {track.artist}")
+
+            audio_path = download(
+                video_id=track.video_id,
+                output_dir=output_dir,
+                audio_format=fmt,
+                filename_template=template,
+                fetch_lyrics=not no_lyrics,
+            )
+            if audio_path:
+                click.echo(f"Downloaded: {audio_path}")
+            return
+
+        # Download from URL (single track or playlist)
         if url:
-            audio_path = download_url(
+            result = download_url(
                 url=url,
                 output_dir=output_dir,
                 audio_format=fmt,
+                filename_template=template,
                 fetch_lyrics=not no_lyrics,
             )
-        else:
-            audio_path = download(
-                video_id=video_id,
-                output_dir=output_dir,
-                audio_format=fmt,
-                fetch_lyrics=not no_lyrics,
-            )
+
+            if isinstance(result, list):
+                click.echo(f"Downloaded {len(result)} tracks to {output_dir}")
+            elif result:
+                click.echo(f"Downloaded: {result}")
+            else:
+                click.echo("Download completed but could not locate file.")
+            return
+
+        # Download by video ID
+        audio_path = download(
+            video_id=video_id,
+            output_dir=output_dir,
+            audio_format=fmt,
+            filename_template=template,
+            fetch_lyrics=not no_lyrics,
+        )
 
         if audio_path:
             click.echo(f"Downloaded: {audio_path}")

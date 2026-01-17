@@ -5,104 +5,17 @@ from pathlib import Path
 
 import yt_dlp
 
+from kikusan.config import DEFAULT_FILENAME_TEMPLATE
 from kikusan.lyrics import get_lyrics, save_lyrics
 
 logger = logging.getLogger(__name__)
 
 
-def download(
-    video_id: str,
-    output_dir: Path,
-    audio_format: str = "opus",
-    fetch_lyrics: bool = True,
-) -> Path:
-    """
-    Download a track from YouTube Music.
-
-    Args:
-        video_id: YouTube video ID
-        output_dir: Directory to save the downloaded file
-        audio_format: Audio format (opus, mp3, flac)
-        fetch_lyrics: Whether to fetch and save lyrics
-
-    Returns:
-        Path to the downloaded audio file
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Configure yt-dlp options
-    ydl_opts = {
+def _get_ydl_opts(output_dir: Path, audio_format: str, filename_template: str) -> dict:
+    """Get common yt-dlp options."""
+    return {
         "format": "bestaudio/best",
-        "outtmpl": str(output_dir / "%(title)s.%(ext)s"),
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": audio_format,
-                "preferredquality": "0",  # Best quality
-            },
-            {
-                "key": "FFmpegMetadata",
-                "add_metadata": True,
-            },
-            {
-                "key": "EmbedThumbnail",
-            },
-        ],
-        "writethumbnail": True,
-        "quiet": True,
-        "no_warnings": True,
-    }
-
-    url = f"https://music.youtube.com/watch?v={video_id}"
-
-    # Extract info first to get metadata
-    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
-        info = ydl.extract_info(url, download=False)
-
-    title = info.get("title", "Unknown")
-    artist = info.get("artist") or info.get("uploader", "Unknown")
-    duration = info.get("duration", 0)
-
-    logger.info("Downloading: %s - %s", artist, title)
-
-    # Download the track
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-
-    # Find the downloaded file
-    audio_path = _find_downloaded_file(output_dir, title, audio_format)
-
-    if audio_path and fetch_lyrics:
-        lyrics = get_lyrics(title, artist, duration)
-        if lyrics:
-            save_lyrics(lyrics, audio_path)
-
-    return audio_path
-
-
-def download_url(
-    url: str,
-    output_dir: Path,
-    audio_format: str = "opus",
-    fetch_lyrics: bool = True,
-) -> Path:
-    """
-    Download a track from a YouTube/YouTube Music URL.
-
-    Args:
-        url: YouTube or YouTube Music URL
-        output_dir: Directory to save the downloaded file
-        audio_format: Audio format (opus, mp3, flac)
-        fetch_lyrics: Whether to fetch and save lyrics
-
-    Returns:
-        Path to the downloaded audio file
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": str(output_dir / "%(title)s.%(ext)s"),
+        "outtmpl": str(output_dir / f"{filename_template}.%(ext)s"),
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -122,7 +35,57 @@ def download_url(
         "no_warnings": True,
     }
 
-    # Extract info first
+
+def _compute_filename(info: dict, filename_template: str) -> str:
+    """Compute the expected filename from metadata using yt-dlp's template."""
+    # Use yt-dlp's template rendering
+    with yt_dlp.YoutubeDL({"outtmpl": filename_template}) as ydl:
+        filename = ydl.prepare_filename(info)
+    return yt_dlp.utils.sanitize_filename(filename)
+
+
+def _file_exists(output_dir: Path, info: dict, audio_format: str, filename_template: str) -> Path | None:
+    """Check if a file with the expected name already exists."""
+    expected_name = _compute_filename(info, filename_template)
+
+    for ext in [audio_format, "opus", "mp3", "m4a", "flac"]:
+        # Check exact match
+        exact_path = output_dir / f"{expected_name}.{ext}"
+        if exact_path.exists():
+            return exact_path
+
+        # Check with glob for partial matches (handles long titles)
+        matches = list(output_dir.glob(f"{expected_name[:50]}*.{ext}"))
+        if matches:
+            return matches[0]
+
+    return None
+
+
+def download(
+    video_id: str,
+    output_dir: Path,
+    audio_format: str = "opus",
+    filename_template: str = DEFAULT_FILENAME_TEMPLATE,
+    fetch_lyrics: bool = True,
+) -> Path:
+    """
+    Download a track from YouTube Music.
+
+    Args:
+        video_id: YouTube video ID
+        output_dir: Directory to save the downloaded file
+        audio_format: Audio format (opus, mp3, flac)
+        filename_template: yt-dlp output template for filename
+        fetch_lyrics: Whether to fetch and save lyrics
+
+    Returns:
+        Path to the downloaded audio file
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    url = f"https://music.youtube.com/watch?v={video_id}"
+
+    # Extract info first to get metadata
     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
         info = ydl.extract_info(url, download=False)
 
@@ -130,13 +93,21 @@ def download_url(
     artist = info.get("artist") or info.get("uploader", "Unknown")
     duration = info.get("duration", 0)
 
+    # Check if already downloaded
+    existing = _file_exists(output_dir, info, audio_format, filename_template)
+    if existing:
+        logger.info("Skipping (exists): %s - %s", artist, title)
+        return existing
+
     logger.info("Downloading: %s - %s", artist, title)
 
-    # Download
+    # Download the track
+    ydl_opts = _get_ydl_opts(output_dir, audio_format, filename_template)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-    audio_path = _find_downloaded_file(output_dir, title, audio_format)
+    # Find the downloaded file
+    audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template)
 
     if audio_path and fetch_lyrics:
         lyrics = get_lyrics(title, artist, duration)
@@ -146,11 +117,145 @@ def download_url(
     return audio_path
 
 
-def _find_downloaded_file(output_dir: Path, title: str, audio_format: str) -> Path | None:
+def download_url(
+    url: str,
+    output_dir: Path,
+    audio_format: str = "opus",
+    filename_template: str = DEFAULT_FILENAME_TEMPLATE,
+    fetch_lyrics: bool = True,
+) -> Path | list[Path]:
+    """
+    Download a track or playlist from a YouTube/YouTube Music URL.
+
+    Args:
+        url: YouTube or YouTube Music URL (single track or playlist)
+        output_dir: Directory to save the downloaded file(s)
+        audio_format: Audio format (opus, mp3, flac)
+        filename_template: yt-dlp output template for filename
+        fetch_lyrics: Whether to fetch and save lyrics
+
+    Returns:
+        Path to downloaded file, or list of Paths for playlists
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Extract info first to check if it's a playlist
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+        info = ydl.extract_info(url, download=False)
+
+    # Check if this is a playlist
+    if info.get("_type") == "playlist" or "entries" in info:
+        return _download_playlist(info, output_dir, audio_format, filename_template, fetch_lyrics)
+
+    # Single track
+    return _download_single(url, info, output_dir, audio_format, filename_template, fetch_lyrics)
+
+
+def _download_single(
+    url: str,
+    info: dict,
+    output_dir: Path,
+    audio_format: str,
+    filename_template: str,
+    fetch_lyrics: bool,
+) -> Path:
+    """Download a single track."""
+    title = info.get("title", "Unknown")
+    artist = info.get("artist") or info.get("uploader", "Unknown")
+    duration = info.get("duration", 0)
+
+    # Check if already downloaded
+    existing = _file_exists(output_dir, info, audio_format, filename_template)
+    if existing:
+        logger.info("Skipping (exists): %s - %s", artist, title)
+        return existing
+
+    logger.info("Downloading: %s - %s", artist, title)
+
+    ydl_opts = _get_ydl_opts(output_dir, audio_format, filename_template)
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+
+    audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template)
+
+    if audio_path and fetch_lyrics:
+        lyrics = get_lyrics(title, artist, duration)
+        if lyrics:
+            save_lyrics(lyrics, audio_path)
+
+    return audio_path
+
+
+def _download_playlist(
+    info: dict,
+    output_dir: Path,
+    audio_format: str,
+    filename_template: str,
+    fetch_lyrics: bool,
+) -> list[Path]:
+    """Download all tracks from a playlist."""
+    entries = info.get("entries", [])
+    playlist_title = info.get("title", "Unknown Playlist")
+
+    logger.info("Downloading playlist: %s (%d tracks)", playlist_title, len(entries))
+
+    downloaded = []
+    skipped = 0
+    ydl_opts = _get_ydl_opts(output_dir, audio_format, filename_template)
+
+    for i, entry in enumerate(entries, 1):
+        if entry is None:
+            continue
+
+        video_id = entry.get("id") or entry.get("url", "").split("=")[-1]
+        title = entry.get("title", "Unknown")
+        artist = entry.get("artist") or entry.get("uploader", "Unknown")
+        duration = entry.get("duration", 0)
+
+        # Check if already downloaded
+        existing = _file_exists(output_dir, entry, audio_format, filename_template)
+        if existing:
+            logger.info("[%d/%d] Skipping (exists): %s - %s", i, len(entries), artist, title)
+            downloaded.append(existing)
+            skipped += 1
+            continue
+
+        logger.info("[%d/%d] Downloading: %s - %s", i, len(entries), artist, title)
+
+        try:
+            url = f"https://music.youtube.com/watch?v={video_id}"
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+
+            audio_path = _find_downloaded_file(output_dir, entry, audio_format, filename_template)
+
+            if audio_path:
+                downloaded.append(audio_path)
+                if fetch_lyrics:
+                    lyrics = get_lyrics(title, artist, duration)
+                    if lyrics:
+                        save_lyrics(lyrics, audio_path)
+
+        except Exception as e:
+            logger.warning("Failed to download %s: %s", title, e)
+
+    new_downloads = len(downloaded) - skipped
+    logger.info("Downloaded %d new tracks (%d skipped)", new_downloads, skipped)
+    return downloaded
+
+
+def _find_downloaded_file(output_dir: Path, info: dict, audio_format: str, filename_template: str) -> Path | None:
     """Find the downloaded audio file in the output directory."""
-    # yt-dlp sanitizes filenames, so we search for matching files
+    expected_name = _compute_filename(info, filename_template)
+
     for ext in [audio_format, "opus", "m4a", "webm"]:
-        matches = list(output_dir.glob(f"*{title}*.{ext}"))
+        # Check exact match first
+        exact_path = output_dir / f"{expected_name}.{ext}"
+        if exact_path.exists():
+            return exact_path
+
+        # Check with glob for partial matches
+        matches = list(output_dir.glob(f"{expected_name[:50]}*.{ext}"))
         if matches:
             return matches[0]
 
