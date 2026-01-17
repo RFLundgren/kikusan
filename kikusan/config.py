@@ -16,6 +16,8 @@ class Config:
     audio_format: str
     filename_template: str
     web_port: int
+    spotify_client_id: str | None
+    spotify_client_secret: str | None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -25,7 +27,14 @@ class Config:
             audio_format=os.getenv("KIKUSAN_AUDIO_FORMAT", "opus"),
             filename_template=os.getenv("KIKUSAN_FILENAME_TEMPLATE", DEFAULT_FILENAME_TEMPLATE),
             web_port=int(os.getenv("KIKUSAN_WEB_PORT", "8000")),
+            spotify_client_id=os.getenv("SPOTIFY_CLIENT_ID"),
+            spotify_client_secret=os.getenv("SPOTIFY_CLIENT_SECRET"),
         )
+
+    @property
+    def spotify_configured(self) -> bool:
+        """Check if Spotify credentials are configured."""
+        return bool(self.spotify_client_id and self.spotify_client_secret)
 
 
 def get_config() -> Config:

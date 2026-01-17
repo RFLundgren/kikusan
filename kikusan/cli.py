@@ -48,7 +48,7 @@ main.add_command(search_cmd, name="search")
 
 @main.command()
 @click.argument("video_id", required=False)
-@click.option("--url", "-u", help="YouTube or YouTube Music URL (supports playlists)")
+@click.option("--url", "-u", help="YouTube, YouTube Music, or Spotify URL")
 @click.option("--query", "-q", help="Search query (downloads first match)")
 @click.option("--output", "-o", type=click.Path(), help="Output directory")
 @click.option(
@@ -86,6 +86,8 @@ def download_cmd(
 
       kikusan download --url "https://music.youtube.com/playlist?list=..."
 
+      kikusan download --url "https://open.spotify.com/playlist/..."
+
       kikusan download --query "Bohemian Rhapsody Queen"
     """
     if not video_id and not url and not query:
@@ -117,22 +119,33 @@ def download_cmd(
                 click.echo(f"Downloaded: {audio_path}")
             return
 
-        # Download from URL (single track or playlist)
+        # Handle URL (YouTube, YouTube Music, or Spotify)
         if url:
-            result = download_url(
-                url=url,
-                output_dir=output_dir,
-                audio_format=fmt,
-                filename_template=template,
-                fetch_lyrics=not no_lyrics,
-            )
+            from kikusan.spotify import is_spotify_url
 
-            if isinstance(result, list):
-                click.echo(f"Downloaded {len(result)} tracks to {output_dir}")
-            elif result:
-                click.echo(f"Downloaded: {result}")
+            if is_spotify_url(url):
+                _download_spotify_url(
+                    url=url,
+                    output_dir=output_dir,
+                    audio_format=fmt,
+                    filename_template=template,
+                    fetch_lyrics=not no_lyrics,
+                )
             else:
-                click.echo("Download completed but could not locate file.")
+                result = download_url(
+                    url=url,
+                    output_dir=output_dir,
+                    audio_format=fmt,
+                    filename_template=template,
+                    fetch_lyrics=not no_lyrics,
+                )
+
+                if isinstance(result, list):
+                    click.echo(f"Downloaded {len(result)} tracks to {output_dir}")
+                elif result:
+                    click.echo(f"Downloaded: {result}")
+                else:
+                    click.echo("Download completed but could not locate file.")
             return
 
         # Download by video ID
@@ -151,6 +164,63 @@ def download_cmd(
 
     except Exception as e:
         raise click.ClickException(str(e))
+
+
+def _download_spotify_url(
+    url: str,
+    output_dir: Path,
+    audio_format: str,
+    filename_template: str,
+    fetch_lyrics: bool,
+) -> None:
+    """Download tracks from a Spotify playlist/album by searching YouTube Music."""
+    from kikusan.spotify import get_tracks_from_url
+
+    spotify_tracks = get_tracks_from_url(url)
+
+    if not spotify_tracks:
+        click.echo("No tracks found in Spotify URL.")
+        return
+
+    click.echo(f"Found {len(spotify_tracks)} tracks in Spotify playlist/album")
+
+    downloaded = 0
+    skipped = 0
+    failed = 0
+
+    for i, sp_track in enumerate(spotify_tracks, 1):
+        click.echo(f"[{i}/{len(spotify_tracks)}] Searching: {sp_track.artist} - {sp_track.name}")
+
+        # Search YouTube Music for this track
+        results = search(sp_track.search_query, limit=1)
+
+        if not results:
+            click.echo(f"  Not found on YouTube Music, skipping")
+            failed += 1
+            continue
+
+        yt_track = results[0]
+        click.echo(f"  Found: {yt_track.title} - {yt_track.artist}")
+
+        try:
+            audio_path = download(
+                video_id=yt_track.video_id,
+                output_dir=output_dir,
+                audio_format=audio_format,
+                filename_template=filename_template,
+                fetch_lyrics=fetch_lyrics,
+            )
+
+            if audio_path and "Skipping" not in str(audio_path):
+                downloaded += 1
+            else:
+                skipped += 1
+
+        except Exception as e:
+            click.echo(f"  Failed: {e}")
+            failed += 1
+
+    click.echo(f"\nCompleted: {downloaded} downloaded, {skipped} skipped, {failed} failed")
 
 
 main.add_command(download_cmd, name="download")

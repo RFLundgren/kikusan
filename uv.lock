@@ -372,6 +372,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "httpx" },
     { name = "mutagen" },
+    { name = "spotipy" },
     { name = "yt-dlp" },
     { name = "ytmusicapi" },
 ]
@@ -382,6 +383,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "mutagen", specifier = ">=1.47.0" },
+    { name = "spotipy", specifier = ">=2.24.0" },
     { name = "yt-dlp", specifier = ">=2025.12.8" },
     { name = "ytmusicapi", specifier = ">=1.8.0" },
 ]
@@ -671,6 +673,15 @@ wheels = [
 ]
 
 [[package]]
+name = "redis"
+version = "7.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/c8/983d5c6579a411d8a99bc5823cc5712768859b5ce2c8afe1a65b37832c81/redis-7.1.0.tar.gz", hash = "sha256:b1cc3cfa5a2cb9c2ab3ba700864fb0ad75617b41f01352ce5779dabf6d5f9c3c", size = 4796669, upload-time = "2025-11-19T15:54:39.961Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/f0/8956f8a86b20d7bb9d6ac0187cf4cd54d8065bc9a1a09eb8011d4d326596/redis-7.1.0-py3-none-any.whl", hash = "sha256:23c52b208f92b56103e17c5d06bdc1a6c2c0b3106583985a76a18f83b265de2b", size = 354159, upload-time = "2025-11-19T15:54:38.064Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.32.5"
 source = { registry = "https://pypi.org/simple" }
@@ -800,6 +811,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/58/15/8b3609fd3830ef7b27b655beb4b4e9c62313a4e8da8c676e142cc210d58e/shellingham-1.5.4.tar.gz", hash = "sha256:8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de", size = 10310, upload-time = "2023-10-24T04:13:40.426Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl", hash = "sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686", size = 9755, upload-time = "2023-10-24T04:13:38.866Z" },
+]
+
+[[package]]
+name = "spotipy"
+version = "2.25.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "redis" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5c/25/abb658f5a1f8c3eb556b737964ec4c27a264939608e135d80229c5a17241/spotipy-2.25.2.tar.gz", hash = "sha256:5ed45c044156ca5518997e2502b1f2c1e7336407cb1fb8fe112d144b4d5282c8", size = 44933, upload-time = "2025-11-26T20:22:58.452Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/71/869c1ff4e7a40f99007d731327e9d5e2910b406128290c4d8942e579072d/spotipy-2.25.2-py3-none-any.whl", hash = "sha256:694bc9734d94171716257bf18eea9f1cb2ff8c581e59c74464137433830cf890", size = 31790, upload-time = "2025-11-26T20:22:57.087Z" },
 ]
 
 [[package]]
