@@ -1,0 +1,12 @@
+services:
+  kikusan:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./downloads:/downloads
+    environment:
+      - KIKUSAN_DOWNLOAD_DIR=/downloads
+      - KIKUSAN_AUDIO_FORMAT=opus
+      - KIKUSAN_WEB_PORT=8000
+    restart: unless-stopped

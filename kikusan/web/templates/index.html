@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kikusan</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Kikusan</h1>
+            <p>Search and download music from YouTube Music</p>
+        </header>
+
+        <form id="search-form" class="search-form">
+            <input
+                type="text"
+                id="search-input"
+                name="q"
+                placeholder="Search for music..."
+                autocomplete="off"
+                required
+            >
+            <button type="submit">Search</button>
+        </form>
+
+        <div id="status" class="status"></div>
+
+        <div id="results" class="results"></div>
+    </div>
+
+    <script>
+        const searchForm = document.getElementById('search-form');
+        const searchInput = document.getElementById('search-input');
+        const resultsDiv = document.getElementById('results');
+        const statusDiv = document.getElementById('status');
+
+        function showStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + (isError ? 'error' : 'info');
+            statusDiv.style.display = message ? 'block' : 'none';
+        }
+
+        searchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            showStatus('Searching...');
+            resultsDiv.innerHTML = '';
+
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.results.length === 0) {
+                    showStatus('No results found.');
+                    return;
+                }
+
+                showStatus('');
+                renderResults(data.results);
+            } catch (error) {
+                showStatus('Search failed: ' + error.message, true);
+            }
+        });
+
+        function renderResults(tracks) {
+            resultsDiv.innerHTML = tracks.map(track => `
+                <div class="track">
+                    <img
+                        class="track-cover"
+                        src="${track.thumbnail_url || ''}"
+                        alt=""
+                        loading="lazy"
+                    >
+                    <div class="track-info">
+                        <div class="track-title">${escapeHtml(track.title)}</div>
+                        <div class="track-artist">${escapeHtml(track.artist)}${track.album ? ' - ' + escapeHtml(track.album) : ''}</div>
+                        <div class="track-duration">${track.duration}</div>
+                    </div>
+                    <button
+                        class="download-btn"
+                        data-video-id="${track.video_id}"
+                        data-title="${escapeHtml(track.title)}"
+                        data-artist="${escapeHtml(track.artist)}"
+                    >
+                        Download
+                    </button>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            document.querySelectorAll('.download-btn').forEach(btn => {
+                btn.addEventListener('click', handleDownload);
+            });
+        }
+
+        async function handleDownload(e) {
+            const btn = e.target;
+            const videoId = btn.dataset.videoId;
+            const title = btn.dataset.title;
+            const artist = btn.dataset.artist;
+
+            btn.disabled = true;
+            btn.textContent = 'Downloading...';
+            showStatus(`Downloading: ${title}...`);
+
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_id: videoId, title, artist })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    btn.textContent = 'Done!';
+                    showStatus(data.message);
+                } else {
+                    btn.textContent = 'Failed';
+                    showStatus(data.message, true);
+                }
+            } catch (error) {
+                btn.textContent = 'Error';
+                showStatus('Download failed: ' + error.message, true);
+            }
+
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = 'Download';
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

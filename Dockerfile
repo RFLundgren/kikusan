@@ -1,0 +1,29 @@
+FROM python:3.12-slim
+
+# Install ffmpeg for audio processing
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY kikusan/ ./kikusan/
+
+# Install dependencies
+RUN uv sync --frozen
+
+# Create downloads directory
+RUN mkdir -p /downloads
+
+ENV KIKUSAN_DOWNLOAD_DIR=/downloads
+ENV KIKUSAN_WEB_PORT=8000
+
+EXPOSE 8000
+
+# Run the web server
+CMD ["uv", "run", "kikusan", "web", "--host", "0.0.0.0"]

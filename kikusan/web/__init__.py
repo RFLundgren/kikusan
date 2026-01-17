@@ -1,0 +1,1 @@
+"""Kikusan web interface."""
