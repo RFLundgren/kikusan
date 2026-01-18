@@ -1,0 +1,151 @@
+"""APScheduler management for cron jobs."""
+
+import logging
+import signal
+import sys
+from pathlib import Path
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+from kikusan.config import get_config
+from kikusan.cron.config import CronConfig, load_config
+from kikusan.cron.sync import sync_playlist
+
+logger = logging.getLogger(__name__)
+
+
+class CronScheduler:
+    """Manages cron-based playlist synchronization."""
+
+    def __init__(self, config_path: Path, download_dir: Path | None = None):
+        """
+        Initialize the cron scheduler.
+
+        Args:
+            config_path: Path to cron.yaml configuration
+            download_dir: Optional override for download directory
+        """
+        self.config_path = config_path
+        self.cron_config: CronConfig | None = None
+        self.scheduler: BackgroundScheduler | None = None
+        self.download_dir = download_dir
+
+        # Load main config for defaults
+        main_config = get_config()
+        if not self.download_dir:
+            self.download_dir = main_config.download_dir
+
+        self.audio_format = main_config.audio_format
+        self.filename_template = main_config.filename_template
+
+    def load_configuration(self) -> None:
+        """Load and validate cron configuration."""
+        logger.info("Loading configuration from: %s", self.config_path)
+        self.cron_config = load_config(self.config_path)
+
+    def start(self) -> None:
+        """Start the scheduler."""
+        if not self.cron_config:
+            self.load_configuration()
+
+        logger.info("Starting cron scheduler")
+
+        self.scheduler = BackgroundScheduler()
+
+        # Schedule each playlist
+        for playlist_name, playlist_config in self.cron_config.playlists.items():
+            self._schedule_playlist(playlist_config)
+
+        self.scheduler.start()
+        logger.info("Scheduler started successfully")
+
+    def _schedule_playlist(self, playlist_config) -> None:
+        """
+        Schedule a playlist for synchronization.
+
+        Args:
+            playlist_config: Playlist configuration
+        """
+        trigger = CronTrigger.from_crontab(playlist_config.schedule)
+
+        self.scheduler.add_job(
+            func=self._sync_job,
+            trigger=trigger,
+            args=[playlist_config],
+            id=playlist_config.name,
+            name=f"Sync {playlist_config.name}",
+            replace_existing=True,
+        )
+
+        logger.info(
+            "Scheduled playlist '%s' with cron: %s",
+            playlist_config.name,
+            playlist_config.schedule,
+        )
+
+    def _sync_job(self, playlist_config) -> None:
+        """
+        Job function to sync a playlist.
+
+        This is called by APScheduler on schedule.
+
+        Args:
+            playlist_config: Playlist configuration
+        """
+        try:
+            sync_playlist(
+                playlist_config=playlist_config,
+                download_dir=self.download_dir,
+                audio_format=self.audio_format,
+                filename_template=self.filename_template,
+            )
+        except Exception as e:
+            logger.error("Sync job failed for %s: %s", playlist_config.name, e)
+
+    def sync_all_once(self) -> None:
+        """Sync all playlists once immediately."""
+        if not self.cron_config:
+            self.load_configuration()
+
+        logger.info("Syncing all playlists once")
+
+        for playlist_config in self.cron_config.playlists.values():
+            self._sync_job(playlist_config)
+
+        logger.info("All playlists synced")
+
+    def stop(self) -> None:
+        """Stop the scheduler gracefully."""
+        if self.scheduler:
+            logger.info("Stopping scheduler...")
+            self.scheduler.shutdown(wait=True)
+            logger.info("Scheduler stopped")
+
+    def run_forever(self) -> None:
+        """
+        Run the scheduler indefinitely with signal handling.
+
+        Blocks until SIGTERM or SIGINT is received.
+        """
+        # Setup signal handlers for graceful shutdown
+        def handle_shutdown(signum, frame):
+            logger.info("Received shutdown signal (%s), stopping...", signum)
+            self.stop()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, handle_shutdown)
+        signal.signal(signal.SIGINT, handle_shutdown)
+
+        # Start scheduler
+        self.start()
+
+        logger.info("Cron scheduler running. Press Ctrl+C to stop.")
+
+        # Keep the main thread alive
+        try:
+            while True:
+                # Sleep indefinitely, signals will wake us up
+                signal.pause()
+        except (KeyboardInterrupt, SystemExit):
+            self.stop()

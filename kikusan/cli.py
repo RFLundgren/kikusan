@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 from kikusan.config import get_config
+from kikusan.cron.cli import cron
 from kikusan.download import download, download_url
 from kikusan.search import search
 
@@ -67,6 +68,12 @@ main.add_command(search_cmd, name="search")
     help="Filename template (default: '%(artist,uploader)s - %(title)s')",
 )
 @click.option("--no-lyrics", is_flag=True, help="Skip fetching lyrics")
+@click.option(
+    "--add-to-playlist",
+    "-p",
+    "playlist_name",
+    help="Add downloaded track(s) to M3U playlist",
+)
 def download_cmd(
     video_id: str | None,
     url: str | None,
@@ -75,6 +82,7 @@ def download_cmd(
     audio_format: str | None,
     filename_template: str | None,
     no_lyrics: bool,
+    playlist_name: str | None,
 ):
     """Download a track by video ID, URL, or search query.
 
@@ -117,6 +125,11 @@ def download_cmd(
             )
             if audio_path:
                 click.echo(f"Downloaded: {audio_path}")
+                if playlist_name:
+                    from kikusan.playlist import add_to_m3u
+
+                    add_to_m3u([audio_path], playlist_name, output_dir)
+                    click.echo(f"Added to playlist: {playlist_name}.m3u")
             return
 
         # Handle URL (YouTube, YouTube Music, or Spotify)
@@ -130,6 +143,7 @@ def download_cmd(
                     audio_format=fmt,
                     filename_template=template,
                     fetch_lyrics=not no_lyrics,
+                    playlist_name=playlist_name,
                 )
             else:
                 result = download_url(
@@ -142,8 +156,18 @@ def download_cmd(
 
                 if isinstance(result, list):
                     click.echo(f"Downloaded {len(result)} tracks to {output_dir}")
+                    if playlist_name and result:
+                        from kikusan.playlist import add_to_m3u
+
+                        add_to_m3u(result, playlist_name, output_dir)
+                        click.echo(f"Added {len(result)} track(s) to playlist: {playlist_name}.m3u")
                 elif result:
                     click.echo(f"Downloaded: {result}")
+                    if playlist_name:
+                        from kikusan.playlist import add_to_m3u
+
+                        add_to_m3u([result], playlist_name, output_dir)
+                        click.echo(f"Added to playlist: {playlist_name}.m3u")
                 else:
                     click.echo("Download completed but could not locate file.")
             return
@@ -159,6 +183,11 @@ def download_cmd(
 
         if audio_path:
             click.echo(f"Downloaded: {audio_path}")
+            if playlist_name:
+                from kikusan.playlist import add_to_m3u
+
+                add_to_m3u([audio_path], playlist_name, output_dir)
+                click.echo(f"Added to playlist: {playlist_name}.m3u")
         else:
             click.echo("Download completed but could not locate file.")
 
@@ -172,6 +201,7 @@ def _download_spotify_url(
     audio_format: str,
     filename_template: str,
     fetch_lyrics: bool,
+    playlist_name: str | None = None,
 ) -> None:
     """Download tracks from a Spotify playlist/album by searching YouTube Music."""
     from kikusan.spotify import get_tracks_from_url
@@ -187,6 +217,7 @@ def _download_spotify_url(
     downloaded = 0
     skipped = 0
     failed = 0
+    downloaded_paths = []
 
     for i, sp_track in enumerate(spotify_tracks, 1):
         click.echo(f"[{i}/{len(spotify_tracks)}] Searching: {sp_track.artist} - {sp_track.name}")
@@ -211,10 +242,12 @@ def _download_spotify_url(
                 fetch_lyrics=fetch_lyrics,
             )
 
-            if audio_path and "Skipping" not in str(audio_path):
-                downloaded += 1
-            else:
-                skipped += 1
+            if audio_path:
+                downloaded_paths.append(audio_path)
+                if "Skipping" not in str(audio_path):
+                    downloaded += 1
+                else:
+                    skipped += 1
 
         except Exception as e:
             click.echo(f"  Failed: {e}")
@@ -222,8 +255,18 @@ def _download_spotify_url(
 
     click.echo(f"\nCompleted: {downloaded} downloaded, {skipped} skipped, {failed} failed")
 
+    # Add all downloaded tracks to playlist
+    if playlist_name and downloaded_paths:
+        from kikusan.playlist import add_to_m3u
+
+        add_to_m3u(downloaded_paths, playlist_name, output_dir)
+        click.echo(f"Added {len(downloaded_paths)} track(s) to playlist: {playlist_name}.m3u")
+
 
 main.add_command(download_cmd, name="download")
+
+
+main.add_command(cron, name="cron")
 
 
 @main.command()

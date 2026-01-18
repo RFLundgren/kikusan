@@ -1,0 +1,77 @@
+# Docker Compose configuration for Kikusan Cron
+#
+# This docker-compose file runs the Kikusan cron service for automatic
+# playlist synchronization based on schedules defined in cron.yaml.
+
+services:
+  # Kikusan cron service - monitors and syncs playlists
+  kikusan-cron:
+    build: .
+    container_name: kikusan-cron
+    command: ["uv", "run", "kikusan", "cron", "--config", "/config/cron.yaml"]
+
+    volumes:
+      # Mount downloads directory (contains audio files and state)
+      - ./downloads:/downloads
+
+      # Mount cron configuration file (read-only)
+      - ./cron.yaml:/config/cron.yaml:ro
+
+    environment:
+      # Download directory inside container
+      - KIKUSAN_DOWNLOAD_DIR=/downloads
+
+      # Audio format (opus, mp3, or flac)
+      - KIKUSAN_AUDIO_FORMAT=opus
+
+      # Spotify credentials (required for Spotify playlists)
+      # Create an app at https://developer.spotify.com/dashboard
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+
+      # Optional: Filename template
+      # - KIKUSAN_FILENAME_TEMPLATE=%(artist,uploader)s - %(title)s
+
+    restart: unless-stopped
+
+    # Optional: Health check
+    # healthcheck:
+    #   test: ["CMD", "test", "-d", "/downloads/.kikusan/state"]
+    #   interval: 5m
+    #   timeout: 10s
+    #   retries: 3
+
+  # Optional: Run web UI alongside cron service
+  # Uncomment the section below to enable the web interface
+
+  # kikusan-web:
+  #   build: .
+  #   container_name: kikusan-web
+  #   command: ["uv", "run", "kikusan", "web", "--host", "0.0.0.0", "--port", "8000"]
+  #
+  #   ports:
+  #     - "8000:8000"
+  #
+  #   volumes:
+  #     - ./downloads:/downloads
+  #
+  #   environment:
+  #     - KIKUSAN_DOWNLOAD_DIR=/downloads
+  #     - KIKUSAN_AUDIO_FORMAT=opus
+  #     - KIKUSAN_WEB_PORT=8000
+  #
+  #   restart: unless-stopped
+
+# Usage:
+#   1. Create cron.yaml with your playlist configurations
+#   2. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in .env file
+#   3. Run: docker-compose -f docker-compose.cron.yml up -d
+#   4. View logs: docker-compose -f docker-compose.cron.yml logs -f kikusan-cron
+#   5. Stop: docker-compose -f docker-compose.cron.yml down
+#
+# Files structure:
+#   ./downloads/                    - Downloaded audio files
+#   ./downloads/.kikusan/state/     - State files (playlist tracking)
+#   ./downloads/{playlist}.m3u      - Generated M3U playlists
+#   ./cron.yaml                     - Cron configuration
+#   ./.env                          - Environment variables (optional)

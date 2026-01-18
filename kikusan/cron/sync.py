@@ -1,0 +1,374 @@
+"""Playlist synchronization logic."""
+
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+import yt_dlp
+
+from kikusan.cron.config import PlaylistConfig
+from kikusan.cron.state import PlaylistState, TrackState, get_state_dir, load_state, save_state
+from kikusan.download import download
+from kikusan.playlist import add_to_m3u
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SyncResult:
+    """Result of a playlist sync operation."""
+
+    downloaded: int
+    skipped: int
+    deleted: int
+    failed: int
+
+
+def sync_playlist(
+    playlist_config: PlaylistConfig,
+    download_dir: Path,
+    audio_format: str,
+    filename_template: str,
+) -> SyncResult:
+    """
+    Synchronize a playlist with its configured source.
+
+    Args:
+        playlist_config: Playlist configuration
+        download_dir: Download directory
+        audio_format: Audio format (opus, mp3, flac)
+        filename_template: Filename template for downloads
+
+    Returns:
+        SyncResult with counts of operations performed
+    """
+    logger.info("Starting sync for playlist: %s", playlist_config.name)
+
+    state_dir = get_state_dir(download_dir)
+
+    try:
+        # Fetch current tracks from URL
+        current_tracks = fetch_current_tracks(playlist_config.url)
+        if not current_tracks:
+            logger.warning("No tracks found in playlist: %s", playlist_config.name)
+            return SyncResult(downloaded=0, skipped=0, deleted=0, failed=0)
+
+        logger.info("Found %d track(s) in playlist", len(current_tracks))
+
+        # Load existing state
+        state = load_state(state_dir, playlist_config.name)
+        if not state:
+            # Create fresh state
+            state = PlaylistState(
+                playlist_name=playlist_config.name,
+                url=playlist_config.url,
+                last_check=datetime.now().isoformat(),
+                tracks=[],
+            )
+            logger.info("Created fresh state for playlist: %s", playlist_config.name)
+
+        # Compare tracks
+        new_tracks, removed_tracks = compare_tracks(current_tracks, state)
+
+        logger.info(
+            "Changes detected: %d new, %d removed",
+            len(new_tracks),
+            len(removed_tracks),
+        )
+
+        # Download new tracks
+        download_result = download_new_tracks(
+            new_tracks,
+            download_dir,
+            audio_format,
+            filename_template,
+            state,
+        )
+
+        # Remove old tracks if sync=true
+        deleted_count = 0
+        if playlist_config.sync and removed_tracks:
+            deleted_count = remove_old_tracks(removed_tracks, state)
+
+        # Update M3U playlist
+        update_m3u_playlist(playlist_config.name, state, download_dir)
+
+        # Update and save state
+        state.url = playlist_config.url
+        state.last_check = datetime.now().isoformat()
+        save_state(state_dir, state)
+
+        result = SyncResult(
+            downloaded=download_result["downloaded"],
+            skipped=download_result["skipped"],
+            deleted=deleted_count,
+            failed=download_result["failed"],
+        )
+
+        logger.info(
+            "Sync completed for %s: %d downloaded, %d skipped, %d deleted, %d failed",
+            playlist_config.name,
+            result.downloaded,
+            result.skipped,
+            result.deleted,
+            result.failed,
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error("Sync failed for %s: %s", playlist_config.name, e)
+        return SyncResult(downloaded=0, skipped=0, deleted=0, failed=1)
+
+
+def fetch_current_tracks(url: str) -> list[tuple[str, str, str]]:
+    """
+    Fetch current tracks from a playlist URL.
+
+    Handles both YouTube/YouTube Music and Spotify URLs.
+
+    Args:
+        url: Playlist URL
+
+    Returns:
+        List of tuples: (video_id, title, artist)
+    """
+    # Check if Spotify URL
+    from kikusan.spotify import is_spotify_url
+
+    if is_spotify_url(url):
+        return _fetch_spotify_tracks(url)
+    else:
+        return _fetch_youtube_tracks(url)
+
+
+def _fetch_youtube_tracks(url: str) -> list[tuple[str, str, str]]:
+    """Fetch tracks from YouTube/YouTube Music playlist."""
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        # Check if this is a playlist
+        if info.get("_type") != "playlist" and "entries" not in info:
+            # Single video, treat as one-item playlist
+            video_id = info.get("id")
+            title = info.get("title", "Unknown")
+            artist = info.get("artist") or info.get("uploader", "Unknown")
+            return [(video_id, title, artist)]
+
+        # Extract tracks from playlist
+        entries = info.get("entries", [])
+        tracks = []
+        for entry in entries:
+            if not entry:
+                continue
+            video_id = entry.get("id")
+            title = entry.get("title", "Unknown")
+            artist = entry.get("artist") or entry.get("uploader", "Unknown")
+            if video_id:
+                tracks.append((video_id, title, artist))
+
+        return tracks
+
+    except Exception as e:
+        logger.error("Failed to fetch YouTube playlist: %s", e)
+        return []
+
+
+def _fetch_spotify_tracks(url: str) -> list[tuple[str, str, str]]:
+    """
+    Fetch tracks from Spotify playlist and search YouTube Music.
+
+    Returns video IDs from YouTube Music search results.
+    """
+    try:
+        from kikusan.search import search
+        from kikusan.spotify import get_tracks_from_url
+
+        spotify_tracks = get_tracks_from_url(url)
+        if not spotify_tracks:
+            return []
+
+        youtube_tracks = []
+        for sp_track in spotify_tracks:
+            # Search YouTube Music for this track
+            results = search(sp_track.search_query, limit=1)
+            if results:
+                yt_track = results[0]
+                youtube_tracks.append((yt_track.video_id, yt_track.title, yt_track.artist))
+            else:
+                logger.warning(
+                    "Could not find on YouTube Music: %s - %s",
+                    sp_track.artist,
+                    sp_track.name,
+                )
+
+        return youtube_tracks
+
+    except Exception as e:
+        logger.error("Failed to fetch Spotify playlist: %s", e)
+        return []
+
+
+def compare_tracks(
+    current: list[tuple[str, str, str]], state: PlaylistState
+) -> tuple[list[tuple[str, str, str]], list[TrackState]]:
+    """
+    Compare current tracks with state to identify changes.
+
+    Args:
+        current: Current tracks from playlist
+        state: Existing playlist state
+
+    Returns:
+        Tuple of (new_tracks, removed_tracks)
+    """
+    current_ids = {track[0] for track in current}
+    state_ids = {track.video_id for track in state.tracks}
+
+    new_ids = current_ids - state_ids
+    removed_ids = state_ids - current_ids
+
+    new_tracks = [t for t in current if t[0] in new_ids]
+    removed_tracks = [t for t in state.tracks if t.video_id in removed_ids]
+
+    return new_tracks, removed_tracks
+
+
+def download_new_tracks(
+    tracks: list[tuple[str, str, str]],
+    download_dir: Path,
+    audio_format: str,
+    filename_template: str,
+    state: PlaylistState,
+) -> dict:
+    """
+    Download new tracks and update state.
+
+    Args:
+        tracks: List of tuples (video_id, title, artist)
+        download_dir: Download directory
+        audio_format: Audio format
+        filename_template: Filename template
+        state: Playlist state to update
+
+    Returns:
+        Dict with counts: downloaded, skipped, failed
+    """
+    downloaded = 0
+    skipped = 0
+    failed = 0
+
+    for i, (video_id, title, artist) in enumerate(tracks, 1):
+        logger.info("[%d/%d] Downloading: %s - %s", i, len(tracks), artist, title)
+
+        try:
+            audio_path = download(
+                video_id=video_id,
+                output_dir=download_dir,
+                audio_format=audio_format,
+                filename_template=filename_template,
+                fetch_lyrics=True,
+            )
+
+            if audio_path:
+                # Check if it was skipped (already existed)
+                if audio_path in [Path(t.file_path) for t in state.tracks]:
+                    skipped += 1
+                else:
+                    # Add to state
+                    track_state = TrackState(
+                        video_id=video_id,
+                        title=title,
+                        artist=artist,
+                        file_path=str(audio_path),
+                        downloaded_at=datetime.now().isoformat(),
+                    )
+                    state.tracks.append(track_state)
+                    downloaded += 1
+
+        except Exception as e:
+            logger.error("Failed to download %s - %s: %s", artist, title, e)
+            failed += 1
+
+    return {"downloaded": downloaded, "skipped": skipped, "failed": failed}
+
+
+def remove_old_tracks(tracks: list[TrackState], state: PlaylistState) -> int:
+    """
+    Remove tracks that are no longer in the playlist.
+
+    Deletes audio files, .lrc files, and removes from state.
+
+    Args:
+        tracks: Tracks to remove
+        state: Playlist state to update
+
+    Returns:
+        Number of tracks deleted
+    """
+    deleted_count = 0
+
+    for track in tracks:
+        logger.info("Removing: %s - %s", track.artist, track.title)
+
+        file_path = Path(track.file_path)
+
+        # Delete audio file
+        if file_path.exists():
+            try:
+                file_path.unlink()
+                logger.debug("Deleted: %s", file_path)
+                deleted_count += 1
+            except Exception as e:
+                logger.error("Failed to delete %s: %s", file_path, e)
+                continue
+
+        # Delete .lrc file if exists
+        lrc_path = file_path.with_suffix(".lrc")
+        if lrc_path.exists():
+            try:
+                lrc_path.unlink()
+                logger.debug("Deleted lyrics: %s", lrc_path)
+            except Exception as e:
+                logger.warning("Failed to delete lyrics %s: %s", lrc_path, e)
+
+        # Remove from state
+        state.tracks = [t for t in state.tracks if t.video_id != track.video_id]
+
+    return deleted_count
+
+
+def update_m3u_playlist(
+    playlist_name: str, state: PlaylistState, download_dir: Path
+) -> None:
+    """
+    Update M3U playlist file with current tracks.
+
+    Rebuilds the playlist from current state to maintain order.
+
+    Args:
+        playlist_name: Playlist name
+        state: Current playlist state
+        download_dir: Download directory
+    """
+    if not state.tracks:
+        logger.debug("No tracks in state, skipping M3U update")
+        return
+
+    # Get all file paths that actually exist
+    file_paths = []
+    for track in state.tracks:
+        path = Path(track.file_path)
+        if path.exists():
+            file_paths.append(path)
+        else:
+            logger.warning("Track file not found: %s", path)
+
+    if file_paths:
+        try:
+            add_to_m3u(file_paths, playlist_name, download_dir)
+            logger.debug("Updated M3U playlist: %s.m3u", playlist_name)
+        except Exception as e:
+            logger.error("Failed to update M3U playlist: %s", e)

@@ -1,0 +1,49 @@
+# Kikusan Cron Configuration Example
+#
+# This file defines playlists to be monitored and synchronized automatically
+# according to cron schedules.
+
+playlists:
+  # Playlist name - used for state tracking and M3U playlist file
+  favorites:
+    # YouTube, YouTube Music, or Spotify playlist URL
+    url: https://open.spotify.com/playlist/4X7NjgnVWsjOLNmZtUfFUK?si=93678213885d4c05
+
+    # Sync behavior:
+    # - false: Keep local files even if removed from playlist
+    # - true: Delete local files when removed from playlist
+    sync: false
+
+    # Cron schedule expression (standard cron format)
+    # Format: minute hour day month weekday
+    # Examples:
+    #   "5 4 * * *"        - Daily at 04:05
+    #   "0 */2 * * *"      - Every 2 hours
+    #   "0 0 * * 0"        - Weekly on Sunday at midnight
+    #   "*/30 * * * *"     - Every 30 minutes
+    schedule: "5 4 * * *"
+
+  # Another playlist example with sync enabled
+  mixed:
+    url: https://open.spotify.com/playlist/1fA6WesRnRQoQl5Nj4sk7S?si=6acbec5276ed4f13
+
+    # This playlist will delete local files when tracks are removed
+    sync: true
+
+    # Run at minute 23 past every 2nd hour from 0 through 20
+    schedule: "23 0-20/2 * * *"
+
+  # YouTube Music playlist example
+  # workout:
+  #   url: https://music.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf
+  #   sync: false
+  #   schedule: "0 6 * * *"  # Daily at 06:00
+
+# Usage:
+#   kikusan cron                          # Run continuously
+#   kikusan cron --config cron.yaml       # Specify config file
+#   kikusan cron --once                   # Sync all playlists once and exit
+#   kikusan cron --output /custom/path    # Override download directory
+#
+# State files are stored in: {download_dir}/.kikusan/state/
+# M3U playlists are stored in: {download_dir}/{playlist_name}.m3u

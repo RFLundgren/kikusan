@@ -9,8 +9,15 @@
 <body>
     <div class="container">
         <header>
-            <h1>Kikusan</h1>
-            <p>Search and download music from YouTube Music</p>
+            <div>
+                <div>
+                    <h1>Kikusan</h1>
+                    <p>Search and download music from YouTube Music</p>
+                </div>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
         </header>
 
         <form id="search-form" class="search-form">
@@ -31,6 +38,44 @@
     </div>
 
     <script>
+        // Theme management
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.querySelector('.theme-icon');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const theme = savedTheme || (prefersDark.matches ? 'dark' : 'light');
+            setTheme(theme);
+        }
+
+        function setTheme(theme) {
+            if (theme === 'light') {
+                document.body.classList.add('light-theme');
+                themeIcon.textContent = '☀️';
+            } else {
+                document.body.classList.remove('light-theme');
+                themeIcon.textContent = '🌙';
+            }
+            localStorage.setItem('theme', theme);
+        }
+
+        function toggleTheme() {
+            const isLight = document.body.classList.contains('light-theme');
+            setTheme(isLight ? 'dark' : 'light');
+        }
+
+        themeToggle.addEventListener('click', toggleTheme);
+        initTheme();
+
+        // Listen for system preference changes
+        prefersDark.addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+
+        // Search functionality
         const searchForm = document.getElementById('search-form');
         const searchInput = document.getElementById('search-input');
         const resultsDiv = document.getElementById('results');
