@@ -69,6 +69,7 @@ Environment variables:
 | `KIKUSAN_AUDIO_FORMAT` | `opus` | Audio format (opus, mp3, flac) |
 | `KIKUSAN_FILENAME_TEMPLATE` | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format) |
 | `KIKUSAN_WEB_PORT` | `8000` | Web server port |
+| `KIKUSAN_WEB_PLAYLIST` | `None` | M3U playlist name for web downloads (optional) |
 
 ## Requirements
 

@@ -22,6 +22,7 @@ RUN mkdir -p /downloads
 
 ENV KIKUSAN_DOWNLOAD_DIR=/downloads
 ENV KIKUSAN_WEB_PORT=8000
+ENV KIKUSAN_WEB_PLAYLIST=web-downloads
 
 EXPOSE 8000
 

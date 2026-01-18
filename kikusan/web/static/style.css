@@ -192,19 +192,25 @@ header p {
 .track-title {
     font-weight: 600;
     margin-bottom: 0.25rem;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     overflow-wrap: break-word;
+    word-wrap: break-word;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
 }
 
 .track-artist {
     color: var(--text-secondary);
     font-size: 0.9rem;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     overflow-wrap: break-word;
+    word-wrap: break-word;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
 }
 
 .track-duration {
@@ -297,5 +303,16 @@ header p {
 @media (min-width: 1024px) {
     body {
         padding: 2rem;
+    }
+}
+
+/* Desktop - single line for cleaner look */
+@media (min-width: 640px) {
+    .track-title,
+    .track-artist {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        line-clamp: 1;
+        -webkit-line-clamp: 1;
     }
 }

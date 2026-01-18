@@ -18,6 +18,7 @@ class Config:
     web_port: int
     spotify_client_id: str | None
     spotify_client_secret: str | None
+    web_playlist_name: str | None = None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -29,6 +30,7 @@ class Config:
             web_port=int(os.getenv("KIKUSAN_WEB_PORT", "8000")),
             spotify_client_id=os.getenv("SPOTIFY_CLIENT_ID"),
             spotify_client_secret=os.getenv("SPOTIFY_CLIENT_SECRET"),
+            web_playlist_name=os.getenv("KIKUSAN_WEB_PLAYLIST"),
         )
 
     @property

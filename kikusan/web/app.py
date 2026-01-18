@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from kikusan.config import get_config
 from kikusan.download import download
+from kikusan.playlist import add_to_m3u
 from kikusan.search import search
 
 app = FastAPI(title="Kikusan", description="Search and download music from YouTube Music")
@@ -96,6 +97,10 @@ async def api_download(request: DownloadRequest):
             filename_template=config.filename_template,
             fetch_lyrics=True,
         )
+
+        # Add to playlist if configured
+        if audio_path and config.web_playlist_name:
+            add_to_m3u([audio_path], config.web_playlist_name, config.download_dir)
 
         return DownloadResponse(
             success=True,
