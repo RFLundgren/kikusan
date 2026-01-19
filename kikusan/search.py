@@ -18,6 +18,7 @@ class Track:
     album: str | None
     duration_seconds: int
     thumbnail_url: str | None
+    view_count: str | None
 
     @property
     def duration_display(self) -> str:
@@ -62,6 +63,9 @@ def search(query: str, limit: int = 20) -> list[Track]:
         thumbnails = item.get("thumbnails", [])
         thumbnail_url = thumbnails[-1]["url"] if thumbnails else None
 
+        # Extract view count (formatted string like "1.9B", "47M", etc.)
+        view_count = item.get("views")
+
         tracks.append(
             Track(
                 video_id=item["videoId"],
@@ -70,6 +74,7 @@ def search(query: str, limit: int = 20) -> list[Track]:
                 album=album_name,
                 duration_seconds=duration_seconds,
                 thumbnail_url=thumbnail_url,
+                view_count=view_count,
             )
         )
 

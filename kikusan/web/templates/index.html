@@ -124,7 +124,10 @@
                         <div class="track-info">
                             <div class="track-title">${escapeHtml(track.title)}</div>
                             <div class="track-artist">${escapeHtml(track.artist)}${track.album ? ' - ' + escapeHtml(track.album) : ''}</div>
-                            <div class="track-duration">${track.duration}</div>
+                            <div class="track-meta">
+                                <span class="track-duration">${track.duration}</span>
+                                ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ''}
+                            </div>
                         </div>
                     </div>
                     <button

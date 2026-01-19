@@ -218,10 +218,21 @@ header p {
     word-break: break-word;
 }
 
+.track-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+}
+
 .track-duration {
     color: var(--text-tertiary);
-    font-size: 0.85rem;
-    margin-top: 0.25rem;
+}
+
+.track-views {
+    color: var(--text-tertiary);
 }
 
 .download-btn {

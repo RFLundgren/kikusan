@@ -48,6 +48,7 @@ class TrackResponse(BaseModel):
     album: str | None
     duration: str
     thumbnail_url: str | None
+    view_count: str | None
 
 
 class SearchResponse(BaseModel):
@@ -78,6 +79,7 @@ async def api_search(q: str = Query(..., min_length=1, description="Search query
                 album=track.album,
                 duration=track.duration_display,
                 thumbnail_url=track.thumbnail_url,
+                view_count=track.view_count,
             )
             for track in results
         ],
