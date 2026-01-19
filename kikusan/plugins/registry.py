@@ -73,9 +73,11 @@ def discover_plugins() -> None:
     # Register built-in plugins
     try:
         from kikusan.plugins.listenbrainz import ListenbrainzPlugin
+        from kikusan.plugins.reddit import RedditPlugin
         from kikusan.plugins.rss import RSSPlugin
 
         register_plugin(ListenbrainzPlugin)
+        register_plugin(RedditPlugin)
         register_plugin(RSSPlugin)
         logger.debug("Registered built-in plugins")
     except ImportError as e:

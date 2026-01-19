@@ -61,6 +61,41 @@ plugins:
   #     artist_field: creator  # Optional: customize field mappings
   #     title_field: title
 
+  # Reddit r/listentothis - discover new music daily
+  reddit-listentothis:
+    type: reddit
+    sync: false
+    schedule: "0 9 * * *"  # Daily at 9am
+    config:
+      subreddit: listentothis
+      sort: top
+      time_filter: day
+      limit: 25
+      min_score: 100  # Only highly upvoted tracks
+
+  # Reddit r/Music - weekly top posts
+  # reddit-music-weekly:
+  #   type: reddit
+  #   sync: true  # Remove tracks that fall off the list
+  #   schedule: "0 10 * * 1"  # Monday at 10am
+  #   config:
+  #     subreddit: Music
+  #     sort: top
+  #     time_filter: week
+  #     limit: 50
+  #     min_score: 500
+
+  # Reddit r/IndieHeads - hot tracks every 6 hours
+  # reddit-indieheads:
+  #   type: reddit
+  #   sync: false
+  #   schedule: "0 */6 * * *"
+  #   config:
+  #     subreddit: indieheads
+  #     sort: hot
+  #     limit: 20
+  #     min_score: 50
+
 # Usage:
 #   kikusan cron                          # Run continuously
 #   kikusan cron --config cron.yaml       # Specify config file
