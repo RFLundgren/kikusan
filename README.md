@@ -11,6 +11,33 @@ Search and download music from YouTube Music with lyrics.
 - Automatic lyrics fetching from lrclib.net (LRC format)
 - CLI and web interface
 - Docker support
+- **Plugin system** for custom music sources (RSS feeds, listenbrainz, etc.)
+- Scheduled sync with cron support
+
+## Plugin System
+
+Kikusan supports plugins for syncing music from various sources beyond standard playlists:
+
+**Built-in Plugins:**
+- `listenbrainz` - Weekly recommendations from listenbrainz.org
+- `rss` - Generic RSS/Atom feed parser for music podcasts, blogs, etc.
+
+**Usage:**
+
+```bash
+# List available plugins
+kikusan plugins list
+
+# Run a plugin once
+kikusan plugins run listenbrainz --config '{"user": "myuser"}'
+
+# Schedule in cron.yaml
+# See cron.example.yaml for configuration examples
+```
+
+**Creating Third-Party Plugins:**
+
+See [`examples/third-party-plugin/`](examples/third-party-plugin/) for a complete example of creating your own plugin. Plugins are distributed as Python packages and automatically discovered via entry points.
 
 ## Installation
 
