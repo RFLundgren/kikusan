@@ -72,10 +72,12 @@ def discover_plugins() -> None:
 
     # Register built-in plugins
     try:
+        from kikusan.plugins.billboard import BillboardPlugin
         from kikusan.plugins.listenbrainz import ListenbrainzPlugin
         from kikusan.plugins.reddit import RedditPlugin
         from kikusan.plugins.rss import RSSPlugin
 
+        register_plugin(BillboardPlugin)
         register_plugin(ListenbrainzPlugin)
         register_plugin(RedditPlugin)
         register_plugin(RSSPlugin)
