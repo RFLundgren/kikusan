@@ -8,6 +8,7 @@ import click
 from kikusan.config import get_config
 from kikusan.cron.cli import cron
 from kikusan.download import download, download_url
+from kikusan.plugins.cli import plugins
 from kikusan.search import search
 
 logging.basicConfig(
@@ -267,6 +268,9 @@ main.add_command(download_cmd, name="download")
 
 
 main.add_command(cron, name="cron")
+
+
+main.add_command(plugins, name="plugins")
 
 
 @main.command()

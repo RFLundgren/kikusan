@@ -39,11 +39,38 @@ playlists:
   #   sync: false
   #   schedule: "0 6 * * *"  # Daily at 06:00
 
+# Plugin-based syncs (NEW!)
+# Plugins allow fetching music from sources other than playlists
+plugins:
+  # Listenbrainz weekly recommendations
+  listenbrainz-discoveries:
+    type: listenbrainz
+    sync: false
+    schedule: "0 8 * * 1"  # Every Monday at 8am
+    config:
+      user: your_listenbrainz_username
+      recommendation_type: weekly-exploration  # or 'weekly-jams'
+
+  # RSS feed example (music podcast, blog, etc.)
+  # music-podcast:
+  #   type: rss
+  #   sync: true  # Remove tracks that are no longer in the feed
+  #   schedule: "0 */6 * * *"  # Every 6 hours
+  #   config:
+  #     url: https://example.com/music-feed.rss
+  #     artist_field: creator  # Optional: customize field mappings
+  #     title_field: title
+
 # Usage:
 #   kikusan cron                          # Run continuously
 #   kikusan cron --config cron.yaml       # Specify config file
-#   kikusan cron --once                   # Sync all playlists once and exit
+#   kikusan cron --once                   # Sync all playlists and plugins once and exit
 #   kikusan cron --output /custom/path    # Override download directory
 #
-# State files are stored in: {download_dir}/.kikusan/state/
-# M3U playlists are stored in: {download_dir}/{playlist_name}.m3u
+#   kikusan plugins list                  # List available plugins
+#   kikusan plugins run listenbrainz --config '{"user": "myuser"}'
+#
+# State files are stored in:
+#   - Playlists: {download_dir}/.kikusan/state/
+#   - Plugins: {download_dir}/.kikusan/plugin_state/
+# M3U playlists are stored in: {download_dir}/{name}.m3u

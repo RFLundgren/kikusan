@@ -15,10 +15,14 @@ dependencies = [
     "apscheduler>=3.10.4",
     "pyyaml>=6.0.1",
     "croniter>=1.3.0",
+    "beautifulsoup4>=4.12.0",
 ]
 
 [project.scripts]
 kikusan = "kikusan.cli:main"
+
+[project.entry-points."kikusan.plugins"]
+# Third-party plugins can register here
 
 [build-system]
 requires = ["hatchling"]

@@ -53,9 +53,18 @@ class CronScheduler:
 
         self.scheduler = BackgroundScheduler()
 
+        # Discover plugins
+        from kikusan.plugins.registry import discover_plugins
+
+        discover_plugins()
+
         # Schedule each playlist
         for playlist_name, playlist_config in self.cron_config.playlists.items():
             self._schedule_playlist(playlist_config)
+
+        # Schedule each plugin
+        for plugin_name, plugin_config in self.cron_config.plugins.items():
+            self._schedule_plugin(plugin_config)
 
         self.scheduler.start()
         logger.info("Scheduler started successfully")
@@ -103,17 +112,83 @@ class CronScheduler:
         except Exception as e:
             logger.error("Sync job failed for %s: %s", playlist_config.name, e)
 
+    def _schedule_plugin(self, plugin_config) -> None:
+        """
+        Schedule a plugin for synchronization.
+
+        Args:
+            plugin_config: Plugin configuration
+        """
+        trigger = CronTrigger.from_crontab(plugin_config.schedule)
+
+        self.scheduler.add_job(
+            func=self._plugin_sync_job,
+            trigger=trigger,
+            args=[plugin_config],
+            id=f"plugin_{plugin_config.name}",
+            name=f"Plugin sync: {plugin_config.name}",
+            replace_existing=True,
+        )
+
+        logger.info(
+            "Scheduled plugin '%s' (%s) with cron: %s",
+            plugin_config.name,
+            plugin_config.type,
+            plugin_config.schedule,
+        )
+
+    def _plugin_sync_job(self, plugin_config) -> None:
+        """
+        Job function to sync a plugin.
+
+        This is called by APScheduler on schedule.
+
+        Args:
+            plugin_config: Plugin configuration
+        """
+        try:
+            from kikusan.plugins.base import PluginConfig
+            from kikusan.plugins.registry import get_plugin
+            from kikusan.plugins.sync import sync_plugin_instance
+
+            # Get plugin instance
+            plugin_class = get_plugin(plugin_config.type)
+            plugin = plugin_class()
+
+            # Create config
+            cfg = PluginConfig(
+                name=plugin_config.name,
+                download_dir=self.download_dir,
+                audio_format=self.audio_format,
+                filename_template=self.filename_template,
+                config=plugin_config.config,
+            )
+
+            # Run sync
+            sync_plugin_instance(plugin, cfg, sync_mode=plugin_config.sync)
+
+        except Exception as e:
+            logger.error("Plugin sync job failed for %s: %s", plugin_config.name, e)
+
     def sync_all_once(self) -> None:
-        """Sync all playlists once immediately."""
+        """Sync all playlists and plugins once immediately."""
         if not self.cron_config:
             self.load_configuration()
 
-        logger.info("Syncing all playlists once")
+        # Discover plugins
+        from kikusan.plugins.registry import discover_plugins
+
+        discover_plugins()
+
+        logger.info("Syncing all playlists and plugins once")
 
         for playlist_config in self.cron_config.playlists.values():
             self._sync_job(playlist_config)
 
-        logger.info("All playlists synced")
+        for plugin_config in self.cron_config.plugins.values():
+            self._plugin_sync_job(plugin_config)
+
+        logger.info("All playlists and plugins synced")
 
     def stop(self) -> None:
         """Stop the scheduler gracefully."""

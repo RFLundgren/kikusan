@@ -22,10 +22,22 @@ class PlaylistConfig:
 
 
 @dataclass
+class PluginInstanceConfig:
+    """Configuration for a single plugin instance."""
+
+    name: str
+    type: str  # Plugin type name
+    sync: bool
+    schedule: str
+    config: dict  # Plugin-specific config
+
+
+@dataclass
 class CronConfig:
-    """Root configuration for cron playlists."""
+    """Root configuration for cron playlists and plugins."""
 
     playlists: dict[str, PlaylistConfig]
+    plugins: dict[str, PluginInstanceConfig]
 
 
 def load_config(path: Path) -> CronConfig:
@@ -51,59 +63,123 @@ def load_config(path: Path) -> CronConfig:
     except yaml.YAMLError as e:
         raise ValueError(f"Invalid YAML syntax: {e}")
 
-    if not data or "playlists" not in data:
-        raise ValueError("Config must have 'playlists' key")
+    if not data:
+        raise ValueError("Config file is empty")
 
-    playlists_data = data["playlists"]
-    if not isinstance(playlists_data, dict):
-        raise ValueError("'playlists' must be a dictionary")
+    # Check that at least playlists or plugins are defined
+    if "playlists" not in data and "plugins" not in data:
+        raise ValueError("Config must have 'playlists' or 'plugins' key")
 
-    if not playlists_data:
-        raise ValueError("No playlists defined in config")
-
+    # Load playlists (optional, defaults to empty)
     playlists = {}
-    for name, config in playlists_data.items():
-        # Validate playlist name
-        sanitized_name = validate_playlist_name(name)
+    if "playlists" in data:
+        playlists_data = data["playlists"]
+        if not isinstance(playlists_data, dict):
+            raise ValueError("'playlists' must be a dictionary")
 
-        # Validate required fields
-        if not isinstance(config, dict):
-            raise ValueError(f"Playlist '{name}' config must be a dictionary")
+        for name, config in playlists_data.items():
+            # Validate playlist name
+            sanitized_name = validate_playlist_name(name)
 
-        if "url" not in config:
-            raise ValueError(f"Playlist '{name}' missing required field: url")
-        if "sync" not in config:
-            raise ValueError(f"Playlist '{name}' missing required field: sync")
-        if "schedule" not in config:
-            raise ValueError(f"Playlist '{name}' missing required field: schedule")
+            # Validate required fields
+            if not isinstance(config, dict):
+                raise ValueError(f"Playlist '{name}' config must be a dictionary")
 
-        url = config["url"]
-        sync = config["sync"]
-        schedule = config["schedule"]
+            if "url" not in config:
+                raise ValueError(f"Playlist '{name}' missing required field: url")
+            if "sync" not in config:
+                raise ValueError(f"Playlist '{name}' missing required field: sync")
+            if "schedule" not in config:
+                raise ValueError(f"Playlist '{name}' missing required field: schedule")
 
-        # Validate types
-        if not isinstance(url, str):
-            raise ValueError(f"Playlist '{name}' url must be a string")
-        if not isinstance(sync, bool):
-            raise ValueError(f"Playlist '{name}' sync must be a boolean")
-        if not isinstance(schedule, str):
-            raise ValueError(f"Playlist '{name}' schedule must be a string")
+            url = config["url"]
+            sync = config["sync"]
+            schedule = config["schedule"]
 
-        # Validate URL
-        validate_url(url, name)
+            # Validate types
+            if not isinstance(url, str):
+                raise ValueError(f"Playlist '{name}' url must be a string")
+            if not isinstance(sync, bool):
+                raise ValueError(f"Playlist '{name}' sync must be a boolean")
+            if not isinstance(schedule, str):
+                raise ValueError(f"Playlist '{name}' schedule must be a string")
 
-        # Validate cron schedule
-        validate_cron_schedule(schedule, name)
+            # Validate URL
+            validate_url(url, name)
 
-        playlists[sanitized_name] = PlaylistConfig(
-            name=sanitized_name,
-            url=url,
-            sync=sync,
-            schedule=schedule,
-        )
+            # Validate cron schedule
+            validate_cron_schedule(schedule, name)
 
-    logger.info("Loaded configuration for %d playlist(s)", len(playlists))
-    return CronConfig(playlists=playlists)
+            playlists[sanitized_name] = PlaylistConfig(
+                name=sanitized_name,
+                url=url,
+                sync=sync,
+                schedule=schedule,
+            )
+
+    # Load plugins (optional, defaults to empty)
+    plugins = {}
+    if "plugins" in data:
+        plugins_data = data["plugins"]
+        if not isinstance(plugins_data, dict):
+            raise ValueError("'plugins' must be a dictionary")
+
+        for name, config in plugins_data.items():
+            # Validate instance name
+            sanitized_name = validate_playlist_name(name)
+
+            # Validate required fields
+            if not isinstance(config, dict):
+                raise ValueError(f"Plugin '{name}' config must be a dictionary")
+
+            if "type" not in config:
+                raise ValueError(f"Plugin '{name}' missing required field: type")
+            if "sync" not in config:
+                raise ValueError(f"Plugin '{name}' missing required field: sync")
+            if "schedule" not in config:
+                raise ValueError(f"Plugin '{name}' missing required field: schedule")
+            if "config" not in config:
+                raise ValueError(f"Plugin '{name}' missing required field: config")
+
+            plugin_type = config["type"]
+
+            # Validate types
+            if not isinstance(plugin_type, str):
+                raise ValueError(f"Plugin '{name}' type must be a string")
+            if not isinstance(config["sync"], bool):
+                raise ValueError(f"Plugin '{name}' sync must be a boolean")
+            if not isinstance(config["schedule"], str):
+                raise ValueError(f"Plugin '{name}' schedule must be a string")
+            if not isinstance(config["config"], dict):
+                raise ValueError(f"Plugin '{name}' config must be a dictionary")
+
+            # Get plugin class and validate config
+            try:
+                from kikusan.plugins.registry import get_plugin
+
+                plugin_class = get_plugin(plugin_type)
+                plugin_instance = plugin_class()
+                plugin_instance.validate_config(config["config"])
+            except Exception as e:
+                raise ValueError(f"Plugin '{name}' configuration invalid: {e}")
+
+            # Validate cron schedule
+            validate_cron_schedule(config["schedule"], name)
+
+            plugins[sanitized_name] = PluginInstanceConfig(
+                name=sanitized_name,
+                type=plugin_type,
+                sync=config["sync"],
+                schedule=config["schedule"],
+                config=config["config"],
+            )
+
+    logger.info(
+        "Loaded configuration for %d playlist(s) and %d plugin(s)",
+        len(playlists),
+        len(plugins),
+    )
+    return CronConfig(playlists=playlists, plugins=plugins)
 
 
 def validate_playlist_name(name: str) -> str:
