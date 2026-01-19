@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kikusan</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -14,9 +15,16 @@
                     <h1>Kikusan</h1>
                     <p>Search and download music from YouTube Music</p>
                 </div>
-                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
-                    <span class="theme-icon">🌙</span>
-                </button>
+                <div class="header-controls">
+                    <select id="format-selector" class="format-selector" aria-label="Audio format">
+                        <option value="opus">Opus</option>
+                        <option value="mp3">MP3</option>
+                        <option value="flac">FLAC</option>
+                    </select>
+                    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+                        <span class="theme-icon">🌙</span>
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -75,6 +83,79 @@
             }
         });
 
+        // Format management
+        const formatSelector = document.getElementById('format-selector');
+
+        function initFormat() {
+            const savedFormat = localStorage.getItem('audioFormat') || 'opus';
+            formatSelector.value = savedFormat;
+        }
+
+        function saveFormat() {
+            localStorage.setItem('audioFormat', formatSelector.value);
+        }
+
+        formatSelector.addEventListener('change', saveFormat);
+        initFormat();
+
+        // Audio playback management
+        let currentAudio = null;
+        let currentPlayingButton = null;
+
+        function stopCurrentAudio() {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            if (currentPlayingButton) {
+                currentPlayingButton.textContent = '▶';
+                currentPlayingButton.disabled = false;
+                currentPlayingButton = null;
+            }
+        }
+
+        async function togglePlay(videoId, button) {
+            if (currentPlayingButton === button) {
+                stopCurrentAudio();
+                return;
+            }
+
+            stopCurrentAudio();
+            button.disabled = true;
+            button.textContent = '⏳';
+
+            try {
+                const response = await fetch(`/api/stream-url/${videoId}`);
+                if (!response.ok) throw new Error('Failed to get stream URL');
+                const data = await response.json();
+
+                currentAudio = new Audio(data.url);
+                currentPlayingButton = button;
+
+                currentAudio.addEventListener('loadedmetadata', () => {
+                    button.textContent = '⏸';
+                    button.disabled = false;
+                });
+
+                currentAudio.addEventListener('ended', () => {
+                    stopCurrentAudio();
+                });
+
+                currentAudio.addEventListener('error', (e) => {
+                    console.error('Audio playback error:', e);
+                    showStatus('Playback failed', true);
+                    stopCurrentAudio();
+                });
+
+                await currentAudio.play();
+            } catch (error) {
+                console.error('Failed to play:', error);
+                showStatus('Failed to start playback: ' + error.message, true);
+                button.textContent = '▶';
+                button.disabled = false;
+            }
+        }
+
         // Search functionality
         const searchForm = document.getElementById('search-form');
         const searchInput = document.getElementById('search-input');
@@ -87,11 +168,33 @@
             statusDiv.style.display = message ? 'block' : 'none';
         }
 
-        searchForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const query = searchInput.value.trim();
-            if (!query) return;
+        // URL query parameter handling
+        function getQueryParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
 
+        function updateUrlWithQuery(query) {
+            const url = new URL(window.location);
+            if (query) {
+                url.searchParams.set('q', query);
+            } else {
+                url.searchParams.delete('q');
+            }
+            window.history.pushState({}, '', url);
+        }
+
+        // Auto-search on page load
+        function initAutoSearch() {
+            const query = getQueryParam('q');
+            if (query) {
+                searchInput.value = query;
+                performSearch(query);
+            }
+        }
+
+        // Extract search logic into reusable function
+        async function performSearch(query) {
             showStatus('Searching...');
             resultsDiv.innerHTML = '';
 
@@ -109,9 +212,36 @@
             } catch (error) {
                 showStatus('Search failed: ' + error.message, true);
             }
+        }
+
+        searchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (!query) return;
+
+            updateUrlWithQuery(query);
+            performSearch(query);
         });
 
+        // Handle browser back/forward
+        window.addEventListener('popstate', () => {
+            const query = getQueryParam('q');
+            if (query) {
+                searchInput.value = query;
+                performSearch(query);
+            } else {
+                searchInput.value = '';
+                resultsDiv.innerHTML = '';
+                showStatus('');
+            }
+        });
+
+        initAutoSearch();
+
         function renderResults(tracks) {
+            // Stop any playing audio when re-rendering results
+            stopCurrentAudio();
+
             resultsDiv.innerHTML = tracks.map(track => `
                 <div class="track">
                     <div class="track-main">
@@ -130,57 +260,98 @@
                             </div>
                         </div>
                     </div>
-                    <button
-                        class="download-btn"
-                        data-video-id="${track.video_id}"
-                        data-title="${escapeHtml(track.title)}"
-                        data-artist="${escapeHtml(track.artist)}"
-                    >
-                        Download
-                    </button>
+                    <div class="track-actions">
+                        <button
+                            class="play-btn"
+                            data-video-id="${track.video_id}"
+                            aria-label="Play preview"
+                        >
+                            ▶
+                        </button>
+                        <button
+                            class="download-btn"
+                            data-video-id="${track.video_id}"
+                            data-title="${escapeHtml(track.title)}"
+                            data-artist="${escapeHtml(track.artist)}"
+                        >
+                            Download
+                        </button>
+                    </div>
                 </div>
             `).join('');
 
-            // Add click handlers
+            // Add play button handlers
+            document.querySelectorAll('.play-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const videoId = e.target.dataset.videoId;
+                    togglePlay(videoId, e.target);
+                });
+            });
+
+            // Add download button handlers
             document.querySelectorAll('.download-btn').forEach(btn => {
                 btn.addEventListener('click', handleDownload);
             });
         }
 
         async function handleDownload(e) {
+            e.stopPropagation();
             const btn = e.target;
             const videoId = btn.dataset.videoId;
             const title = btn.dataset.title;
             const artist = btn.dataset.artist;
 
+            // Check if this is a "Save to Computer" click
+            if (btn.dataset.filePath) {
+                const filePath = encodeURIComponent(btn.dataset.filePath);
+                window.location.href = `/api/download-file/${filePath}`;
+                return;
+            }
+
+            const format = formatSelector.value;
+
             btn.disabled = true;
+            const originalText = btn.textContent;
             btn.textContent = 'Downloading...';
-            showStatus(`Downloading: ${title}...`);
+            showStatus(`Downloading: ${title} (${format.toUpperCase()})...`);
 
             try {
                 const response = await fetch('/api/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_id: videoId, title, artist })
+                    body: JSON.stringify({ video_id: videoId, title, artist, audio_format: format })
                 });
                 const data = await response.json();
 
                 if (data.success) {
-                    btn.textContent = 'Done!';
-                    showStatus(data.message);
+                    btn.textContent = 'Save to Computer';
+                    btn.dataset.filePath = data.file_path;
+                    btn.classList.add('save-btn');
+                    btn.disabled = false;
+                    showStatus(data.message + ' - Click "Save to Computer" to download to your device');
+
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.classList.remove('save-btn');
+                        delete btn.dataset.filePath;
+                    }, 30000);
                 } else {
                     btn.textContent = 'Failed';
                     showStatus(data.message, true);
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    }, 3000);
                 }
             } catch (error) {
                 btn.textContent = 'Error';
                 showStatus('Download failed: ' + error.message, true);
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }, 3000);
             }
-
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.textContent = 'Download';
-            }, 3000);
         }
 
         function escapeHtml(text) {
