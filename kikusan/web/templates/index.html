@@ -114,16 +114,18 @@
         function renderResults(tracks) {
             resultsDiv.innerHTML = tracks.map(track => `
                 <div class="track">
-                    <img
-                        class="track-cover"
-                        src="${track.thumbnail_url || ''}"
-                        alt=""
-                        loading="lazy"
-                    >
-                    <div class="track-info">
-                        <div class="track-title">${escapeHtml(track.title)}</div>
-                        <div class="track-artist">${escapeHtml(track.artist)}${track.album ? ' - ' + escapeHtml(track.album) : ''}</div>
-                        <div class="track-duration">${track.duration}</div>
+                    <div class="track-main">
+                        <img
+                            class="track-cover"
+                            src="${track.thumbnail_url || ''}"
+                            alt=""
+                            loading="lazy"
+                        >
+                        <div class="track-info">
+                            <div class="track-title">${escapeHtml(track.title)}</div>
+                            <div class="track-artist">${escapeHtml(track.artist)}${track.album ? ' - ' + escapeHtml(track.album) : ''}</div>
+                            <div class="track-duration">${track.duration}</div>
+                        </div>
                     </div>
                     <button
                         class="download-btn"

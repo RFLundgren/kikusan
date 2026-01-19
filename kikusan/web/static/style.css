@@ -160,13 +160,11 @@ header p {
 
 .track {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     padding: 1rem;
     background: var(--bg-secondary);
     border-radius: 8px;
     border: 1px solid var(--border-color);
-    flex-wrap: wrap;
     gap: 0.75rem;
 }
 
@@ -174,12 +172,19 @@ header p {
     border-color: var(--border-hover);
 }
 
+.track-main {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+}
+
 .track-cover {
     width: 80px;
     height: 80px;
     border-radius: 6px;
     object-fit: cover;
-    margin-right: 1rem;
     flex-shrink: 0;
     background: var(--bg-tertiary);
 }
@@ -193,24 +198,24 @@ header p {
     font-weight: 600;
     margin-bottom: 0.25rem;
     overflow: hidden;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-    line-clamp: 2;
-    -webkit-line-clamp: 2;
+    text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    word-break: break-word;
 }
 
 .track-artist {
     color: var(--text-secondary);
     font-size: 0.9rem;
     overflow: hidden;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-    line-clamp: 2;
-    -webkit-line-clamp: 2;
+    text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    word-break: break-word;
 }
 
 .track-duration {
@@ -220,7 +225,6 @@ header p {
 }
 
 .download-btn {
-    margin-left: 1rem;
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
     font-weight: 600;
@@ -233,6 +237,7 @@ header p {
     white-space: nowrap;
     min-height: 44px;
     min-width: 90px;
+    flex-shrink: 0;
 }
 
 .download-btn:hover:not(:disabled) {
@@ -271,6 +276,12 @@ header p {
 @media (max-width: 640px) {
     .track {
         padding: 0.75rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .track-main {
+        margin-bottom: 0.75rem;
     }
 
     .track-cover {
@@ -279,8 +290,8 @@ header p {
     }
 
     .download-btn {
-        min-width: 90px;
-        margin-left: 0.5rem;
+        width: 100%;
+        min-width: unset;
     }
 }
 
@@ -307,12 +318,12 @@ header p {
 }
 
 /* Desktop - single line for cleaner look */
-@media (min-width: 640px) {
+@media (min-width: 1024px) {
     .track-title,
     .track-artist {
         white-space: nowrap;
         text-overflow: ellipsis;
-        line-clamp: 1;
         -webkit-line-clamp: 1;
+        line-clamp: 1;
     }
 }
