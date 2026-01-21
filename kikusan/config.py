@@ -19,6 +19,8 @@ class Config:
     spotify_client_id: str | None
     spotify_client_secret: str | None
     web_playlist_name: str | None = None
+    gotify_url: str | None = None
+    gotify_token: str | None = None
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -31,12 +33,19 @@ class Config:
             spotify_client_id=os.getenv("SPOTIFY_CLIENT_ID"),
             spotify_client_secret=os.getenv("SPOTIFY_CLIENT_SECRET"),
             web_playlist_name=os.getenv("KIKUSAN_WEB_PLAYLIST"),
+            gotify_url=os.getenv("GOTIFY_URL"),
+            gotify_token=os.getenv("GOTIFY_TOKEN"),
         )
 
     @property
     def spotify_configured(self) -> bool:
         """Check if Spotify credentials are configured."""
         return bool(self.spotify_client_id and self.spotify_client_secret)
+
+    @property
+    def gotify_configured(self) -> bool:
+        """Check if Gotify notifications are configured."""
+        return bool(self.gotify_url and self.gotify_token)
 
 
 def get_config() -> Config:

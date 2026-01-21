@@ -32,6 +32,10 @@ services:
       # Optional: Filename template
       # - KIKUSAN_FILENAME_TEMPLATE=%(artist,uploader)s - %(title)s
 
+      # Optional: Gotify notifications
+      # - GOTIFY_URL=  # Gotify server URL
+      # - GOTIFY_TOKEN=  # Gotify app token
+
     restart: unless-stopped
 
     # Optional: Health check
@@ -59,6 +63,8 @@ services:
   #     - KIKUSAN_DOWNLOAD_DIR=/downloads
   #     - KIKUSAN_AUDIO_FORMAT=opus
   #     - KIKUSAN_WEB_PORT=8000
+  #     # - GOTIFY_URL=  # Optional: Gotify server URL
+  #     # - GOTIFY_TOKEN=  # Optional: Gotify app token
   #
   #   restart: unless-stopped
 

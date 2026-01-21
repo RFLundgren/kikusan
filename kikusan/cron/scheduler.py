@@ -103,14 +103,33 @@ class CronScheduler:
             playlist_config: Playlist configuration
         """
         try:
-            sync_playlist(
+            result = sync_playlist(
                 playlist_config=playlist_config,
                 download_dir=self.download_dir,
                 audio_format=self.audio_format,
                 filename_template=self.filename_template,
             )
+
+            from kikusan.notifications import send_sync_notification
+
+            send_sync_notification(
+                name=playlist_config.name,
+                sync_type="playlist",
+                result=result,
+                success=True,
+            )
         except Exception as e:
             logger.error("Sync job failed for %s: %s", playlist_config.name, e)
+
+            from kikusan.notifications import send_sync_notification
+
+            send_sync_notification(
+                name=playlist_config.name,
+                sync_type="playlist",
+                result=None,
+                success=False,
+                error=str(e),
+            )
 
     def _schedule_plugin(self, plugin_config) -> None:
         """
@@ -165,10 +184,29 @@ class CronScheduler:
             )
 
             # Run sync
-            sync_plugin_instance(plugin, cfg, sync_mode=plugin_config.sync)
+            result = sync_plugin_instance(plugin, cfg, sync_mode=plugin_config.sync)
+
+            from kikusan.notifications import send_sync_notification
+
+            send_sync_notification(
+                name=plugin_config.name,
+                sync_type="plugin",
+                result=result,
+                success=True,
+            )
 
         except Exception as e:
             logger.error("Plugin sync job failed for %s: %s", plugin_config.name, e)
+
+            from kikusan.notifications import send_sync_notification
+
+            send_sync_notification(
+                name=plugin_config.name,
+                sync_type="plugin",
+                result=None,
+                success=False,
+                error=str(e),
+            )
 
     def sync_all_once(self) -> None:
         """Sync all playlists and plugins once immediately."""

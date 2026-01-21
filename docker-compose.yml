@@ -10,4 +10,6 @@ services:
       - KIKUSAN_AUDIO_FORMAT=opus
       - KIKUSAN_WEB_PORT=8000
       - KIKUSAN_WEB_PLAYLIST=web-downloads
+      # - GOTIFY_URL=  # Optional: Gotify server URL
+      # - GOTIFY_TOKEN=  # Optional: Gotify app token
     restart: unless-stopped

@@ -125,6 +125,31 @@ Create a `cron.yaml` file to configure:
 
 See `cron.example.yaml` for detailed configuration examples.
 
+### Notifications
+
+Kikusan can send push notifications via [Gotify](https://gotify.net/) for scheduled sync operations:
+
+- **Summary notifications only** - One notification per sync operation, not per track
+- **Includes download/skip/fail counts** - See results at a glance
+- **Optional** - Gracefully disabled if not configured
+- **Non-blocking** - Notification failures don't stop downloads
+
+**Setup:**
+
+1. Install a Gotify server or use an existing instance
+2. Create an application token in Gotify
+3. Set environment variables:
+   ```bash
+   export GOTIFY_URL="https://push.example.com"
+   export GOTIFY_TOKEN="your-app-token"
+   ```
+
+**Notifications are sent for:**
+- Scheduled playlist syncs (via `kikusan cron`)
+- Scheduled plugin syncs (via `kikusan cron`)
+
+Notifications are **not** sent for CLI operations or web UI downloads, as these are interactive and the user already sees the results.
+
 ### Docker
 
 ```bash
@@ -143,6 +168,8 @@ docker compose up -d
 | `KIKUSAN_FILENAME_TEMPLATE` | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format) |
 | `KIKUSAN_WEB_PORT` | `8000` | Web server port |
 | `KIKUSAN_WEB_PLAYLIST` | `None` | M3U playlist name for web downloads (optional) |
+| `GOTIFY_URL` | `None` | Gotify server URL for notifications (optional) |
+| `GOTIFY_TOKEN` | `None` | Gotify application token (optional) |
 
 ### State Files & Playlists
 
