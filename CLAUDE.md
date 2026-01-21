@@ -12,8 +12,17 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Download button for each track
 - Dark/light theme toggle
 
+### Sync Safety Features
+- **Cross-Reference Protection**: When `sync=True` for a playlist/plugin, songs are only deleted from disk if they are not referenced by any other playlist or plugin
+- Implementation in `kikusan/reference_checker.py`: Scans all playlist and plugin state files before deletion
+- Each deletion operation checks both `.kikusan/state/*.json` (playlists) and `.kikusan/plugin_state/*.json` (plugins)
+- Songs are removed from the current playlist/plugin state even if the file is preserved due to other references
+
 ### Architecture Notes
 - `kikusan/search.py`: Uses ytmusicapi to search YouTube Music, extracts view_count from search results
 - `kikusan/web/app.py`: FastAPI backend with search and download endpoints
 - `kikusan/web/templates/index.html`: Single-page frontend with embedded JavaScript
 - `kikusan/web/static/style.css`: Responsive CSS with dark/light themes
+- `kikusan/reference_checker.py`: Cross-playlist/plugin reference checking for safe file deletion
+- `kikusan/cron/sync.py`: Playlist synchronization with reference-aware deletion
+- `kikusan/plugins/sync.py`: Plugin synchronization with reference-aware deletion

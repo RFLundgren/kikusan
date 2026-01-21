@@ -11,6 +11,7 @@ from kikusan.cron.config import PlaylistConfig
 from kikusan.cron.state import PlaylistState, TrackState, get_state_dir, load_state, save_state
 from kikusan.download import download
 from kikusan.playlist import add_to_m3u
+from kikusan.reference_checker import is_safe_to_delete
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ def sync_playlist(
         # Remove old tracks if sync=true
         deleted_count = 0
         if playlist_config.sync and removed_tracks:
-            deleted_count = remove_old_tracks(removed_tracks, state)
+            deleted_count = remove_old_tracks(removed_tracks, state, download_dir)
 
         # Update M3U playlist
         update_m3u_playlist(playlist_config.name, state, download_dir)
@@ -295,28 +296,46 @@ def download_new_tracks(
     return {"downloaded": downloaded, "skipped": skipped, "failed": failed}
 
 
-def remove_old_tracks(tracks: list[TrackState], state: PlaylistState) -> int:
+def remove_old_tracks(tracks: list[TrackState], state: PlaylistState, download_dir: Path) -> int:
     """
     Remove tracks that are no longer in the playlist.
 
+    Only deletes files if they are not referenced by other playlists or plugins.
     Deletes audio files, .lrc files, and removes from state.
 
     Args:
         tracks: Tracks to remove
         state: Playlist state to update
+        download_dir: Download directory (used to check cross-references)
 
     Returns:
         Number of tracks deleted
     """
     deleted_count = 0
+    skipped_count = 0
 
     for track in tracks:
         logger.info("Removing: %s - %s", track.artist, track.title)
 
         file_path = Path(track.file_path)
 
-        # Delete audio file
+        # Check if file is referenced by other playlists/plugins
         if file_path.exists():
+            if not is_safe_to_delete(
+                file_path,
+                download_dir,
+                current_playlist_name=state.playlist_name,
+            ):
+                logger.info(
+                    "Skipping deletion of %s (referenced by other playlists/plugins)",
+                    file_path.name,
+                )
+                skipped_count += 1
+                # Still remove from current playlist state
+                state.tracks = [t for t in state.tracks if t.video_id != track.video_id]
+                continue
+
+            # Safe to delete - no other references
             try:
                 file_path.unlink()
                 logger.debug("Deleted: %s", file_path)
@@ -325,17 +344,23 @@ def remove_old_tracks(tracks: list[TrackState], state: PlaylistState) -> int:
                 logger.error("Failed to delete %s: %s", file_path, e)
                 continue
 
-        # Delete .lrc file if exists
-        lrc_path = file_path.with_suffix(".lrc")
-        if lrc_path.exists():
-            try:
-                lrc_path.unlink()
-                logger.debug("Deleted lyrics: %s", lrc_path)
-            except Exception as e:
-                logger.warning("Failed to delete lyrics %s: %s", lrc_path, e)
+            # Delete .lrc file if exists
+            lrc_path = file_path.with_suffix(".lrc")
+            if lrc_path.exists():
+                try:
+                    lrc_path.unlink()
+                    logger.debug("Deleted lyrics: %s", lrc_path)
+                except Exception as e:
+                    logger.warning("Failed to delete lyrics %s: %s", lrc_path, e)
 
         # Remove from state
         state.tracks = [t for t in state.tracks if t.video_id != track.video_id]
+
+    if skipped_count > 0:
+        logger.info(
+            "Skipped deletion of %d file(s) referenced by other sources",
+            skipped_count,
+        )
 
     return deleted_count
 

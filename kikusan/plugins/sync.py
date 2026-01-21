@@ -14,6 +14,7 @@ from kikusan.plugins.state import (
     load_plugin_state,
     save_plugin_state,
 )
+from kikusan.reference_checker import is_safe_to_delete
 from kikusan.search import search
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ def sync_plugin_instance(
         # Remove old tracks if sync=true
         deleted_count = 0
         if sync_mode and removed_tracks:
-            deleted_count = _remove_tracks(removed_tracks, state)
+            deleted_count = _remove_tracks(removed_tracks, state, config.download_dir)
 
         # Update M3U playlist
         _update_m3u(config.name, state, config.download_dir)
@@ -203,15 +204,44 @@ def _download_songs(
     }
 
 
-def _remove_tracks(tracks: list[PluginTrackState], state: PluginState) -> int:
-    """Remove tracks from filesystem and state."""
+def _remove_tracks(tracks: list[PluginTrackState], state: PluginState, download_dir: Path) -> int:
+    """Remove tracks from filesystem and state.
+
+    Only deletes files if they are not referenced by other playlists or plugins.
+
+    Args:
+        tracks: Tracks to remove
+        state: Plugin state to update
+        download_dir: Download directory (used to check cross-references)
+
+    Returns:
+        Number of tracks deleted
+    """
     deleted = 0
+    skipped = 0
 
     for track in tracks:
         logger.info("Removing: %s - %s", track.artist, track.title)
 
         file_path = Path(track.file_path)
+
+        # Check if file is referenced by other playlists/plugins
         if file_path.exists():
+            if not is_safe_to_delete(
+                file_path,
+                download_dir,
+                current_plugin_name=state.plugin_name,
+            ):
+                logger.info(
+                    "Skipping deletion of %s (referenced by other playlists/plugins)",
+                    file_path.name,
+                )
+                skipped += 1
+                # Still remove from current plugin state
+                state.tracks = [t for t in state.tracks if t.cache_key != track.cache_key]
+                continue
+
+            # Safe to delete - no other references
             try:
                 file_path.unlink()
                 deleted += 1
@@ -226,6 +256,12 @@ def _remove_tracks(tracks: list[PluginTrackState], state: PluginState) -> int:
 
         # Remove from state
         state.tracks = [t for t in state.tracks if t.cache_key != track.cache_key]
+
+    if skipped > 0:
+        logger.info(
+            "Skipped deletion of %d file(s) referenced by other sources",
+            skipped,
+        )
 
     return deleted
 
