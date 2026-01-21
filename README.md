@@ -19,6 +19,7 @@ Search and download music from YouTube Music with lyrics.
 Kikusan supports plugins for syncing music from various sources beyond standard playlists:
 
 **Built-in Plugins:**
+
 - **`listenbrainz`** - Weekly recommendations from listenbrainz.org
   - Required: `user` (listenbrainz username)
   - Optional: `recommendation_type` (weekly-exploration, weekly-jams)
@@ -96,6 +97,7 @@ kikusan web
 ```
 
 **Features:**
+
 - Search YouTube Music with real-time results
 - Download individual tracks with format selection (OPUS/MP3/FLAC)
 - Dark/light theme toggle with automatic system preference detection
@@ -118,9 +120,10 @@ kikusan cron --config /path/to/cron.yaml
 ```
 
 Create a `cron.yaml` file to configure:
+
 - **Playlists**: YouTube Music, YouTube, or Spotify playlists
 - **Plugins**: Listenbrainz, Reddit, Billboard, RSS feeds
-- **Schedule**: Standard cron expressions (e.g., "0 9 * * *" for daily at 9am)
+- **Schedule**: Standard cron expressions (e.g., "0 9 \* \* \*" for daily at 9am)
 - **Sync Mode**: Keep or delete files when removed from source
 
 See `cron.example.yaml` for detailed configuration examples.
@@ -145,6 +148,7 @@ Kikusan can send push notifications via [Gotify](https://gotify.net/) for schedu
    ```
 
 **Notifications are sent for:**
+
 - Scheduled playlist syncs (via `kikusan cron`)
 - Scheduled plugin syncs (via `kikusan cron`)
 
@@ -161,15 +165,15 @@ docker compose up -d
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `KIKUSAN_DOWNLOAD_DIR` | `./downloads` | Download directory |
-| `KIKUSAN_AUDIO_FORMAT` | `opus` | Audio format (opus, mp3, flac) |
-| `KIKUSAN_FILENAME_TEMPLATE` | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format) |
-| `KIKUSAN_WEB_PORT` | `8000` | Web server port |
-| `KIKUSAN_WEB_PLAYLIST` | `None` | M3U playlist name for web downloads (optional) |
-| `GOTIFY_URL` | `None` | Gotify server URL for notifications (optional) |
-| `GOTIFY_TOKEN` | `None` | Gotify application token (optional) |
+| Variable                    | Default                           | Description                                    |
+| --------------------------- | --------------------------------- | ---------------------------------------------- |
+| `KIKUSAN_DOWNLOAD_DIR`      | `./downloads`                     | Download directory                             |
+| `KIKUSAN_AUDIO_FORMAT`      | `opus`                            | Audio format (opus, mp3, flac)                 |
+| `KIKUSAN_FILENAME_TEMPLATE` | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format)              |
+| `KIKUSAN_WEB_PORT`          | `8000`                            | Web server port                                |
+| `KIKUSAN_WEB_PLAYLIST`      | `None`                            | M3U playlist name for web downloads (optional) |
+| `GOTIFY_URL`                | `None`                            | Gotify server URL for notifications (optional) |
+| `GOTIFY_TOKEN`              | `None`                            | Gotify application token (optional)            |
 
 ### State Files & Playlists
 
@@ -177,6 +181,24 @@ Kikusan tracks downloaded files and generates M3U playlists automatically:
 
 - **State Files**: Stored in `{download_dir}/.kikusan/state/` (for playlists) and `{download_dir}/.kikusan/plugin_state/` (for plugins)
 - **M3U Playlists**: Generated at `{download_dir}/{name}.m3u` for each sync configuration
+
+## Authentication
+
+kikusan does not use any kind of authentication. If you need to secure it, I suggest to use **Caddy** with **authelia**. This caddy config works for me:
+
+```Caddy
+(authelia_forwarder) {
+  forward_auth http://192.168.1.10:9091 {
+    uri /api/authz/forward-auth
+    copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+  }
+}
+
+kikusan.foobar.test {
+  import authelia_forwarder
+  reverse_proxy http://192.168.1.11:8007
+}
+```
 
 ## Requirements
 
