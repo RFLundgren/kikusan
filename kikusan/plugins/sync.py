@@ -14,7 +14,7 @@ from kikusan.plugins.state import (
     load_plugin_state,
     save_plugin_state,
 )
-from kikusan.reference_checker import is_safe_to_delete
+from kikusan.reference_checker import get_navidrome_protection_cache, is_safe_to_delete
 from kikusan.search import search
 
 logger = logging.getLogger(__name__)
@@ -220,6 +220,9 @@ def _remove_tracks(tracks: list[PluginTrackState], state: PluginState, download_
     deleted = 0
     skipped = 0
 
+    # Fetch Navidrome protection data once for batch
+    navidrome_cache = get_navidrome_protection_cache()
+
     for track in tracks:
         logger.info("Removing: %s - %s", track.artist, track.title)
 
@@ -231,6 +234,7 @@ def _remove_tracks(tracks: list[PluginTrackState], state: PluginState, download_
                 file_path,
                 download_dir,
                 current_plugin_name=state.plugin_name,
+                navidrome_cache=navidrome_cache,
             ):
                 logger.info(
                     "Skipping deletion of %s (referenced by other playlists/plugins)",

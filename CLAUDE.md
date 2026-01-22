@@ -18,11 +18,26 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Each deletion operation checks both `.kikusan/state/*.json` (playlists) and `.kikusan/plugin_state/*.json` (plugins)
 - Songs are removed from the current playlist/plugin state even if the file is preserved due to other references
 
+- **Navidrome Protection**: Prevents deletion of songs starred in Navidrome or in designated "keep" playlist
+- Real-time API checks during sync operations via Subsonic API
+- Batch caching for performance (fetches once per sync, not per file)
+- Two-tier matching: path-based (fast/accurate) + metadata-based (fallback)
+- Fail-safe behavior: keeps files if Navidrome is unreachable
+- Opt-in via environment variables: NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD, NAVIDROME_KEEP_PLAYLIST
+
 ### Architecture Notes
 - `kikusan/search.py`: Uses ytmusicapi to search YouTube Music, extracts view_count from search results
 - `kikusan/web/app.py`: FastAPI backend with search and download endpoints
 - `kikusan/web/templates/index.html`: Single-page frontend with embedded JavaScript
 - `kikusan/web/static/style.css`: Responsive CSS with dark/light themes
 - `kikusan/reference_checker.py`: Cross-playlist/plugin reference checking for safe file deletion
-- `kikusan/cron/sync.py`: Playlist synchronization with reference-aware deletion
-- `kikusan/plugins/sync.py`: Plugin synchronization with reference-aware deletion
+  - Includes metadata extraction using mutagen
+  - Navidrome protection checks via batch caching
+  - Fail-safe deletion logic (keeps files on errors)
+- `kikusan/navidrome.py`: Subsonic API client for Navidrome integration
+  - Token-based authentication (MD5 hash per Subsonic API spec)
+  - Fetches starred songs and playlist contents
+  - Two-tier song matching (path-based + metadata-based)
+  - Environment-based configuration: NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD
+- `kikusan/cron/sync.py`: Playlist synchronization with reference-aware deletion and Navidrome protection
+- `kikusan/plugins/sync.py`: Plugin synchronization with reference-aware deletion and Navidrome protection

@@ -11,7 +11,7 @@ from kikusan.cron.config import PlaylistConfig
 from kikusan.cron.state import PlaylistState, TrackState, get_state_dir, load_state, save_state
 from kikusan.download import download
 from kikusan.playlist import add_to_m3u
-from kikusan.reference_checker import is_safe_to_delete
+from kikusan.reference_checker import get_navidrome_protection_cache, is_safe_to_delete
 
 logger = logging.getLogger(__name__)
 
@@ -314,6 +314,9 @@ def remove_old_tracks(tracks: list[TrackState], state: PlaylistState, download_d
     deleted_count = 0
     skipped_count = 0
 
+    # Fetch Navidrome protection data once for batch
+    navidrome_cache = get_navidrome_protection_cache()
+
     for track in tracks:
         logger.info("Removing: %s - %s", track.artist, track.title)
 
@@ -325,6 +328,7 @@ def remove_old_tracks(tracks: list[TrackState], state: PlaylistState, download_d
                 file_path,
                 download_dir,
                 current_playlist_name=state.playlist_name,
+                navidrome_cache=navidrome_cache,
             ):
                 logger.info(
                     "Skipping deletion of %s (referenced by other playlists/plugins)",

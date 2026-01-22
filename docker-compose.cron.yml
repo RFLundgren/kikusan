@@ -36,6 +36,12 @@ services:
       # - GOTIFY_URL=  # Gotify server URL
       # - GOTIFY_TOKEN=  # Gotify app token
 
+      # Optional: Navidrome protection (prevent deletion of starred/favorited songs)
+      # - NAVIDROME_URL=  # Navidrome server URL (e.g., https://music.example.com)
+      # - NAVIDROME_USER=  # Navidrome username
+      # - NAVIDROME_PASSWORD=  # Navidrome password
+      # - NAVIDROME_KEEP_PLAYLIST=keep  # Playlist name for protection (default: keep)
+
     restart: unless-stopped
 
     # Optional: Health check
@@ -65,6 +71,10 @@ services:
   #     - KIKUSAN_WEB_PORT=8000
   #     # - GOTIFY_URL=  # Optional: Gotify server URL
   #     # - GOTIFY_TOKEN=  # Optional: Gotify app token
+  #     # - NAVIDROME_URL=  # Optional: Navidrome server URL
+  #     # - NAVIDROME_USER=  # Optional: Navidrome username
+  #     # - NAVIDROME_PASSWORD=  # Optional: Navidrome password
+  #     # - NAVIDROME_KEEP_PLAYLIST=keep  # Optional: Playlist name for protection
   #
   #   restart: unless-stopped
 

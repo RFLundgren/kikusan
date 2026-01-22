@@ -14,6 +14,11 @@ Search and download music from YouTube Music with lyrics.
 - **Scheduled Sync**: Automated playlist monitoring with cron scheduling
 - **M3U Playlists**: Automatic playlist file generation for downloads
 
+## Usecase
+
+I use navidrome as my music server. The music is located on a NAS and mounted into the navidrome container (read-only).
+Kikusan syncs my youtube music and spotify playlists shared mount and creates local m3u playlists. If kikusan has a discovery playlist configured (sync=True), songs which were removed from the upstream playlist get also removed from navidrome. There are some exceptions: They won't get removed if the songs are referenced by another playlist or starred in navidrome or in the `keep` playlist. Navidrome imports those playlist daily. Then I use [symfonium](https://play.google.com/store/apps/details?id=app.symfonik.music.player) to access my music via subsonic api.
+
 ## Plugin System
 
 Kikusan supports plugins for syncing music from various sources beyond standard playlists:
@@ -154,6 +159,48 @@ Kikusan can send push notifications via [Gotify](https://gotify.net/) for schedu
 
 Notifications are **not** sent for CLI operations or web UI downloads, as these are interactive and the user already sees the results.
 
+### Navidrome Protection
+
+Prevent deletion of songs during sync if they are starred or in a designated playlist in Navidrome:
+
+**Features:**
+
+- Protect songs starred/favorited in Navidrome (via Symfonium or other Subsonic clients)
+- Protect songs in a designated "keep" playlist
+- Real-time API checks during each sync operation
+- Gracefully disabled if not configured
+- Fails safe: keeps files if Navidrome is unreachable
+
+**Setup:**
+
+1. Configure environment variables:
+
+   ```bash
+   export NAVIDROME_URL="https://music.example.com"
+   export NAVIDROME_USER="your-username"
+   export NAVIDROME_PASSWORD="your-password"
+   export NAVIDROME_KEEP_PLAYLIST="keep"  # optional, defaults to "keep"
+   ```
+
+2. Star songs in your Subsonic client (Symfonium, DSub, etc.) or add them to your "keep" playlist
+
+3. When kikusan syncs playlists with `sync: true`, protected songs won't be deleted even if removed from the source playlist
+
+**Behavior:**
+
+- Checks both starred songs AND songs in the keep playlist
+- Protected files are skipped during deletion with detailed logging
+- Works alongside existing cross-playlist/plugin reference protection
+- Minimal performance impact (~3 API calls per sync operation)
+
+**Example workflow:**
+
+1. Sync YouTube Music playlist with `sync: true`
+2. Song gets removed from YouTube Music playlist
+3. You've starred the song in Symfonium (synced to Navidrome)
+4. Kikusan detects the star and keeps the file on disk
+5. File remains available in Navidrome/Symfonium
+
 ### Docker
 
 ```bash
@@ -174,6 +221,10 @@ docker compose up -d
 | `KIKUSAN_WEB_PLAYLIST`      | `None`                            | M3U playlist name for web downloads (optional) |
 | `GOTIFY_URL`                | `None`                            | Gotify server URL for notifications (optional) |
 | `GOTIFY_TOKEN`              | `None`                            | Gotify application token (optional)            |
+| `NAVIDROME_URL`             | `None`                            | Navidrome server URL for protection (optional) |
+| `NAVIDROME_USER`            | `None`                            | Navidrome username (optional)                  |
+| `NAVIDROME_PASSWORD`        | `None`                            | Navidrome password (optional)                  |
+| `NAVIDROME_KEEP_PLAYLIST`   | `keep`                            | Playlist name for protection (optional)        |
 
 ### State Files & Playlists
 
