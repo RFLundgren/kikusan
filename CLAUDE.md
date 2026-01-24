@@ -11,6 +11,7 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Displayed alongside duration in the track metadata section
 - Download button for each track
 - Dark/light theme toggle
+- Version display in header (dynamically loaded from `pyproject.toml` via `importlib.metadata`)
 
 ### Sync Safety Features
 - **Cross-Reference Protection**: When `sync=True` for a playlist/plugin, songs are only deleted from disk if they are not referenced by any other playlist or plugin

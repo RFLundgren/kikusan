@@ -68,6 +68,13 @@ header h1 {
     margin-bottom: 0.5rem;
 }
 
+header h1 .version {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    vertical-align: middle;
+}
+
 header p {
     color: var(--text-secondary);
 }

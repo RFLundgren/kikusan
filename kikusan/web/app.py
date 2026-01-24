@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from kikusan import __version__
 from kikusan.config import get_config
 from kikusan.download import download
 from kikusan.playlist import add_to_m3u
@@ -132,7 +133,7 @@ class StreamUrlResponse(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Render the main search page."""
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(request=request, name="index.html", context={"version": __version__})
 
 
 @app.get("/api/search", response_model=SearchResponse)
