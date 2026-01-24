@@ -7,11 +7,13 @@ from pathlib import Path
 
 import yt_dlp
 
+from kikusan.config import get_config
 from kikusan.cron.config import PlaylistConfig
 from kikusan.cron.state import PlaylistState, TrackState, get_state_dir, load_state, save_state
 from kikusan.download import download
 from kikusan.playlist import add_to_m3u
 from kikusan.reference_checker import get_navidrome_protection_cache, is_safe_to_delete
+from kikusan.yt_dlp_wrapper import extract_info_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,8 @@ def sync_playlist(
     download_dir: Path,
     audio_format: str,
     filename_template: str,
+    organization_mode: str = "flat",
+    use_primary_artist: bool = False,
 ) -> SyncResult:
     """
     Synchronize a playlist with its configured source.
@@ -40,6 +44,8 @@ def sync_playlist(
         download_dir: Download directory
         audio_format: Audio format (opus, mp3, flac)
         filename_template: Filename template for downloads
+        organization_mode: File organization mode ("flat" or "album")
+        use_primary_artist: Extract primary artist for folder (before feat., &, etc.)
 
     Returns:
         SyncResult with counts of operations performed
@@ -85,6 +91,8 @@ def sync_playlist(
             audio_format,
             filename_template,
             state,
+            organization_mode,
+            use_primary_artist,
         )
 
         # Remove old tracks if sync=true
@@ -146,9 +154,17 @@ def fetch_current_tracks(url: str) -> list[tuple[str, str, str]]:
 
 def _fetch_youtube_tracks(url: str) -> list[tuple[str, str, str]]:
     """Fetch tracks from YouTube/YouTube Music playlist."""
+    config = get_config()
+
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as ydl:
-            info = ydl.extract_info(url, download=False)
+        ydl_opts = {"quiet": True, "no_warnings": True, "extract_flat": True}
+        info = extract_info_with_retry(
+            ydl_opts=ydl_opts,
+            url=url,
+            download=False,
+            cookie_file=config.cookie_file_path,
+            config=config,
+        )
 
         # Check if this is a playlist
         if info.get("_type") != "playlist" and "entries" not in info:
@@ -243,6 +259,8 @@ def download_new_tracks(
     audio_format: str,
     filename_template: str,
     state: PlaylistState,
+    organization_mode: str = "flat",
+    use_primary_artist: bool = False,
 ) -> dict:
     """
     Download new tracks and update state.
@@ -253,6 +271,8 @@ def download_new_tracks(
         audio_format: Audio format
         filename_template: Filename template
         state: Playlist state to update
+        organization_mode: File organization mode ("flat" or "album")
+        use_primary_artist: Extract primary artist for folder (before feat., &, etc.)
 
     Returns:
         Dict with counts: downloaded, skipped, failed
@@ -260,6 +280,9 @@ def download_new_tracks(
     downloaded = 0
     skipped = 0
     failed = 0
+
+    from kikusan.config import get_config
+    config = get_config()
 
     for i, (video_id, title, artist) in enumerate(tracks, 1):
         logger.info("[%d/%d] Downloading: %s - %s", i, len(tracks), artist, title)
@@ -271,6 +294,9 @@ def download_new_tracks(
                 audio_format=audio_format,
                 filename_template=filename_template,
                 fetch_lyrics=True,
+                organization_mode=organization_mode,
+                use_primary_artist=use_primary_artist,
+                cookie_file=config.cookie_file_path,
             )
 
             if audio_path:

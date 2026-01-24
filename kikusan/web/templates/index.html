@@ -16,6 +16,9 @@
                     <p>Search and download music from YouTube Music</p>
                 </div>
                 <div class="header-controls">
+                    <a href="https://github.com/dadav/kikusan" target="_blank" class="github-star" aria-label="Star on GitHub">
+                        ⭐ Star on GitHub
+                    </a>
                     <select id="format-selector" class="format-selector" aria-label="Audio format">
                         <option value="opus">Opus</option>
                         <option value="mp3">MP3</option>
@@ -23,6 +26,9 @@
                     </select>
                     <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
                         <span class="theme-icon">🌙</span>
+                    </button>
+                    <button id="settings-btn" class="icon-btn" aria-label="Settings" title="Settings">
+                        ⚙️
                     </button>
                 </div>
             </div>
@@ -40,9 +46,54 @@
             <button type="submit">Search</button>
         </form>
 
+        <div class="search-tabs">
+            <button class="tab-btn active" data-tab="songs">Songs</button>
+            <button class="tab-btn" data-tab="albums">Albums</button>
+        </div>
+
         <div id="status" class="status"></div>
 
-        <div id="results" class="results"></div>
+        <!-- Queue Section -->
+        <div id="queue-section" class="queue-section">
+            <div class="queue-header">
+                <h2>Download Queue</h2>
+                <button id="clear-completed-btn" class="clear-btn">Clear Completed</button>
+            </div>
+            <div id="queue-list" class="queue-list"></div>
+        </div>
+
+        <div id="songs-results" class="results active"></div>
+        <div id="albums-results" class="albums-grid"></div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <section class="settings-section">
+                    <h3>Cookie Authentication</h3>
+                    <p class="settings-description">
+                        Upload a cookies.txt file to access age-restricted or region-locked content.
+                        <a href="https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp" target="_blank">Learn more</a>
+                    </p>
+
+                    <div id="cookie-status" class="cookie-status">
+                        <span class="status-indicator"></span>
+                        <span class="status-text">Checking...</span>
+                    </div>
+
+                    <div class="cookie-actions">
+                        <input type="file" id="cookie-file-input" accept=".txt" style="display: none;">
+                        <button id="upload-cookie-btn" class="btn btn-primary">Upload cookies.txt</button>
+                        <button id="delete-cookie-btn" class="btn btn-danger" style="display: none;">Delete Cookie File</button>
+                    </div>
+                </section>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -159,8 +210,25 @@
         // Search functionality
         const searchForm = document.getElementById('search-form');
         const searchInput = document.getElementById('search-input');
-        const resultsDiv = document.getElementById('results');
+        const resultsDiv = document.getElementById('songs-results');
         const statusDiv = document.getElementById('status');
+
+        // Tab management
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const songsResults = document.getElementById('songs-results');
+        const albumsResults = document.getElementById('albums-results');
+        let currentTab = 'songs';
+
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                setActiveTab(tab);
+
+                const query = searchInput.value.trim();
+                updateUrlParams(query, tab);
+                if (query) performSearch(query);
+            });
+        });
 
         function showStatus(message, isError = false) {
             statusDiv.textContent = message;
@@ -174,18 +242,52 @@
             return urlParams.get(name);
         }
 
-        function updateUrlWithQuery(query) {
+        function updateUrlParams(query, tab) {
             const url = new URL(window.location);
             if (query) {
                 url.searchParams.set('q', query);
             } else {
                 url.searchParams.delete('q');
             }
+            if (tab && tab !== 'songs') {
+                url.searchParams.set('tab', tab);
+            } else {
+                url.searchParams.delete('tab');
+            }
             window.history.pushState({}, '', url);
+        }
+
+        // Initialize tab from URL
+        function initTabFromUrl() {
+            const tab = getQueryParam('tab') || 'songs';
+            if (tab === 'songs' || tab === 'albums') {
+                setActiveTab(tab);
+            }
+        }
+
+        // Set active tab (updates UI and currentTab variable)
+        function setActiveTab(tab) {
+            currentTab = tab;
+            tabButtons.forEach(b => {
+                if (b.dataset.tab === tab) {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+
+            if (tab === 'songs') {
+                songsResults.classList.add('active');
+                albumsResults.classList.remove('active');
+            } else {
+                songsResults.classList.remove('active');
+                albumsResults.classList.add('active');
+            }
         }
 
         // Auto-search on page load
         function initAutoSearch() {
+            initTabFromUrl();
             const query = getQueryParam('q');
             if (query) {
                 searchInput.value = query;
@@ -196,8 +298,16 @@
         // Extract search logic into reusable function
         async function performSearch(query) {
             showStatus('Searching...');
-            resultsDiv.innerHTML = '';
+            if (currentTab === 'songs') {
+                songsResults.innerHTML = '';
+                await performSongSearch(query);
+            } else {
+                albumsResults.innerHTML = '';
+                await performAlbumSearch(query);
+            }
+        }
 
+        async function performSongSearch(query) {
             try {
                 const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
                 const data = await response.json();
@@ -214,35 +324,151 @@
             }
         }
 
+        async function performAlbumSearch(query) {
+            try {
+                const response = await fetch(`/api/search/albums?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                if (data.results.length === 0) {
+                    showStatus('No albums found.');
+                    return;
+                }
+                showStatus('');
+                renderAlbums(data.results);
+            } catch (error) {
+                showStatus('Album search failed: ' + error.message, true);
+            }
+        }
+
         searchForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = searchInput.value.trim();
             if (!query) return;
 
-            updateUrlWithQuery(query);
+            updateUrlParams(query, currentTab);
             performSearch(query);
         });
 
         // Handle browser back/forward
         window.addEventListener('popstate', () => {
             const query = getQueryParam('q');
+            const tab = getQueryParam('tab') || 'songs';
+
+            // Restore tab state
+            if (tab === 'songs' || tab === 'albums') {
+                setActiveTab(tab);
+            }
+
             if (query) {
                 searchInput.value = query;
                 performSearch(query);
             } else {
                 searchInput.value = '';
-                resultsDiv.innerHTML = '';
+                songsResults.innerHTML = '';
+                albumsResults.innerHTML = '';
                 showStatus('');
             }
         });
 
         initAutoSearch();
 
+        function renderAlbums(albums) {
+            albumsResults.innerHTML = albums.map(album => `
+                <div class="album-card">
+                    <img class="album-cover" src="${album.thumbnail_url || ''}" alt="${escapeHtml(album.title)}" onerror="this.style.display='none'">
+                    <div class="album-info">
+                        <div class="album-title">${escapeHtml(album.title)}</div>
+                        <div class="album-artist">${escapeHtml(album.artist)}</div>
+                        <div class="album-meta">
+                            ${album.year ? `<span>${album.year}</span>` : ''}
+                            ${album.track_count ? `<span>${album.track_count} tracks</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="album-actions">
+                        <button class="view-album-btn" data-browse-id="${album.browse_id}">View Tracks</button>
+                        <button class="download-album-btn"
+                                data-browse-id="${album.browse_id}"
+                                data-title="${escapeHtml(album.title)}"
+                                data-artist="${escapeHtml(album.artist)}">
+                            Download Album
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.view-album-btn').forEach(btn => {
+                btn.addEventListener('click', handleViewAlbum);
+            });
+            document.querySelectorAll('.download-album-btn').forEach(btn => {
+                btn.addEventListener('click', handleDownloadAlbum);
+            });
+        }
+
+        async function handleViewAlbum(e) {
+            const browseId = e.target.dataset.browseId;
+            try {
+                showStatus('Loading album tracks...');
+                const response = await fetch(`/api/album/${browseId}/tracks`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Failed to load album');
+
+                showStatus('');
+                setActiveTab('songs');
+
+                renderResults(data.tracks);
+                showStatus(`Showing ${data.tracks.length} tracks from "${data.album_title}"`);
+            } catch (error) {
+                showStatus('Failed to load album: ' + error.message, true);
+            }
+        }
+
+        async function handleDownloadAlbum(e) {
+            const btn = e.target;
+            const browseId = btn.dataset.browseId;
+            const title = btn.dataset.title;
+            const artist = btn.dataset.artist;
+            const format = formatSelector.value;
+
+            btn.disabled = true;
+            btn.textContent = 'Queuing...';
+
+            try {
+                const response = await fetch('/api/queue/add-album', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        browse_id: browseId,
+                        album_title: title,
+                        artist: artist,
+                        audio_format: format
+                    })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    btn.textContent = `Queued (${data.track_count})`;
+                    showStatus(`Added ${data.track_count} tracks to queue`);
+                    setTimeout(() => {
+                        btn.textContent = 'Download Album';
+                        btn.disabled = false;
+                    }, 3000);
+                } else {
+                    throw new Error(data.detail || 'Unknown error');
+                }
+            } catch (error) {
+                btn.textContent = 'Failed';
+                showStatus('Failed: ' + error.message, true);
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = 'Download Album';
+                }, 3000);
+            }
+        }
+
         function renderResults(tracks) {
             // Stop any playing audio when re-rendering results
             stopCurrentAudio();
 
-            resultsDiv.innerHTML = tracks.map(track => `
+            songsResults.innerHTML = tracks.map(track => `
                 <div class="track">
                     <div class="track-main">
                         <img
@@ -268,6 +494,9 @@
                         >
                             ▶
                         </button>
+                        <button class="copy-url-btn" data-video-id="${track.video_id}" aria-label="Copy URL" title="Copy YouTube Music URL">
+                            🔗
+                        </button>
                         <button
                             class="download-btn"
                             data-video-id="${track.video_id}"
@@ -289,10 +518,55 @@
                 });
             });
 
+            // Add copy URL button handlers
+            document.querySelectorAll('.copy-url-btn').forEach(btn => {
+                btn.addEventListener('click', handleCopyUrl);
+            });
+
             // Add download button handlers
             document.querySelectorAll('.download-btn').forEach(btn => {
                 btn.addEventListener('click', handleDownload);
             });
+        }
+
+        async function handleCopyUrl(e) {
+            e.stopPropagation();
+            const btn = e.target;
+            const videoId = btn.dataset.videoId;
+            const url = `https://music.youtube.com/watch?v=${videoId}`;
+            const originalText = btn.textContent;
+
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(url);
+                    btn.textContent = '✓';
+                    showStatus('URL copied to clipboard');
+                } else {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = url;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    const success = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+
+                    if (success) {
+                        btn.textContent = '✓';
+                        showStatus('URL copied to clipboard');
+                    } else {
+                        throw new Error('Copy command failed');
+                    }
+                }
+
+                setTimeout(() => { btn.textContent = originalText; }, 2000);
+            } catch (error) {
+                console.error('Failed to copy URL:', error);
+                btn.textContent = '✗';
+                showStatus('Failed to copy URL: ' + error.message, true);
+                setTimeout(() => { btn.textContent = originalText; }, 2000);
+            }
         }
 
         async function handleDownload(e) {
@@ -301,44 +575,30 @@
             const videoId = btn.dataset.videoId;
             const title = btn.dataset.title;
             const artist = btn.dataset.artist;
-
-            // Check if this is a "Save to Computer" click
-            if (btn.dataset.filePath) {
-                const filePath = encodeURIComponent(btn.dataset.filePath);
-                window.location.href = `/api/download-file/${filePath}`;
-                return;
-            }
-
             const format = formatSelector.value;
 
             btn.disabled = true;
             const originalText = btn.textContent;
-            btn.textContent = 'Downloading...';
-            showStatus(`Downloading: ${title} (${format.toUpperCase()})...`);
+            btn.textContent = 'Adding...';
 
             try {
-                const response = await fetch('/api/download', {
+                const response = await fetch('/api/queue/add', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ video_id: videoId, title, artist, audio_format: format })
                 });
                 const data = await response.json();
 
-                if (data.success) {
-                    btn.textContent = 'Save to Computer';
-                    btn.dataset.filePath = data.file_path;
-                    btn.classList.add('save-btn');
-                    btn.disabled = false;
-                    showStatus(data.message + ' - Click "Save to Computer" to download to your device');
-
+                if (response.ok) {
+                    btn.textContent = 'Queued';
+                    showStatus(`Added to queue: ${title}`);
                     setTimeout(() => {
                         btn.textContent = originalText;
-                        btn.classList.remove('save-btn');
-                        delete btn.dataset.filePath;
-                    }, 30000);
+                        btn.disabled = false;
+                    }, 2000);
                 } else {
                     btn.textContent = 'Failed';
-                    showStatus(data.message, true);
+                    showStatus('Failed to add to queue', true);
                     setTimeout(() => {
                         btn.disabled = false;
                         btn.textContent = originalText;
@@ -346,13 +606,267 @@
                 }
             } catch (error) {
                 btn.textContent = 'Error';
-                showStatus('Download failed: ' + error.message, true);
+                showStatus('Failed to add to queue: ' + error.message, true);
                 setTimeout(() => {
                     btn.disabled = false;
                     btn.textContent = originalText;
                 }, 3000);
             }
         }
+
+        // Queue Management
+        let eventSource = null;
+
+        function initQueue() {
+            // Connect to SSE endpoint for real-time updates
+            eventSource = new EventSource('/api/queue/stream');
+
+            eventSource.onmessage = (event) => {
+                const jobs = JSON.parse(event.data);
+                updateQueueUI(jobs);
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                // Reconnect after 5 seconds
+                setTimeout(() => {
+                    if (eventSource) {
+                        eventSource.close();
+                    }
+                    initQueue();
+                }, 5000);
+            };
+
+            // Load initial queue
+            fetchQueue();
+        }
+
+        async function fetchQueue() {
+            try {
+                const response = await fetch('/api/queue/jobs');
+                const data = await response.json();
+                updateQueueUI(data.jobs);
+            } catch (error) {
+                console.error('Failed to fetch queue:', error);
+            }
+        }
+
+        function updateQueueUI(jobs) {
+            const queueList = document.getElementById('queue-list');
+            const queueSection = document.getElementById('queue-section');
+
+            if (jobs.length === 0) {
+                queueSection.style.display = 'none';
+                return;
+            }
+
+            queueSection.style.display = 'block';
+
+            queueList.innerHTML = jobs.map(job => {
+                const statusClass = job.status.toLowerCase();
+                let progressHtml = '';
+                let actionsHtml = '';
+
+                if (job.status === 'downloading') {
+                    progressHtml = `
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${job.progress}%"></div>
+                            <span class="progress-text">${job.progress.toFixed(1)}% - ${job.speed} - ${job.eta}</span>
+                        </div>
+                    `;
+                }
+
+                if (job.status === 'completed' && job.file_path) {
+                    actionsHtml = `
+                        <a href="/api/download-file/${encodeURIComponent(job.file_path)}" class="download-file-btn" download>
+                            💾 Save to Computer
+                        </a>
+                    `;
+                }
+
+                if (job.status === 'completed' || job.status === 'failed') {
+                    actionsHtml += `
+                        <button class="clear-job-btn" data-job-id="${job.id}">Clear</button>
+                    `;
+                }
+
+                const errorHtml = job.error ? `<div class="job-error">${escapeHtml(job.error)}</div>` : '';
+
+                return `
+                    <div class="job-card ${statusClass}">
+                        <div class="job-header">
+                            <div class="job-info">
+                                <span class="job-title">${escapeHtml(job.title)}</span>
+                                <span class="job-artist">${escapeHtml(job.artist)}</span>
+                            </div>
+                            <span class="job-status status-${statusClass}">${job.status.toUpperCase()}</span>
+                        </div>
+                        ${progressHtml}
+                        ${errorHtml}
+                        ${actionsHtml}
+                    </div>
+                `;
+            }).join('');
+
+            // Add clear button handlers
+            document.querySelectorAll('.clear-job-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const jobId = e.target.dataset.jobId;
+                    await removeJob(jobId);
+                });
+            });
+        }
+
+        async function removeJob(jobId) {
+            try {
+                await fetch(`/api/queue/${jobId}`, { method: 'DELETE' });
+            } catch (error) {
+                console.error('Failed to remove job:', error);
+                showStatus('Failed to remove job', true);
+            }
+        }
+
+        async function clearCompleted() {
+            try {
+                const response = await fetch('/api/queue/jobs');
+                const data = await response.json();
+                for (const job of data.jobs) {
+                    if (job.status === 'completed' || job.status === 'failed') {
+                        await removeJob(job.id);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to clear completed:', error);
+                showStatus('Failed to clear completed jobs', true);
+            }
+        }
+
+        document.getElementById('clear-completed-btn').addEventListener('click', clearCompleted);
+
+        // Initialize queue on page load
+        initQueue();
+
+        // Settings modal management
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const modalClose = settingsModal.querySelector('.modal-close');
+        const cookieFileInput = document.getElementById('cookie-file-input');
+        const uploadCookieBtn = document.getElementById('upload-cookie-btn');
+        const deleteCookieBtn = document.getElementById('delete-cookie-btn');
+        const cookieStatus = document.getElementById('cookie-status');
+
+        // Open settings
+        settingsBtn.addEventListener('click', async () => {
+            settingsModal.classList.add('active');
+            await refreshCookieStatus();
+        });
+
+        // Close settings
+        modalClose.addEventListener('click', () => {
+            settingsModal.classList.remove('active');
+        });
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                settingsModal.classList.remove('active');
+            }
+        });
+
+        // Refresh cookie status
+        async function refreshCookieStatus() {
+            try {
+                const response = await fetch('/api/settings/cookies/status');
+                const data = await response.json();
+
+                const indicator = cookieStatus.querySelector('.status-indicator');
+                const text = cookieStatus.querySelector('.status-text');
+
+                if (data.configured && data.exists) {
+                    indicator.className = 'status-indicator status-success';
+                    text.textContent = `Cookie file configured (${data.source})`;
+                    deleteCookieBtn.style.display = data.source === 'uploaded' ? 'inline-block' : 'none';
+                } else if (data.configured && !data.exists) {
+                    indicator.className = 'status-indicator status-warning';
+                    text.textContent = `Cookie file configured but not found`;
+                    deleteCookieBtn.style.display = 'none';
+                } else {
+                    indicator.className = 'status-indicator status-none';
+                    text.textContent = 'No cookie file configured';
+                    deleteCookieBtn.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Failed to get cookie status:', error);
+                const indicator = cookieStatus.querySelector('.status-indicator');
+                const text = cookieStatus.querySelector('.status-text');
+                indicator.className = 'status-indicator status-error';
+                text.textContent = 'Error checking cookie status';
+            }
+        }
+
+        // Upload cookie file
+        uploadCookieBtn.addEventListener('click', () => {
+            cookieFileInput.click();
+        });
+
+        cookieFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            uploadCookieBtn.disabled = true;
+            uploadCookieBtn.textContent = 'Uploading...';
+
+            try {
+                const response = await fetch('/api/settings/cookies/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showStatus('Cookie file uploaded successfully');
+                    await refreshCookieStatus();
+                } else {
+                    throw new Error(data.detail || 'Upload failed');
+                }
+            } catch (error) {
+                showStatus('Failed to upload cookie file: ' + error.message, true);
+            } finally {
+                uploadCookieBtn.disabled = false;
+                uploadCookieBtn.textContent = 'Upload cookies.txt';
+                cookieFileInput.value = '';
+            }
+        });
+
+        // Delete cookie file
+        deleteCookieBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to delete the uploaded cookie file?')) {
+                return;
+            }
+
+            deleteCookieBtn.disabled = true;
+            deleteCookieBtn.textContent = 'Deleting...';
+
+            try {
+                const response = await fetch('/api/settings/cookies', {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showStatus('Cookie file deleted successfully');
+                    await refreshCookieStatus();
+                } else {
+                    throw new Error(data.detail || 'Delete failed');
+                }
+            } catch (error) {
+                showStatus('Failed to delete cookie file: ' + error.message, true);
+            } finally {
+                deleteCookieBtn.disabled = false;
+                deleteCookieBtn.textContent = 'Delete Cookie File';
+            }
+        });
 
         function escapeHtml(text) {
             const div = document.createElement('div');
