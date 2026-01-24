@@ -5,7 +5,7 @@ services:
       - "8000:8000"
     volumes:
       - ./downloads:/downloads
-      - ./.kikusan:/.kikusan  # Persistent storage for uploaded cookies
+      - ./.kikusan:/app/.kikusan # Persistent storage for uploaded cookies
       # - ./cookies:/cookies  # Optional: for env var cookie method
     environment:
       - KIKUSAN_DOWNLOAD_DIR=/downloads
