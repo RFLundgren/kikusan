@@ -1,5 +1,7 @@
 # Kikusan
 
+![UI](ui.png)
+
 Search and download music from YouTube Music with lyrics.
 
 ## Features
@@ -237,23 +239,24 @@ hooks:
 
 Hooks receive context via environment variables:
 
-| Variable               | Description                                    |
-| ---------------------- | ---------------------------------------------- |
-| `KIKUSAN_EVENT`        | Event type (playlist_updated, sync_completed)  |
-| `KIKUSAN_PLAYLIST_NAME`| Name of the playlist/plugin                    |
-| `KIKUSAN_PLAYLIST_PATH`| Absolute path to the M3U file (if exists)      |
-| `KIKUSAN_SYNC_TYPE`    | Type: "playlist" or "plugin"                   |
-| `KIKUSAN_DOWNLOADED`   | Number of tracks downloaded                    |
-| `KIKUSAN_SKIPPED`      | Number of tracks skipped                       |
-| `KIKUSAN_DELETED`      | Number of tracks deleted                       |
-| `KIKUSAN_FAILED`       | Number of tracks that failed                   |
-| `KIKUSAN_SUCCESS`      | "true" or "false"                              |
+| Variable                | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `KIKUSAN_EVENT`         | Event type (playlist_updated, sync_completed) |
+| `KIKUSAN_PLAYLIST_NAME` | Name of the playlist/plugin                   |
+| `KIKUSAN_PLAYLIST_PATH` | Absolute path to the M3U file (if exists)     |
+| `KIKUSAN_SYNC_TYPE`     | Type: "playlist" or "plugin"                  |
+| `KIKUSAN_DOWNLOADED`    | Number of tracks downloaded                   |
+| `KIKUSAN_SKIPPED`       | Number of tracks skipped                      |
+| `KIKUSAN_DELETED`       | Number of tracks deleted                      |
+| `KIKUSAN_FAILED`        | Number of tracks that failed                  |
+| `KIKUSAN_SUCCESS`       | "true" or "false"                             |
 
 **Navidrome Integration Example:**
 
 To automatically import playlists to Navidrome using its [playlist import API](https://github.com/navidrome/navidrome/pull/2273):
 
 1. Set environment variables:
+
    ```bash
    export NAVIDROME_URL="https://music.example.com"
    export NAVIDROME_TOKEN="your-api-token"
@@ -282,28 +285,28 @@ docker compose up -d
 
 ### Environment Variables
 
-| Variable                      | Default                           | Description                                    |
-| ----------------------------- | --------------------------------- | ---------------------------------------------- |
-| `KIKUSAN_DOWNLOAD_DIR`        | `./downloads`                     | Download directory                             |
-| `KIKUSAN_AUDIO_FORMAT`        | `opus`                            | Audio format (opus, mp3, flac)                 |
-| `KIKUSAN_FILENAME_TEMPLATE`   | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format)              |
-| `KIKUSAN_ORGANIZATION_MODE`   | `flat`                            | File organization mode (flat, album)           |
-| `KIKUSAN_USE_PRIMARY_ARTIST`  | `false`                           | Use primary artist for folders (true, false)   |
-| `KIKUSAN_WEB_PORT`            | `8000`                            | Web server port                                |
-| `KIKUSAN_WEB_PLAYLIST`        | `None`                            | M3U playlist name for web downloads (optional) |
-| `KIKUSAN_CORS_ORIGINS`        | `*`                               | CORS allowed origins (comma-separated)         |
-| `KIKUSAN_COOKIE_MODE`         | `auto`                            | Cookie usage: auto, always, or never           |
-| `KIKUSAN_COOKIE_RETRY_DELAY`  | `1.0`                             | Delay in seconds before retrying with cookies  |
-| `KIKUSAN_LOG_COOKIE_USAGE`    | `true`                            | Log cookie usage statistics (true, false)      |
-| `SPOTIFY_CLIENT_ID`           | `None`                            | Spotify API client ID (for Spotify playlists)  |
-| `SPOTIFY_CLIENT_SECRET`       | `None`                            | Spotify API client secret (optional)           |
-| `GOTIFY_URL`                  | `None`                            | Gotify server URL for notifications (optional) |
-| `GOTIFY_TOKEN`                | `None`                            | Gotify application token (optional)            |
-| `NAVIDROME_URL`               | `None`                            | Navidrome server URL for protection (optional) |
-| `NAVIDROME_USER`              | `None`                            | Navidrome username (optional)                  |
-| `NAVIDROME_PASSWORD`          | `None`                            | Navidrome password (optional)                  |
-| `NAVIDROME_KEEP_PLAYLIST`     | `keep`                            | Playlist name for protection (optional)        |
-| `YT_DLP_COOKIE_FILE`          | `None`                            | Path to cookies.txt file for yt-dlp (optional) |
+| Variable                     | Default                           | Description                                    |
+| ---------------------------- | --------------------------------- | ---------------------------------------------- |
+| `KIKUSAN_DOWNLOAD_DIR`       | `./downloads`                     | Download directory                             |
+| `KIKUSAN_AUDIO_FORMAT`       | `opus`                            | Audio format (opus, mp3, flac)                 |
+| `KIKUSAN_FILENAME_TEMPLATE`  | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format)              |
+| `KIKUSAN_ORGANIZATION_MODE`  | `flat`                            | File organization mode (flat, album)           |
+| `KIKUSAN_USE_PRIMARY_ARTIST` | `false`                           | Use primary artist for folders (true, false)   |
+| `KIKUSAN_WEB_PORT`           | `8000`                            | Web server port                                |
+| `KIKUSAN_WEB_PLAYLIST`       | `None`                            | M3U playlist name for web downloads (optional) |
+| `KIKUSAN_CORS_ORIGINS`       | `*`                               | CORS allowed origins (comma-separated)         |
+| `KIKUSAN_COOKIE_MODE`        | `auto`                            | Cookie usage: auto, always, or never           |
+| `KIKUSAN_COOKIE_RETRY_DELAY` | `1.0`                             | Delay in seconds before retrying with cookies  |
+| `KIKUSAN_LOG_COOKIE_USAGE`   | `true`                            | Log cookie usage statistics (true, false)      |
+| `SPOTIFY_CLIENT_ID`          | `None`                            | Spotify API client ID (for Spotify playlists)  |
+| `SPOTIFY_CLIENT_SECRET`      | `None`                            | Spotify API client secret (optional)           |
+| `GOTIFY_URL`                 | `None`                            | Gotify server URL for notifications (optional) |
+| `GOTIFY_TOKEN`               | `None`                            | Gotify application token (optional)            |
+| `NAVIDROME_URL`              | `None`                            | Navidrome server URL for protection (optional) |
+| `NAVIDROME_USER`             | `None`                            | Navidrome username (optional)                  |
+| `NAVIDROME_PASSWORD`         | `None`                            | Navidrome password (optional)                  |
+| `NAVIDROME_KEEP_PLAYLIST`    | `keep`                            | Playlist name for protection (optional)        |
+| `YT_DLP_COOKIE_FILE`         | `None`                            | Path to cookies.txt file for yt-dlp (optional) |
 
 ### Cookie Authentication
 
@@ -323,6 +326,7 @@ Kikusan supports two methods for providing cookies to yt-dlp:
 **Priority**: Web-uploaded cookies take precedence over environment variable.
 
 **Exporting Cookies**:
+
 - Chrome/Edge: Install "Get cookies.txt LOCALLY" extension
 - Firefox: Install "cookies.txt" extension
 - See [yt-dlp FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for detailed instructions
@@ -378,6 +382,7 @@ export KIKUSAN_ORGANIZATION_MODE=album
 **Multi-Artist Handling:**
 
 By default, album mode uses the full artist string from metadata:
+
 - `Queen feat. David Bowie` → folder: `Queen feat. David Bowie/`
 - `Artist1, Artist2` → folder: `Artist1, Artist2/`
 
@@ -388,11 +393,12 @@ export KIKUSAN_USE_PRIMARY_ARTIST=true
 ```
 
 This extracts the main artist (before separators) for folder names:
+
 - `Queen feat. David Bowie` → folder: `Queen/`
 - `Artist1, Artist2` → folder: `Artist1/`
 - `Artist & Guest` → folder: `Artist/`
 
-Supported separators (in priority order): ` feat. `, ` ft. `, ` featuring `, ` with `, ` & `, `, `
+Supported separators (in priority order): `feat.`, `ft.`, `featuring`, `with`, `&`, `, `
 
 The full artist metadata is still preserved in the audio file tags.
 
@@ -419,12 +425,12 @@ This section documents all CLI commands and their options.
 
 These options apply to all commands:
 
-| Option                  | Env Variable                | Description                                                  |
-| ----------------------- | --------------------------- | ------------------------------------------------------------ |
-| `--cookie-mode`         | `KIKUSAN_COOKIE_MODE`       | Cookie usage: `auto` (retry on auth errors), `always`, `never`. Default: `auto` |
-| `--cookie-retry-delay`  | `KIKUSAN_COOKIE_RETRY_DELAY`| Delay in seconds before retrying with cookies. Default: `1.0` |
-| `--no-log-cookie-usage` | (inverse of `KIKUSAN_LOG_COOKIE_USAGE`) | Disable logging of cookie usage statistics   |
-| `--version`             | -                           | Show version and exit                                        |
+| Option                  | Env Variable                            | Description                                                                     |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
+| `--cookie-mode`         | `KIKUSAN_COOKIE_MODE`                   | Cookie usage: `auto` (retry on auth errors), `always`, `never`. Default: `auto` |
+| `--cookie-retry-delay`  | `KIKUSAN_COOKIE_RETRY_DELAY`            | Delay in seconds before retrying with cookies. Default: `1.0`                   |
+| `--no-log-cookie-usage` | (inverse of `KIKUSAN_LOG_COOKIE_USAGE`) | Disable logging of cookie usage statistics                                      |
+| `--version`             | -                                       | Show version and exit                                                           |
 
 ### kikusan search
 
@@ -434,9 +440,9 @@ Search for music on YouTube Music.
 kikusan search "query" [OPTIONS]
 ```
 
-| Option          | Description                        |
-| --------------- | ---------------------------------- |
-| `-l, --limit`   | Maximum number of results (default: 10) |
+| Option        | Description                             |
+| ------------- | --------------------------------------- |
+| `-l, --limit` | Maximum number of results (default: 10) |
 
 ### kikusan download
 
@@ -446,16 +452,16 @@ Download a track by video ID, URL, or search query.
 kikusan download [VIDEO_ID] [OPTIONS]
 ```
 
-| Option                                       | Env Variable                | Description                                      |
-| -------------------------------------------- | --------------------------- | ------------------------------------------------ |
-| `-u, --url`                                  | -                           | YouTube, YouTube Music, or Spotify URL           |
-| `-q, --query`                                | -                           | Search query (downloads first match)             |
-| `-o, --output`                               | `KIKUSAN_DOWNLOAD_DIR`      | Output directory                                 |
-| `-f, --format`                               | `KIKUSAN_AUDIO_FORMAT`      | Audio format: `opus`, `mp3`, `flac`. Default: `opus` |
-| `-n, --filename`                             | `KIKUSAN_FILENAME_TEMPLATE` | Filename template (yt-dlp format)                |
-| `--no-lyrics`                                | -                           | Skip fetching lyrics                             |
-| `-p, --add-to-playlist`                      | -                           | Add downloaded track(s) to M3U playlist          |
-| `--organization-mode`                        | `KIKUSAN_ORGANIZATION_MODE` | File organization: `flat` or `album`. Default: `flat` |
+| Option                                         | Env Variable                 | Description                                            |
+| ---------------------------------------------- | ---------------------------- | ------------------------------------------------------ |
+| `-u, --url`                                    | -                            | YouTube, YouTube Music, or Spotify URL                 |
+| `-q, --query`                                  | -                            | Search query (downloads first match)                   |
+| `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Output directory                                       |
+| `-f, --format`                                 | `KIKUSAN_AUDIO_FORMAT`       | Audio format: `opus`, `mp3`, `flac`. Default: `opus`   |
+| `-n, --filename`                               | `KIKUSAN_FILENAME_TEMPLATE`  | Filename template (yt-dlp format)                      |
+| `--no-lyrics`                                  | -                            | Skip fetching lyrics                                   |
+| `-p, --add-to-playlist`                        | -                            | Add downloaded track(s) to M3U playlist                |
+| `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`  |
 | `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode |
 
 ### kikusan web
@@ -466,14 +472,14 @@ Start the web interface.
 kikusan web [OPTIONS]
 ```
 
-| Option                                       | Env Variable                | Description                                      |
-| -------------------------------------------- | --------------------------- | ------------------------------------------------ |
-| `--host`                                     | -                           | Host to bind to. Default: `0.0.0.0`              |
-| `-p, --port`                                 | `KIKUSAN_WEB_PORT`          | Port to listen on. Default: `8000`               |
-| `--cors-origins`                             | `KIKUSAN_CORS_ORIGINS`      | CORS allowed origins (comma-separated or `*`). Default: `*` |
-| `--web-playlist`                             | `KIKUSAN_WEB_PLAYLIST`      | M3U playlist name for web downloads (optional)   |
-| `--organization-mode`                        | `KIKUSAN_ORGANIZATION_MODE` | File organization: `flat` or `album`. Default: `flat` |
-| `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode |
+| Option                                         | Env Variable                 | Description                                                 |
+| ---------------------------------------------- | ---------------------------- | ----------------------------------------------------------- |
+| `--host`                                       | -                            | Host to bind to. Default: `0.0.0.0`                         |
+| `-p, --port`                                   | `KIKUSAN_WEB_PORT`           | Port to listen on. Default: `8000`                          |
+| `--cors-origins`                               | `KIKUSAN_CORS_ORIGINS`       | CORS allowed origins (comma-separated or `*`). Default: `*` |
+| `--web-playlist`                               | `KIKUSAN_WEB_PLAYLIST`       | M3U playlist name for web downloads (optional)              |
+| `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`       |
+| `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode      |
 
 ### kikusan cron
 
@@ -483,13 +489,13 @@ Run continuous playlist sync based on cron.yaml.
 kikusan cron [OPTIONS]
 ```
 
-| Option                                       | Env Variable                | Description                                      |
-| -------------------------------------------- | --------------------------- | ------------------------------------------------ |
-| `-c, --config`                               | -                           | Path to cron configuration file. Default: `cron.yaml` |
-| `-o, --output`                               | `KIKUSAN_DOWNLOAD_DIR`      | Override download directory                      |
-| `--once`                                     | -                           | Run all playlists once and exit (skip scheduling) |
-| `-f, --format`                               | `KIKUSAN_AUDIO_FORMAT`      | Audio format: `opus`, `mp3`, `flac`. Default: `opus` |
-| `--organization-mode`                        | `KIKUSAN_ORGANIZATION_MODE` | File organization: `flat` or `album`. Default: `flat` |
+| Option                                         | Env Variable                 | Description                                            |
+| ---------------------------------------------- | ---------------------------- | ------------------------------------------------------ |
+| `-c, --config`                                 | -                            | Path to cron configuration file. Default: `cron.yaml`  |
+| `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Override download directory                            |
+| `--once`                                       | -                            | Run all playlists once and exit (skip scheduling)      |
+| `-f, --format`                                 | `KIKUSAN_AUDIO_FORMAT`       | Audio format: `opus`, `mp3`, `flac`. Default: `opus`   |
+| `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`  |
 | `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode |
 
 ### kikusan plugins list
@@ -510,12 +516,12 @@ Run a plugin sync once (without cron.yaml).
 kikusan plugins run PLUGIN_NAME --config '{"key": "value"}' [OPTIONS]
 ```
 
-| Option                                       | Env Variable                | Description                                      |
-| -------------------------------------------- | --------------------------- | ------------------------------------------------ |
-| `-c, --config`                               | -                           | Plugin config as JSON string (required)          |
-| `-o, --output`                               | `KIKUSAN_DOWNLOAD_DIR`      | Download directory                               |
-| `-f, --format`                               | `KIKUSAN_AUDIO_FORMAT`      | Audio format: `opus`, `mp3`, `flac`. Default: `opus` |
-| `--organization-mode`                        | `KIKUSAN_ORGANIZATION_MODE` | File organization: `flat` or `album`. Default: `flat` |
+| Option                                         | Env Variable                 | Description                                            |
+| ---------------------------------------------- | ---------------------------- | ------------------------------------------------------ |
+| `-c, --config`                                 | -                            | Plugin config as JSON string (required)                |
+| `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Download directory                                     |
+| `-f, --format`                                 | `KIKUSAN_AUDIO_FORMAT`       | Audio format: `opus`, `mp3`, `flac`. Default: `opus`   |
+| `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`  |
 | `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode |
 
 ## Authentication
