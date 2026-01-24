@@ -219,6 +219,33 @@ header p {
     border-bottom-color: var(--accent-primary);
 }
 
+/* Back to Albums button (shown when viewing album tracks) */
+.back-to-albums-btn {
+    display: none;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.back-to-albums-btn::before {
+    content: '\2190';
+    margin-right: 0.5rem;
+}
+
+.back-to-albums-btn:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-tertiary);
+}
+
 .results {
     display: none;
     flex-direction: column;

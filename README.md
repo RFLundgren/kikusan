@@ -222,6 +222,10 @@ hooks:
   # Import playlist to Navidrome when updated
   - event: playlist_updated
     command: |
+      NAVIDROME_TOKEN=$(curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"username\": \"${NAVIDROME_USER}\", \"password\": \"${NAVIDROME_PASSWORD}\"}" \
+        "${NAVIDROME_URL}/auth/login" | jq -r '.token')
       curl -X POST \
         -H "Content-Type: audio/x-mpegurl" \
         -H "X-ND-Authorization: Bearer ${NAVIDROME_TOKEN}" \
@@ -255,11 +259,12 @@ Hooks receive context via environment variables:
 
 To automatically import playlists to Navidrome using its [playlist import API](https://github.com/navidrome/navidrome/pull/2273):
 
-1. Set environment variables:
+1. Set environment variables (these are already used for Navidrome Protection):
 
    ```bash
    export NAVIDROME_URL="https://music.example.com"
-   export NAVIDROME_TOKEN="your-api-token"
+   export NAVIDROME_USER="your-username"
+   export NAVIDROME_PASSWORD="your-password"
    ```
 
 2. Add hook to `cron.yaml`:
@@ -267,12 +272,18 @@ To automatically import playlists to Navidrome using its [playlist import API](h
    hooks:
      - event: playlist_updated
        command: |
+         NAVIDROME_TOKEN=$(curl -s -X POST \
+           -H "Content-Type: application/json" \
+           -d "{\"username\": \"${NAVIDROME_USER}\", \"password\": \"${NAVIDROME_PASSWORD}\"}" \
+           "${NAVIDROME_URL}/auth/login" | jq -r '.token')
          curl -X POST \
            -H "Content-Type: audio/x-mpegurl" \
            -H "X-ND-Authorization: Bearer ${NAVIDROME_TOKEN}" \
            --data-binary @"${KIKUSAN_PLAYLIST_PATH}" \
            "${NAVIDROME_URL}/api/playlist"
    ```
+
+   Note: This requires `jq` to be installed for parsing the JSON response.
 
 ### Docker
 

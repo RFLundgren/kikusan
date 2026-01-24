@@ -218,10 +218,12 @@
         const songsResults = document.getElementById('songs-results');
         const albumsResults = document.getElementById('albums-results');
         let currentTab = 'songs';
+        let viewingAlbum = null; // Tracks current album view mode { id, title, query }
 
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
+                exitAlbumViewMode(); // Clear album view mode when switching tabs
                 setActiveTab(tab);
 
                 const query = searchInput.value.trim();
@@ -229,6 +231,51 @@
                 if (query) performSearch(query);
             });
         });
+
+        // Exit album view mode and return to normal search
+        function exitAlbumViewMode() {
+            if (viewingAlbum) {
+                viewingAlbum = null;
+                hideBackToAlbumsButton();
+            }
+        }
+
+        // Show a "Back to Albums" button when viewing album tracks
+        function showBackToAlbumsButton(albumTitle) {
+            let backBtn = document.getElementById('back-to-albums-btn');
+            if (!backBtn) {
+                backBtn = document.createElement('button');
+                backBtn.id = 'back-to-albums-btn';
+                backBtn.className = 'back-to-albums-btn';
+                backBtn.addEventListener('click', handleBackToAlbums);
+                // Insert after the search tabs
+                const searchTabs = document.querySelector('.search-tabs');
+                searchTabs.parentNode.insertBefore(backBtn, searchTabs.nextSibling);
+            }
+            backBtn.textContent = 'Back to Albums';
+            backBtn.style.display = 'block';
+        }
+
+        function hideBackToAlbumsButton() {
+            const backBtn = document.getElementById('back-to-albums-btn');
+            if (backBtn) {
+                backBtn.style.display = 'none';
+            }
+        }
+
+        function handleBackToAlbums() {
+            if (viewingAlbum && viewingAlbum.query) {
+                const query = viewingAlbum.query;
+                exitAlbumViewMode();
+                setActiveTab('albums');
+                updateUrlParams(query, 'albums');
+                performSearch(query);
+            } else {
+                exitAlbumViewMode();
+                setActiveTab('albums');
+                updateUrlParams(searchInput.value.trim(), 'albums');
+            }
+        }
 
         function showStatus(message, isError = false) {
             statusDiv.textContent = message;
@@ -242,7 +289,7 @@
             return urlParams.get(name);
         }
 
-        function updateUrlParams(query, tab) {
+        function updateUrlParams(query, tab, albumId = null) {
             const url = new URL(window.location);
             if (query) {
                 url.searchParams.set('q', query);
@@ -253,6 +300,11 @@
                 url.searchParams.set('tab', tab);
             } else {
                 url.searchParams.delete('tab');
+            }
+            if (albumId) {
+                url.searchParams.set('album', albumId);
+            } else {
+                url.searchParams.delete('album');
             }
             window.history.pushState({}, '', url);
         }
@@ -287,8 +339,19 @@
 
         // Auto-search on page load
         function initAutoSearch() {
-            initTabFromUrl();
             const query = getQueryParam('q');
+            const albumId = getQueryParam('album');
+
+            // If we have an album ID, load album tracks directly
+            if (albumId) {
+                if (query) {
+                    searchInput.value = query;
+                }
+                loadAlbumTracks(albumId, query);
+                return;
+            }
+
+            initTabFromUrl();
             if (query) {
                 searchInput.value = query;
                 performSearch(query);
@@ -352,6 +415,17 @@
         window.addEventListener('popstate', () => {
             const query = getQueryParam('q');
             const tab = getQueryParam('tab') || 'songs';
+            const albumId = getQueryParam('album');
+
+            // Handle album view state
+            if (albumId) {
+                // Restore album view mode
+                viewingAlbum = { id: albumId, query: query };
+                loadAlbumTracks(albumId, query);
+                return;
+            } else {
+                exitAlbumViewMode();
+            }
 
             // Restore tab state
             if (tab === 'songs' || tab === 'albums') {
@@ -368,6 +442,35 @@
                 showStatus('');
             }
         });
+
+        // Helper function to load album tracks (used by popstate handler)
+        async function loadAlbumTracks(browseId, originalQuery) {
+            try {
+                showStatus('Loading album tracks...');
+                const response = await fetch(`/api/album/${browseId}/tracks`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Failed to load album');
+
+                showStatus('');
+                viewingAlbum = {
+                    id: browseId,
+                    title: data.album_title,
+                    query: originalQuery
+                };
+
+                setActiveTab('songs');
+                showBackToAlbumsButton(data.album_title);
+                if (originalQuery) {
+                    searchInput.value = originalQuery;
+                }
+
+                renderResults(data.tracks);
+                showStatus(`Showing ${data.tracks.length} tracks from "${data.album_title}"`);
+            } catch (error) {
+                showStatus('Failed to load album: ' + error.message, true);
+                exitAlbumViewMode();
+            }
+        }
 
         initAutoSearch();
 
@@ -412,7 +515,19 @@
                 if (!response.ok) throw new Error(data.detail || 'Failed to load album');
 
                 showStatus('');
+
+                // Store album view state
+                viewingAlbum = {
+                    id: browseId,
+                    title: data.album_title,
+                    query: searchInput.value.trim()
+                };
+
+                // Update URL to reflect we're viewing an album's tracks
+                updateUrlParams(searchInput.value.trim(), 'songs', browseId);
+
                 setActiveTab('songs');
+                showBackToAlbumsButton(data.album_title);
 
                 renderResults(data.tracks);
                 showStatus(`Showing ${data.tracks.length} tracks from "${data.album_title}"`);
