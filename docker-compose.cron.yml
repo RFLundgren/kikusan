@@ -6,7 +6,13 @@
 services:
   # Kikusan cron service - monitors and syncs playlists
   kikusan-cron:
-    build: .
+    build:
+      context: .
+      args:
+        # Match host user UID/GID for volume permissions (default: 1000)
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    user: "${UID:-1000}:${GID:-1000}"
     container_name: kikusan-cron
     command: ["uv", "run", "kikusan", "cron", "--config", "/config/cron.yaml"]
 
@@ -55,7 +61,12 @@ services:
   # Uncomment the section below to enable the web interface
 
   # kikusan-web:
-  #   build: .
+  #   build:
+  #     context: .
+  #     args:
+  #       UID: ${UID:-1000}
+  #       GID: ${GID:-1000}
+  #   user: "${UID:-1000}:${GID:-1000}"
   #   container_name: kikusan-web
   #   command: ["uv", "run", "kikusan", "web", "--host", "0.0.0.0", "--port", "8000"]
   #

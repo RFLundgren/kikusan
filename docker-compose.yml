@@ -1,6 +1,12 @@
 services:
   kikusan:
-    build: .
+    build:
+      context: .
+      args:
+        # Match host user UID/GID for volume permissions (default: 1000)
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "8000:8000"
     volumes:
