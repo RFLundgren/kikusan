@@ -7,6 +7,7 @@ import yt_dlp
 
 from kikusan.config import DEFAULT_FILENAME_TEMPLATE, get_config
 from kikusan.lyrics import get_lyrics, save_lyrics
+from kikusan.tags import write_multi_artist_tags
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
 
 logger = logging.getLogger(__name__)
@@ -276,6 +277,7 @@ def download(
     organization_mode: str = "flat",
     use_primary_artist: bool = False,
     cookie_file: str | None = None,
+    artists: list[str] | None = None,
 ) -> Path:
     """
     Download a track from YouTube Music.
@@ -289,6 +291,7 @@ def download(
         progress_callback: Optional callback for progress updates
         organization_mode: "flat" or "album" organization
         use_primary_artist: Extract primary artist for folder (before feat., &, etc.)
+        artists: List of individual artist names for multi-value tags (optional)
 
     Returns:
         Path to the downloaded audio file
@@ -333,10 +336,16 @@ def download(
     # Find the downloaded file
     audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
 
-    if audio_path and fetch_lyrics:
-        lyrics = get_lyrics(title, artist, duration)
-        if lyrics:
-            save_lyrics(lyrics, audio_path)
+    if audio_path:
+        # Write multi-valued ARTISTS/ALBUMARTISTS tags if artists provided
+        if artists:
+            write_multi_artist_tags(audio_path, artists)
+
+        # Fetch and save lyrics
+        if fetch_lyrics:
+            lyrics = get_lyrics(title, artist, duration)
+            if lyrics:
+                save_lyrics(lyrics, audio_path)
 
     return audio_path
 

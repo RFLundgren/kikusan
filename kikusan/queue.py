@@ -36,6 +36,7 @@ class DownloadJob:
     artist: str
     format: str
     status: JobStatus
+    artists: Optional[list[str]] = None
     progress: float = 0.0
     speed: str = ""
     eta: str = ""
@@ -92,7 +93,14 @@ class QueueManager:
                 pass
         logger.info("Queue manager stopped")
 
-    async def add_job(self, video_id: str, title: str, artist: str, format: str = "opus") -> str:
+    async def add_job(
+        self,
+        video_id: str,
+        title: str,
+        artist: str,
+        format: str = "opus",
+        artists: Optional[list[str]] = None,
+    ) -> str:
         """
         Add a download job to the queue.
 
@@ -101,6 +109,7 @@ class QueueManager:
             title: Track title
             artist: Track artist
             format: Audio format (opus, mp3, flac)
+            artists: List of individual artist names for multi-value tags
 
         Returns:
             Job ID
@@ -113,6 +122,7 @@ class QueueManager:
             artist=artist,
             format=format,
             status=JobStatus.QUEUED,
+            artists=artists,
         )
         self.jobs[job_id] = job
         await self.queue.put(job)
@@ -172,6 +182,7 @@ class QueueManager:
                     organization_mode=config.organization_mode,
                     use_primary_artist=config.use_primary_artist,
                     cookie_file=config.cookie_file_path,
+                    artists=job.artists,
                 ),
             )
 

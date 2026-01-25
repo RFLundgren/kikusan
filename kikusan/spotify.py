@@ -25,6 +25,7 @@ class SpotifyTrack:
 
     name: str
     artist: str
+    artists: list[str]
     album: str | None
     duration_ms: int
 
@@ -96,8 +97,9 @@ def get_playlist_tracks(url: str) -> list[SpotifyTrack]:
             if not track:
                 continue
 
-            artists = track.get("artists", [])
-            artist_name = artists[0]["name"] if artists else "Unknown Artist"
+            artist_objects = track.get("artists", [])
+            artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
+            artist_name = artist_names[0]  # Primary artist for display/compatibility
 
             album = track.get("album")
             album_name = album.get("name") if album else None
@@ -106,6 +108,7 @@ def get_playlist_tracks(url: str) -> list[SpotifyTrack]:
                 SpotifyTrack(
                     name=track.get("name", "Unknown"),
                     artist=artist_name,
+                    artists=artist_names,
                     album=album_name,
                     duration_ms=track.get("duration_ms", 0),
                 )
@@ -155,13 +158,15 @@ def get_album_tracks(url: str) -> list[SpotifyTrack]:
         results = sp.album_tracks(album_id, offset=offset, limit=limit)
 
         for track in results.get("items", []):
-            artists = track.get("artists", [])
-            artist_name = artists[0]["name"] if artists else album_artist
+            artist_objects = track.get("artists", [])
+            artist_names = [a["name"] for a in artist_objects] if artist_objects else [album_artist]
+            artist_name = artist_names[0]  # Primary artist for display/compatibility
 
             tracks.append(
                 SpotifyTrack(
                     name=track.get("name", "Unknown"),
                     artist=artist_name,
+                    artists=artist_names,
                     album=album_name,
                     duration_ms=track.get("duration_ms", 0),
                 )
