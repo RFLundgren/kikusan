@@ -8,6 +8,12 @@ RUN apt-get update && \
 # Install uv for fast package management
 COPY --from=ghcr.io/astral-sh/uv:latest@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b /uv /usr/local/bin/uv
 
+# Create non-root user for security
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g ${GID} kikusan && \
+    useradd -u ${UID} -g ${GID} -m -s /bin/bash kikusan
+
 WORKDIR /app
 
 # Copy project files
@@ -17,12 +23,16 @@ COPY kikusan/ ./kikusan/
 # Install dependencies
 RUN uv sync --frozen
 
-# Create downloads directory
-RUN mkdir -p /downloads
+# Create downloads directory and set permissions
+RUN mkdir -p /downloads && \
+    chown -R kikusan:kikusan /app /downloads
 
 ENV KIKUSAN_DOWNLOAD_DIR=/downloads
 ENV KIKUSAN_WEB_PORT=8000
 ENV KIKUSAN_WEB_PLAYLIST=web-downloads
+
+# Switch to non-root user
+USER kikusan
 
 EXPOSE 8000
 
