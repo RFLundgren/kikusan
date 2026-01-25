@@ -16,6 +16,7 @@ class Song:
     title: str
     album: str | None = None
     duration_seconds: int | None = None
+    artists: list[str] | None = None
 
     @property
     def search_query(self) -> str:

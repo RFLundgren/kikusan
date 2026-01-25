@@ -65,6 +65,7 @@ class DownloadRequest(BaseModel):
     video_id: str
     title: str
     artist: str
+    artists: list[str] | None = None
     audio_format: str = "opus"
 
 
@@ -83,6 +84,7 @@ class TrackResponse(BaseModel):
     video_id: str
     title: str
     artist: str
+    artists: list[str]
     album: str | None
     duration: str
     thumbnail_url: str | None
@@ -148,6 +150,7 @@ async def api_search(q: str = Query(..., min_length=1, description="Search query
                 video_id=track.video_id,
                 title=track.title,
                 artist=track.artist,
+                artists=track.artists,
                 album=track.album,
                 duration=track.duration_display,
                 thumbnail_url=track.thumbnail_url,
@@ -191,6 +194,7 @@ async def api_get_album_tracks(browse_id: str):
                     video_id=track.video_id,
                     title=track.title,
                     artist=track.artist,
+                    artists=track.artists,
                     album=track.album,
                     duration=track.duration_display,
                     thumbnail_url=track.thumbnail_url,
@@ -230,6 +234,7 @@ async def api_download(request: DownloadRequest):
             organization_mode=config.organization_mode,
             use_primary_artist=config.use_primary_artist,
             cookie_file=config.cookie_file_path,
+            artists=request.artists,
         )
 
         # Add to playlist if configured
@@ -331,6 +336,7 @@ class QueueAddRequest(BaseModel):
     video_id: str
     title: str
     artist: str
+    artists: list[str] | None = None
     audio_format: str = "opus"
 
 
@@ -369,6 +375,7 @@ async def add_to_queue(request: QueueAddRequest):
         title=request.title,
         artist=request.artist,
         format=audio_format,
+        artists=request.artists,
     )
 
     return QueueAddResponse(job_id=job_id, status="queued")
@@ -405,6 +412,7 @@ async def add_album_to_queue(request: QueueAddAlbumRequest):
                 title=track.title,
                 artist=track.artist,
                 format=audio_format,
+                artists=track.artists,
             )
             job_ids.append(job_id)
 

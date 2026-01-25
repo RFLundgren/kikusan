@@ -122,6 +122,8 @@ def _extract_metadata(file_path: Path) -> tuple[str, str]:
     """
     Extract artist and title from audio file metadata.
 
+    Prefers ARTISTS multi-value tag if available, falls back to ARTIST.
+
     Args:
         file_path: Path to audio file
 
@@ -135,8 +137,8 @@ def _extract_metadata(file_path: Path) -> tuple[str, str]:
         if not audio:
             return "Unknown", "Unknown"
 
-        # Try common tags
-        artist = audio.get("artist", ["Unknown"])
+        # Try ARTISTS first (multi-value tag), then fall back to artist
+        artist = audio.get("ARTISTS") or audio.get("artists") or audio.get("artist", ["Unknown"])
         title = audio.get("title", ["Unknown"])
 
         # Handle both list and string formats

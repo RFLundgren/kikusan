@@ -15,6 +15,7 @@ class Track:
     video_id: str
     title: str
     artist: str
+    artists: list[str]
     album: str | None
     duration_seconds: int
     thumbnail_url: str | None
@@ -59,9 +60,10 @@ def search(query: str, limit: int = 20) -> list[Track]:
         if item.get("resultType") != "song":
             continue
 
-        # Extract artist name(s)
-        artists = item.get("artists", [])
-        artist_name = artists[0]["name"] if artists else "Unknown Artist"
+        # Extract artist name(s) - keep full list for multi-value tags
+        artist_objects = item.get("artists", [])
+        artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
+        artist_name = artist_names[0]  # Primary artist for display/compatibility
 
         # Extract album name
         album = item.get("album")
@@ -83,6 +85,7 @@ def search(query: str, limit: int = 20) -> list[Track]:
                 video_id=item["videoId"],
                 title=item.get("title", "Unknown Title"),
                 artist=artist_name,
+                artists=artist_names,
                 album=album_name,
                 duration_seconds=duration_seconds,
                 thumbnail_url=thumbnail_url,
@@ -158,9 +161,10 @@ def get_album_tracks(browse_id: str) -> list[Track]:
 
     tracks = []
     for item in album_info.get("tracks", []):
-        # Extract artist name(s)
-        artists = item.get("artists", [])
-        artist_name = artists[0]["name"] if artists else "Unknown Artist"
+        # Extract artist name(s) - keep full list for multi-value tags
+        artist_objects = item.get("artists", [])
+        artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
+        artist_name = artist_names[0]  # Primary artist for display/compatibility
 
         # Extract duration in seconds
         duration_text = item.get("duration", "0:00")
@@ -175,6 +179,7 @@ def get_album_tracks(browse_id: str) -> list[Track]:
                 video_id=item["videoId"],
                 title=item.get("title", "Unknown Title"),
                 artist=artist_name,
+                artists=artist_names,
                 album=album_info.get("title"),
                 duration_seconds=duration_seconds,
                 thumbnail_url=thumbnail_url,
