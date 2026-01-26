@@ -300,7 +300,6 @@ header p {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    line-clamp: 2;
     word-break: break-word;
 }
 
@@ -312,7 +311,6 @@ header p {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    line-clamp: 2;
     word-break: break-word;
 }
 
@@ -646,7 +644,6 @@ header p {
         white-space: nowrap;
         text-overflow: ellipsis;
         -webkit-line-clamp: 1;
-        line-clamp: 1;
     }
 }
 
