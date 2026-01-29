@@ -4,7 +4,8 @@
 
 Search, download and sync music from YouTube Music with lyrics.
 
-[![Release](https://img.shields.io/github/v/release/dadav/kikusan)](https://github.com/dadav/kikusan/releases)
+[![Release](https://img.shields.io/github/v/tag/dadav/kikusan)](https://github.com/dadav/kikusan/releases)
+[![License](https://img.shields.io/github/license/dadav/kikusan)](https://github.com/dadav/kikusan/blob/main/LICENSE)
 
 ![UI](ui.png)
 
