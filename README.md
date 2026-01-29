@@ -26,8 +26,8 @@ Search, download and sync music from YouTube Music with lyrics.
 
 ## Usecase
 
-I use navidrome as my music server. The music is located on a NAS and mounted into the navidrome container (read-only).
-Kikusan syncs my youtube music and spotify playlists shared mount and creates local m3u playlists. If kikusan has a discovery playlist configured (sync=True), songs which were removed from the upstream playlist get also removed from navidrome. There are some exceptions: They won't get removed if the songs are referenced by another playlist or starred in navidrome or in the `keep` playlist. Navidrome imports those playlist daily. Then I use [symfonium](https://play.google.com/store/apps/details?id=app.symfonik.music.player) to access my music via subsonic api.
+I use navidrome as my music server. My music is stored on a NAS and mounted in the navidrome container as read-only.
+Kikusan syncs my youtube music and spotify playlists on this shared mount and creates local m3u playlists. If kikusan has a discovery playlist configured (sync=True), songs that hav been removed from the upstream playlist are also removed from navidrome. There are some exceptions: They won't be removed if the songs are referenced by another playlist or starred in navidrome or in the `keep` playlist. Navidrome imports these playlist daily. Then I use [symfonium](https://play.google.com/store/apps/details?id=app.symfonik.music.player) to access my music via subsonic api.
 
 ## Plugin System
 
