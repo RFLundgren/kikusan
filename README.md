@@ -1,8 +1,14 @@
+<div align="center">
+
 # Kikusan
+
+Search, download and sync music from YouTube Music with lyrics.
+
+[![Release](https://img.shields.io/github/v/release/dadav/kikusan)](https://github.com/dadav/kikusan/releases)
 
 ![UI](ui.png)
 
-Search and download music from YouTube Music with lyrics.
+</div>
 
 ## Features
 
@@ -268,6 +274,7 @@ To automatically import playlists to Navidrome using its [playlist import API](h
    ```
 
 2. Add hook to `cron.yaml`:
+
    ```yaml
    hooks:
      - event: playlist_updated
