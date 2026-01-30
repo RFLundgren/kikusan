@@ -13,6 +13,7 @@ from kikusan.cron.state import PlaylistState, TrackState, get_state_dir, load_st
 from kikusan.download import download
 from kikusan.playlist import add_to_m3u
 from kikusan.reference_checker import get_navidrome_protection_cache, is_safe_to_delete
+from kikusan.unavailable import is_on_cooldown, is_unavailable_error, record_unavailable
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
 
 logger = logging.getLogger(__name__)
@@ -283,8 +284,18 @@ def download_new_tracks(
 
     from kikusan.config import get_config
     config = get_config()
+    cooldown_hours = config.unavailable_cooldown_hours
 
     for i, (video_id, title, artist) in enumerate(tracks, 1):
+        # Check if video is on unavailable cooldown
+        if is_on_cooldown(download_dir, video_id, cooldown_hours):
+            logger.info(
+                "[%d/%d] Skipping (unavailable cooldown): %s - %s",
+                i, len(tracks), artist, title,
+            )
+            skipped += 1
+            continue
+
         logger.info("[%d/%d] Downloading: %s - %s", i, len(tracks), artist, title)
 
         try:
@@ -318,6 +329,9 @@ def download_new_tracks(
         except Exception as e:
             logger.error("Failed to download %s - %s: %s", artist, title, e)
             failed += 1
+            # Record unavailable videos for cooldown
+            if is_unavailable_error(str(e)):
+                record_unavailable(download_dir, video_id, str(e), title=title, artist=artist)
 
     return {"downloaded": downloaded, "skipped": skipped, "failed": failed}
 

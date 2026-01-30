@@ -8,7 +8,7 @@ import click
 
 from kikusan.config import get_config
 from kikusan.cron.cli import cron
-from kikusan.download import download, download_url
+from kikusan.download import UnavailableCooldownError, download, download_url
 from kikusan.plugins.cli import plugins
 from kikusan.search import search
 
@@ -40,8 +40,15 @@ logging.basicConfig(
     default=False,
     help="Disable logging of cookie usage statistics",
 )
+@click.option(
+    "--unavailable-cooldown",
+    type=int,
+    default=None,
+    envvar="KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS",
+    help="Hours to wait before retrying unavailable videos (0 = disabled). Default: 168 (7 days)",
+)
 @click.pass_context
-def main(ctx, cookie_mode: str | None, cookie_retry_delay: float | None, no_log_cookie_usage: bool):
+def main(ctx, cookie_mode: str | None, cookie_retry_delay: float | None, no_log_cookie_usage: bool, unavailable_cooldown: int | None):
     """Kikusan - Search and download music from YouTube Music."""
     # Store global options in context for subcommands to use
     ctx.ensure_object(dict)
@@ -53,6 +60,8 @@ def main(ctx, cookie_mode: str | None, cookie_retry_delay: float | None, no_log_
         os.environ["KIKUSAN_COOKIE_RETRY_DELAY"] = str(cookie_retry_delay)
     if no_log_cookie_usage:
         os.environ["KIKUSAN_LOG_COOKIE_USAGE"] = "false"
+    if unavailable_cooldown is not None:
+        os.environ["KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS"] = str(unavailable_cooldown)
 
 
 @main.command()
@@ -247,6 +256,9 @@ def download_cmd(
         else:
             click.echo("Download completed but could not locate file.")
 
+    except UnavailableCooldownError as e:
+        click.echo(str(e))
+        return
     except Exception as e:
         raise click.ClickException(str(e))
 

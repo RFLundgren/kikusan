@@ -16,6 +16,7 @@ from kikusan.plugins.state import (
 )
 from kikusan.reference_checker import get_navidrome_protection_cache, is_safe_to_delete
 from kikusan.search import search
+from kikusan.unavailable import is_on_cooldown, is_unavailable_error, record_unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,10 @@ def _download_songs(
     failed = 0
     errors = []
 
+    from kikusan.config import get_config
+    app_config = get_config()
+    cooldown_hours = app_config.unavailable_cooldown_hours
+
     for i, song in enumerate(songs, 1):
         logger.info("[%d/%d] Searching: %s - %s", i, len(songs), song.artist, song.title)
 
@@ -156,6 +161,7 @@ def _download_songs(
             skipped += 1
             continue
 
+        video_id = None
         try:
             # Search YouTube Music
             results = search(song.search_query, limit=1)
@@ -167,11 +173,22 @@ def _download_songs(
                 continue
 
             yt_track = results[0]
+            video_id = yt_track.video_id
+
+            # Check if found video is on unavailable cooldown
+            if is_on_cooldown(config.download_dir, video_id, cooldown_hours):
+                logger.info(
+                    "  Skipping (unavailable cooldown): %s - %s",
+                    yt_track.artist, yt_track.title,
+                )
+                skipped += 1
+                continue
+
             logger.info("  Found: %s - %s", yt_track.artist, yt_track.title)
 
             # Download
             audio_path = download(
-                video_id=yt_track.video_id,
+                video_id=video_id,
                 output_dir=config.download_dir,
                 audio_format=config.audio_format,
                 filename_template=config.filename_template,
@@ -188,7 +205,7 @@ def _download_songs(
                     title=song.title,
                     file_path=str(audio_path),
                     downloaded_at=datetime.now().isoformat(),
-                    video_id=yt_track.video_id,
+                    video_id=video_id,
                 )
                 state.tracks.append(track_state)
                 downloaded += 1
@@ -197,6 +214,12 @@ def _download_songs(
             logger.error("  Failed: %s", e)
             failed += 1
             errors.append(f"{song.artist} - {song.title}: {e}")
+            # Record unavailable videos for cooldown
+            if video_id and is_unavailable_error(str(e)):
+                record_unavailable(
+                    config.download_dir, video_id, str(e),
+                    title=song.title, artist=song.artist,
+                )
 
     return {
         "downloaded": downloaded,

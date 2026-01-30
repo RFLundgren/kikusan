@@ -33,6 +33,7 @@ class Config:
     cookie_retry_delay: float = 1.0
     log_cookie_usage: bool = True
     cors_origins: list[str] = field(default_factory=lambda: ["*"])
+    unavailable_cooldown_hours: int = 168  # 7 days
 
     @property
     def cookie_file_path(self) -> str | None:
@@ -73,6 +74,9 @@ class Config:
             "yes",
         )
 
+        # Parse unavailable cooldown hours (0 = disabled)
+        unavailable_cooldown_hours = int(os.getenv("KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS", "168"))
+
         return cls(
             download_dir=Path(os.getenv("KIKUSAN_DOWNLOAD_DIR", "./downloads")),
             audio_format=os.getenv("KIKUSAN_AUDIO_FORMAT", "opus"),
@@ -90,6 +94,7 @@ class Config:
             cookie_retry_delay=cookie_retry_delay,
             log_cookie_usage=log_cookie_usage,
             cors_origins=cors_origins,
+            unavailable_cooldown_hours=unavailable_cooldown_hours,
         )
 
     @property

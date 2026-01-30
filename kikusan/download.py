@@ -8,9 +8,16 @@ import yt_dlp
 from kikusan.config import DEFAULT_FILENAME_TEMPLATE, MAX_FILENAME_BYTES, get_config
 from kikusan.lyrics import get_lyrics, save_lyrics
 from kikusan.tags import write_multi_artist_tags
+from kikusan.unavailable import is_on_cooldown, is_unavailable_error, record_unavailable
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
 
 logger = logging.getLogger(__name__)
+
+
+class UnavailableCooldownError(Exception):
+    """Raised when a video is skipped due to unavailable cooldown."""
+
+    pass
 
 
 def _sanitize_path_component(name: str, max_bytes: int = MAX_FILENAME_BYTES) -> str:
@@ -321,19 +328,39 @@ def download(
 
     Returns:
         Path to the downloaded audio file
+
+    Raises:
+        Exception: If download fails (unavailable errors are recorded before re-raising)
     """
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check if video is on unavailable cooldown before hitting YouTube
+    config = get_config()
+    cooldown_hours = config.unavailable_cooldown_hours
+    if is_on_cooldown(output_dir, video_id, cooldown_hours):
+        logger.info("Skipping (unavailable cooldown): %s", video_id)
+        raise UnavailableCooldownError(
+            f"Video {video_id} is on unavailable cooldown. "
+            f"It will be retried after the cooldown period ({cooldown_hours}h) expires."
+        )
+
     url = f"https://music.youtube.com/watch?v={video_id}"
 
-    # Extract info first to get metadata
-    ydl_opts_info = {"quiet": True, "no_warnings": True}
-    info = extract_info_with_retry(
-        ydl_opts=ydl_opts_info,
-        url=url,
-        download=False,
-        cookie_file=cookie_file,
-        config=get_config(),
-    )
+    try:
+        # Extract info first to get metadata
+        ydl_opts_info = {"quiet": True, "no_warnings": True}
+        info = extract_info_with_retry(
+            ydl_opts=ydl_opts_info,
+            url=url,
+            download=False,
+            cookie_file=cookie_file,
+            config=config,
+        )
+    except Exception as e:
+        # Record unavailable videos for cooldown, then re-raise
+        if is_unavailable_error(str(e)):
+            record_unavailable(output_dir, video_id, str(e))
+        raise
 
     title = info.get("title", "Unknown")
     artist = info.get("artist") or info.get("uploader", "Unknown")
@@ -347,17 +374,23 @@ def download(
 
     logger.info("Downloading: %s - %s", artist, title)
 
-    # Download the track
-    ydl_opts = _get_ydl_opts(
-        output_dir, audio_format, filename_template, organization_mode, info, progress_callback, use_primary_artist, cookie_file
-    )
-    extract_info_with_retry(
-        ydl_opts=ydl_opts,
-        url=url,
-        download=True,
-        cookie_file=cookie_file,
-        config=get_config(),
-    )
+    try:
+        # Download the track
+        ydl_opts = _get_ydl_opts(
+            output_dir, audio_format, filename_template, organization_mode, info, progress_callback, use_primary_artist, cookie_file
+        )
+        extract_info_with_retry(
+            ydl_opts=ydl_opts,
+            url=url,
+            download=True,
+            cookie_file=cookie_file,
+            config=config,
+        )
+    except Exception as e:
+        # Record unavailable videos for cooldown, then re-raise
+        if is_unavailable_error(str(e)):
+            record_unavailable(output_dir, video_id, str(e), title=title, artist=artist)
+        raise
 
     # Find the downloaded file
     audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
@@ -374,6 +407,18 @@ def download(
                 save_lyrics(lyrics, audio_path)
 
     return audio_path
+
+
+def _extract_video_id_from_url(url: str) -> str | None:
+    """Extract YouTube video ID from a URL, if possible.
+
+    Handles youtube.com/watch?v=ID and music.youtube.com/watch?v=ID formats.
+    Returns None for playlists or unrecognized URLs.
+    """
+    import re
+
+    match = re.search(r"[?&]v=([a-zA-Z0-9_-]{11})", url)
+    return match.group(1) if match else None
 
 
 def download_url(
@@ -403,15 +448,22 @@ def download_url(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Extract info first to check if it's a playlist
-    ydl_opts_info = {"quiet": True, "no_warnings": True}
-    info = extract_info_with_retry(
-        ydl_opts=ydl_opts_info,
-        url=url,
-        download=False,
-        cookie_file=cookie_file,
-        config=get_config(),
-    )
+    try:
+        # Extract info first to check if it's a playlist
+        ydl_opts_info = {"quiet": True, "no_warnings": True}
+        info = extract_info_with_retry(
+            ydl_opts=ydl_opts_info,
+            url=url,
+            download=False,
+            cookie_file=cookie_file,
+            config=get_config(),
+        )
+    except Exception as e:
+        # Record unavailable videos for cooldown, then re-raise
+        video_id = _extract_video_id_from_url(url)
+        if video_id and is_unavailable_error(str(e)):
+            record_unavailable(output_dir, video_id, str(e))
+        raise
 
     # Check if this is a playlist
     if info.get("_type") == "playlist" or "entries" in info:
@@ -432,10 +484,14 @@ def _download_single(
     use_primary_artist: bool = False,
     cookie_file: str | None = None,
 ) -> Path:
-    """Download a single track."""
+    """Download a single track.
+
+    Records unavailable videos for cooldown before re-raising errors.
+    """
     title = info.get("title", "Unknown")
     artist = info.get("artist") or info.get("uploader", "Unknown")
     duration = info.get("duration", 0)
+    video_id = info.get("id")
 
     # Check if already downloaded
     existing = _file_exists(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
@@ -445,9 +501,15 @@ def _download_single(
 
     logger.info("Downloading: %s - %s", artist, title)
 
-    ydl_opts = _get_ydl_opts(output_dir, audio_format, filename_template, organization_mode, info, None, use_primary_artist, cookie_file)
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    try:
+        ydl_opts = _get_ydl_opts(output_dir, audio_format, filename_template, organization_mode, info, None, use_primary_artist, cookie_file)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        # Record unavailable videos for cooldown, then re-raise
+        if video_id and is_unavailable_error(str(e)):
+            record_unavailable(output_dir, video_id, str(e), title=title, artist=artist)
+        raise
 
     audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
 
@@ -478,6 +540,9 @@ def _download_playlist(
     downloaded = []
     skipped = 0
 
+    config = get_config()
+    cooldown_hours = config.unavailable_cooldown_hours
+
     for i, entry in enumerate(entries, 1):
         if entry is None:
             continue
@@ -486,6 +551,15 @@ def _download_playlist(
         title = entry.get("title", "Unknown")
         artist = entry.get("artist") or entry.get("uploader", "Unknown")
         duration = entry.get("duration", 0)
+
+        # Check if video is on unavailable cooldown
+        if video_id and is_on_cooldown(output_dir, video_id, cooldown_hours):
+            logger.info(
+                "[%d/%d] Skipping (unavailable cooldown): %s - %s",
+                i, len(entries), artist, title,
+            )
+            skipped += 1
+            continue
 
         # Check if already downloaded
         existing = _file_exists(output_dir, entry, audio_format, filename_template, organization_mode, use_primary_artist)
@@ -505,7 +579,7 @@ def _download_playlist(
                 url=url,
                 download=True,
                 cookie_file=cookie_file,
-                config=get_config(),
+                config=config,
             )
 
             audio_path = _find_downloaded_file(output_dir, entry, audio_format, filename_template, organization_mode, use_primary_artist)
@@ -519,6 +593,9 @@ def _download_playlist(
 
         except Exception as e:
             logger.warning("Failed to download %s: %s", title, e)
+            # Record unavailable videos for cooldown
+            if video_id and is_unavailable_error(str(e)):
+                record_unavailable(output_dir, video_id, str(e), title=title, artist=artist)
 
     new_downloads = len(downloaded) - skipped
     logger.info("Downloaded %d new tracks (%d skipped)", new_downloads, skipped)

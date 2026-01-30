@@ -34,6 +34,22 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - `_truncate_to_bytes()` handles UTF-8 safely (never splits multi-byte characters)
 - The constant `MAX_FILENAME_BYTES` is defined in `kikusan/config.py`
 
+### Unavailable Video Cooldown
+- When a video returns "Video unavailable" during download, the video ID is recorded with a timestamp
+- Subsequent sync/download attempts skip that video until the cooldown period expires
+- Storage: `.kikusan/unavailable.json` - maps video_id to failure record (timestamp, error, title, artist)
+- Default cooldown: 168 hours (7 days), configurable via `KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS` env var or `--unavailable-cooldown` CLI flag
+- Set cooldown to 0 to disable the feature entirely
+- Only "Video unavailable" errors trigger cooldown (not auth errors, network errors, etc.)
+- Integrated into ALL download paths:
+  - `kikusan/download.py`: `download()` (single video - checks cooldown + records on failure), `_download_single()` (URL-based single track), `_download_playlist()` (playlist entries), `download_url()` (URL info extraction)
+  - `kikusan/cron/sync.py`: `download_new_tracks()` (additional pre-check before calling `download()`)
+  - `kikusan/plugins/sync.py`: `_download_songs()` (additional pre-check before calling `download()`)
+- `UnavailableCooldownError`: Custom exception raised by `download()` when a video is on cooldown, caught by CLI for user-friendly output
+- `_extract_video_id_from_url()`: Helper to extract video ID from YouTube URLs for recording in `download_url()` path
+- Implementation in `kikusan/unavailable.py`: Pattern matching, JSON persistence with atomic writes, cooldown logic
+- Corrupted unavailable files are backed up and reset (same pattern as state files)
+
 ### Architecture Notes
 - `kikusan/search.py`: Uses ytmusicapi to search YouTube Music, extracts view_count from search results
 - `kikusan/web/app.py`: FastAPI backend with search and download endpoints
@@ -56,6 +72,17 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Passes context data via environment variables (KIKUSAN_*)
   - Supports timeout and run_on_error options
 - `kikusan/cron/scheduler.py`: Orchestrates sync jobs and triggers hooks after completion
+- `kikusan/download.py`: Core download logic with unavailable video protection
+  - `download()`: Single video download with cooldown check at entry and error recording on failure
+  - `UnavailableCooldownError`: Raised when video is on cooldown (avoids hitting YouTube)
+  - `_extract_video_id_from_url()`: Extracts video ID from YouTube URLs for error recording
+  - All download paths (`download()`, `_download_single()`, `download_url()`, `_download_playlist()`) record unavailable errors
+- `kikusan/unavailable.py`: Unavailable video cooldown management
+  - Tracks video IDs that returned "Video unavailable" errors
+  - JSON persistence in `.kikusan/unavailable.json` with atomic writes
+  - Configurable cooldown period (default: 168 hours / 7 days)
+  - Pattern matching for unavailable-specific errors (distinct from auth/network errors)
+  - Functions: `is_unavailable_error()`, `record_unavailable()`, `is_on_cooldown()`, `clear_expired()`
 
 ### CLI Flags
 All major configuration variables have corresponding CLI flags:
@@ -64,6 +91,7 @@ All major configuration variables have corresponding CLI flags:
 - `--cookie-mode`: Cookie usage mode (auto, always, never)
 - `--cookie-retry-delay`: Delay before retrying with cookies
 - `--no-log-cookie-usage`: Disable cookie usage logging
+- `--unavailable-cooldown`: Hours to wait before retrying unavailable videos (0 = disabled, default: 168)
 
 **download command:**
 - `--organization-mode`: File organization (flat, album)
