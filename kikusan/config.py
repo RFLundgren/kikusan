@@ -7,6 +7,11 @@ from pathlib import Path
 # Default filename template: Artist - Title
 DEFAULT_FILENAME_TEMPLATE = "%(artist,uploader)s - %(title)s"
 
+# Maximum filename length in bytes (excluding extension).
+# Most filesystems (ext4, btrfs, NTFS) limit filenames to 255 bytes.
+# We use 200 to leave room for the extension and intermediate files like .webp thumbnails.
+MAX_FILENAME_BYTES = 200
+
 
 @dataclass
 class Config:

@@ -26,6 +26,14 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Fail-safe behavior: keeps files if Navidrome is unreachable
 - Opt-in via environment variables: NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD, NAVIDROME_KEEP_PLAYLIST
 
+### Filename Length Safety
+- Filenames are truncated to `MAX_FILENAME_BYTES` (200 bytes) to prevent `[Errno 36] File name too long` errors
+- Two layers of protection:
+  1. **yt-dlp level**: `trim_file_name` option in `_get_ydl_opts()` and `_compute_filename()` truncates rendered filenames
+  2. **Path component level**: `_sanitize_path_component()` truncates directory names (artist, album) in album mode
+- `_truncate_to_bytes()` handles UTF-8 safely (never splits multi-byte characters)
+- The constant `MAX_FILENAME_BYTES` is defined in `kikusan/config.py`
+
 ### Architecture Notes
 - `kikusan/search.py`: Uses ytmusicapi to search YouTube Music, extracts view_count from search results
 - `kikusan/web/app.py`: FastAPI backend with search and download endpoints

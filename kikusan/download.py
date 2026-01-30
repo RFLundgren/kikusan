@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yt_dlp
 
-from kikusan.config import DEFAULT_FILENAME_TEMPLATE, get_config
+from kikusan.config import DEFAULT_FILENAME_TEMPLATE, MAX_FILENAME_BYTES, get_config
 from kikusan.lyrics import get_lyrics, save_lyrics
 from kikusan.tags import write_multi_artist_tags
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
@@ -13,8 +13,12 @@ from kikusan.yt_dlp_wrapper import extract_info_with_retry
 logger = logging.getLogger(__name__)
 
 
-def _sanitize_path_component(name: str) -> str:
-    """Sanitize a string for use as a directory name."""
+def _sanitize_path_component(name: str, max_bytes: int = MAX_FILENAME_BYTES) -> str:
+    """Sanitize a string for use as a directory or file name component.
+
+    Removes invalid filesystem characters, replaces slashes, strips whitespace,
+    and truncates to max_bytes to prevent "File name too long" errors.
+    """
     # Remove characters that are invalid in filenames/paths
     invalid_chars = '<>:"|?*'
     for char in invalid_chars:
@@ -23,7 +27,26 @@ def _sanitize_path_component(name: str) -> str:
     name = name.replace("/", "-").replace("\\", "-")
     # Strip leading/trailing whitespace and dots
     name = name.strip(". ")
+    # Truncate to max_bytes to prevent filesystem errors
+    name = _truncate_to_bytes(name, max_bytes)
     return name or "Unknown"
+
+
+def _truncate_to_bytes(text: str, max_bytes: int) -> str:
+    """Truncate a string to fit within max_bytes when UTF-8 encoded.
+
+    Avoids splitting multi-byte characters by encoding character-by-character.
+    Strips trailing whitespace after truncation.
+    """
+    if len(text.encode("utf-8")) <= max_bytes:
+        return text
+    encoded = b""
+    for char in text:
+        char_bytes = char.encode("utf-8")
+        if len(encoded) + len(char_bytes) > max_bytes:
+            break
+        encoded += char_bytes
+    return encoded.decode("utf-8").rstrip()
 
 
 def _get_primary_artist(artist: str) -> str:
@@ -140,6 +163,7 @@ def _get_ydl_opts(
     opts = {
         "format": "bestaudio/best",
         "outtmpl": output_path,
+        "trim_file_name": MAX_FILENAME_BYTES,
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -213,9 +237,11 @@ def _get_ydl_opts(
 
 
 def _compute_filename(info: dict, filename_template: str) -> str:
-    """Compute the expected filename from metadata using yt-dlp's template."""
-    # Use yt-dlp's template rendering
-    with yt_dlp.YoutubeDL({"outtmpl": filename_template}) as ydl:
+    """Compute the expected filename from metadata using yt-dlp's template.
+
+    Uses trim_file_name to match the truncation applied during download.
+    """
+    with yt_dlp.YoutubeDL({"outtmpl": filename_template, "trim_file_name": MAX_FILENAME_BYTES}) as ydl:
         filename = ydl.prepare_filename(info)
     return yt_dlp.utils.sanitize_filename(filename)
 
