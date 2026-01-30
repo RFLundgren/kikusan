@@ -2,7 +2,7 @@ FROM python:3.14-slim@sha256:9b81fe9acff79e61affb44aaf3b6ff234392e8ca477cb86c9f7
 
 # Install ffmpeg for audio processing
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg jq && \
+    apt-get install -y --no-install-recommends ffmpeg jq curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast package management
