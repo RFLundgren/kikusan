@@ -1117,3 +1117,293 @@ header p {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* --- Explore Tab --- */
+
+.explore-section {
+    display: none;
+}
+.explore-section.active {
+    display: block;
+}
+
+.explore-loading, .explore-error {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+}
+.explore-error {
+    color: var(--error);
+}
+
+/* Section headers */
+.explore-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.explore-section-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+.explore-section-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Country selector */
+.country-selector {
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text);
+    font-size: 0.85rem;
+}
+
+/* Download All button */
+.download-all-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+    min-height: 44px;
+    min-width: 100px;
+}
+.download-all-btn:hover:not(:disabled) {
+    background: var(--accent-primary);
+    color: white;
+}
+.download-all-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Charts section */
+.explore-charts-section {
+    margin-bottom: 2rem;
+}
+.chart-tracks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.chart-track {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+.chart-track:hover {
+    background: var(--bg-hover, var(--bg-secondary));
+}
+.chart-rank {
+    font-size: 1rem;
+    font-weight: 700;
+    min-width: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+}
+.chart-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.chart-track-info {
+    flex: 1;
+    min-width: 0;
+}
+.chart-track-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chart-track-artist {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chart-trend {
+    font-size: 0.85rem;
+    min-width: 1.5rem;
+    text-align: center;
+}
+.chart-trend.trend-up { color: #22c55e; }
+.chart-trend.trend-down { color: #ef4444; }
+.chart-trend.trend-neutral { color: var(--text-secondary); }
+.chart-track-actions {
+    flex-shrink: 0;
+}
+.chart-track-actions .download-btn {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+/* Moods & Genres section */
+.explore-moods-section {
+    margin-top: 1.5rem;
+}
+.mood-section {
+    margin-bottom: 1.5rem;
+}
+.mood-section h2 {
+    font-size: 1.15rem;
+    margin: 0 0 0.75rem 0;
+}
+.mood-categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+}
+.mood-category-card {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.9rem;
+    transition: background 0.15s, border-color 0.15s;
+}
+.mood-category-card:hover {
+    background: var(--bg-hover, var(--bg-secondary));
+    border-color: var(--accent);
+}
+
+/* Mood playlists grid */
+.mood-playlists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.mood-playlist-card {
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+.mood-playlist-thumb {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+}
+.mood-playlist-info {
+    padding: 0.75rem;
+}
+.mood-playlist-title {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+.mood-playlist-author {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.mood-playlist-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 0.75rem 0.75rem;
+}
+.mood-playlist-actions button {
+    flex: 1;
+    padding: 0.4rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+.mood-playlist-actions button:hover {
+    border-color: var(--accent);
+}
+.mood-playlist-actions .download-playlist-btn {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+/* Breadcrumb navigation */
+.explore-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+.breadcrumb-link {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 0;
+    font-size: inherit;
+}
+.breadcrumb-link:hover {
+    text-decoration: underline;
+}
+.breadcrumb-sep {
+    color: var(--text-secondary);
+}
+.breadcrumb-current {
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* Playlist tracks header */
+.explore-playlist-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.explore-playlist-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+.explore-track-count {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.explore-tracks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .mood-categories-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+    .mood-playlists-grid {
+        grid-template-columns: 1fr;
+    }
+    .explore-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .chart-track {
+        padding: 0.4rem 0.5rem;
+    }
+}

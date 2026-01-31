@@ -10,7 +10,13 @@ from kikusan.config import get_config
 from kikusan.cron.cli import cron
 from kikusan.download import UnavailableCooldownError, download, download_url
 from kikusan.plugins.cli import plugins
-from kikusan.search import search
+from kikusan.search import (
+    get_charts,
+    get_mood_categories,
+    get_mood_playlists,
+    get_playlist_tracks,
+    search,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -342,6 +348,183 @@ main.add_command(cron, name="cron")
 
 
 main.add_command(plugins, name="plugins")
+
+
+# --- Explore command group ---
+
+
+@main.group()
+def explore():
+    """Explore moods, genres, and charts on YouTube Music."""
+
+
+@explore.command(name="moods")
+def explore_moods():
+    """List available mood & genre categories."""
+    try:
+        sections = get_mood_categories()
+    except Exception as e:
+        raise click.ClickException(str(e))
+
+    if not sections:
+        click.echo("No categories found.")
+        return
+
+    for section in sections:
+        click.echo(f"\n{section.title}:")
+        for cat in section.categories:
+            click.echo(f"  {cat.title}  (params: {cat.params})")
+
+
+@explore.command(name="mood-playlists")
+@click.argument("params")
+@click.option("--download", "-d", "do_download", is_flag=True, help="Download all tracks from all playlists in this category")
+@click.option("--output", "-o", type=click.Path(), help="Output directory")
+@click.option(
+    "--format", "-f", "audio_format",
+    type=click.Choice(["opus", "mp3", "flac"]),
+    default=None,
+    help="Audio format (default: opus)",
+)
+@click.option("--add-to-playlist", "-p", "playlist_name", help="Add downloaded tracks to M3U playlist")
+def explore_mood_playlists_cmd(params: str, do_download: bool, output: str | None, audio_format: str | None, playlist_name: str | None):
+    """List playlists for a mood/genre category.
+
+    PARAMS is the category identifier from 'explore moods'.
+    Use --download to download all tracks from the playlists.
+    """
+    try:
+        playlists = get_mood_playlists(params)
+    except Exception as e:
+        raise click.ClickException(str(e))
+
+    if not playlists:
+        click.echo("No playlists found.")
+        return
+
+    for i, pl in enumerate(playlists, 1):
+        author = f" by {pl.author}" if pl.author else ""
+        click.echo(f"{i:2}. {pl.title}{author}")
+        click.echo(f"    Playlist ID: {pl.playlist_id}")
+
+    if do_download:
+        for pl in playlists:
+            click.echo(f"\nFetching tracks from: {pl.title}")
+            try:
+                tracks = get_playlist_tracks(pl.playlist_id)
+            except Exception as e:
+                click.echo(f"  Failed to fetch tracks: {e}")
+                continue
+            _download_explore_tracks(tracks, output, audio_format, playlist_name)
+
+
+@explore.command(name="charts")
+@click.option("--country", "-c", default="ZZ", help="ISO 3166-1 Alpha-2 country code (default: ZZ for global)")
+@click.option("--download", "-d", "do_download", is_flag=True, help="Download all chart tracks")
+@click.option("--output", "-o", type=click.Path(), help="Output directory")
+@click.option(
+    "--format", "-f", "audio_format",
+    type=click.Choice(["opus", "mp3", "flac"]),
+    default=None,
+    help="Audio format (default: opus)",
+)
+@click.option("--add-to-playlist", "-p", "playlist_name", help="Add downloaded tracks to M3U playlist")
+def explore_charts_cmd(country: str, do_download: bool, output: str | None, audio_format: str | None, playlist_name: str | None):
+    """Show current music charts.
+
+    Use --download to download all chart tracks.
+    """
+    try:
+        charts = get_charts(country)
+    except Exception as e:
+        raise click.ClickException(str(e))
+
+    if charts.tracks:
+        click.echo(f"\nTop Songs ({charts.country}):")
+        for track in charts.tracks:
+            rank = f"#{track.rank} " if track.rank else ""
+            click.echo(f"  {rank}{track.title} - {track.artist}")
+            click.echo(f"    ID: {track.video_id}")
+
+    if charts.artists:
+        click.echo(f"\nTop Artists ({charts.country}):")
+        for artist in charts.artists:
+            rank = f"#{artist.rank} " if artist.rank else ""
+            click.echo(f"  {rank}{artist.title}")
+
+    if do_download and charts.tracks:
+        click.echo(f"\nDownloading {len(charts.tracks)} chart tracks...")
+        config = get_config()
+        output_dir = Path(output) if output else config.download_dir
+        fmt = audio_format or config.audio_format
+        downloaded_paths = []
+
+        for i, track in enumerate(charts.tracks, 1):
+            click.echo(f"[{i}/{len(charts.tracks)}] Downloading: {track.title} - {track.artist}")
+            try:
+                audio_path = download(
+                    video_id=track.video_id,
+                    output_dir=output_dir,
+                    audio_format=fmt,
+                    filename_template=config.filename_template,
+                    fetch_lyrics=True,
+                    organization_mode=config.organization_mode,
+                    use_primary_artist=config.use_primary_artist,
+                )
+                if audio_path:
+                    downloaded_paths.append(audio_path)
+            except UnavailableCooldownError as e:
+                click.echo(f"  Skipped (cooldown): {e}")
+            except Exception as e:
+                click.echo(f"  Failed: {e}")
+
+        click.echo(f"\nDownloaded {len(downloaded_paths)} of {len(charts.tracks)} tracks")
+        if playlist_name and downloaded_paths:
+            from kikusan.playlist import add_to_m3u
+            add_to_m3u(downloaded_paths, playlist_name, output_dir)
+            click.echo(f"Added {len(downloaded_paths)} track(s) to playlist: {playlist_name}.m3u")
+
+
+def _download_explore_tracks(
+    tracks: list,
+    output: str | None,
+    audio_format: str | None,
+    playlist_name: str | None,
+) -> None:
+    """Download a list of Track objects from explore results."""
+    if not tracks:
+        click.echo("  No tracks to download.")
+        return
+
+    config = get_config()
+    output_dir = Path(output) if output else config.download_dir
+    fmt = audio_format or config.audio_format
+    downloaded_paths = []
+
+    for i, track in enumerate(tracks, 1):
+        click.echo(f"[{i}/{len(tracks)}] Downloading: {track.title} - {track.artist}")
+        try:
+            audio_path = download(
+                video_id=track.video_id,
+                output_dir=output_dir,
+                audio_format=fmt,
+                filename_template=config.filename_template,
+                fetch_lyrics=True,
+                organization_mode=config.organization_mode,
+                use_primary_artist=config.use_primary_artist,
+            )
+            if audio_path:
+                downloaded_paths.append(audio_path)
+        except UnavailableCooldownError as e:
+            click.echo(f"  Skipped (cooldown): {e}")
+        except Exception as e:
+            click.echo(f"  Failed: {e}")
+
+    click.echo(f"\nDownloaded {len(downloaded_paths)} of {len(tracks)} tracks")
+    if playlist_name and downloaded_paths:
+        from kikusan.playlist import add_to_m3u
+        add_to_m3u(downloaded_paths, playlist_name, output_dir)
+        click.echo(f"Added {len(downloaded_paths)} track(s) to playlist: {playlist_name}.m3u")
 
 
 @main.command()

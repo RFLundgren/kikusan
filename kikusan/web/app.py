@@ -146,6 +146,49 @@ class StreamUrlResponse(BaseModel):
     expires_in: int
 
 
+class MoodCategoryResponse(BaseModel):
+    """A mood/genre category."""
+    title: str
+    params: str
+
+class MoodSectionResponse(BaseModel):
+    """A section of mood/genre categories."""
+    title: str
+    categories: list[MoodCategoryResponse]
+
+class MoodPlaylistResponse(BaseModel):
+    """A playlist from a mood/genre category."""
+    playlist_id: str
+    title: str
+    thumbnail_url: str | None
+    author: str | None
+
+class ChartTrackResponse(BaseModel):
+    """A chart track."""
+    video_id: str
+    title: str
+    artist: str
+    artists: list[str]
+    album: str | None
+    thumbnail_url: str | None
+    rank: str | None
+    trend: str | None
+
+class ChartArtistResponse(BaseModel):
+    """A chart artist."""
+    browse_id: str
+    title: str
+    thumbnail_url: str | None
+    rank: str | None
+    trend: str | None
+
+class ChartsResponse(BaseModel):
+    """Charts response."""
+    country: str
+    tracks: list[ChartTrackResponse]
+    artists: list[ChartArtistResponse]
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Render the main search page."""
@@ -543,6 +586,122 @@ async def get_queue_stats():
         raise HTTPException(status_code=500, detail="Queue manager not initialized")
 
     return queue_manager.get_stats()
+
+
+# Explore endpoints
+
+@app.get("/api/explore/moods")
+async def api_explore_moods():
+    """Get mood & genre categories."""
+    from kikusan.search import get_mood_categories
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        sections = get_mood_categories()
+        return [
+            MoodSectionResponse(
+                title=s.title,
+                categories=[MoodCategoryResponse(title=c.title, params=c.params) for c in s.categories],
+            )
+            for s in sections
+        ]
+    except Exception as e:
+        logger.error("Failed to get mood categories: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to get mood categories: {str(e)}")
+
+
+@app.get("/api/explore/mood-playlists")
+async def api_explore_mood_playlists(params: str = Query(..., description="Category params from moods endpoint")):
+    """Get playlists for a mood/genre category."""
+    from kikusan.search import get_mood_playlists
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        playlists = get_mood_playlists(params)
+        return [
+            MoodPlaylistResponse(
+                playlist_id=p.playlist_id,
+                title=p.title,
+                thumbnail_url=p.thumbnail_url,
+                author=p.author,
+            )
+            for p in playlists
+        ]
+    except Exception as e:
+        logger.error("Failed to get mood playlists: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to get mood playlists: {str(e)}")
+
+
+@app.get("/api/explore/charts")
+async def api_explore_charts(country: str = Query("ZZ", description="ISO 3166-1 Alpha-2 country code")):
+    """Get current music charts."""
+    from kikusan.search import get_charts
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        charts = get_charts(country)
+        return ChartsResponse(
+            country=charts.country,
+            tracks=[
+                ChartTrackResponse(
+                    video_id=t.video_id,
+                    title=t.title,
+                    artist=t.artist,
+                    artists=t.artists,
+                    album=t.album,
+                    thumbnail_url=t.thumbnail_url,
+                    rank=t.rank,
+                    trend=t.trend,
+                )
+                for t in charts.tracks
+            ],
+            artists=[
+                ChartArtistResponse(
+                    browse_id=a.browse_id,
+                    title=a.title,
+                    thumbnail_url=a.thumbnail_url,
+                    rank=a.rank,
+                    trend=a.trend,
+                )
+                for a in charts.artists
+            ],
+        )
+    except Exception as e:
+        logger.error("Failed to get charts: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to get charts: {str(e)}")
+
+
+@app.get("/api/explore/playlist/{playlist_id}/tracks")
+async def api_explore_playlist_tracks(playlist_id: str):
+    """Get tracks from a YouTube Music playlist (mood/genre playlist)."""
+    from kikusan.search import get_playlist_tracks
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        tracks = get_playlist_tracks(playlist_id)
+        return {
+            "playlist_id": playlist_id,
+            "tracks": [
+                TrackResponse(
+                    video_id=track.video_id,
+                    title=track.title,
+                    artist=track.artist,
+                    artists=track.artists,
+                    album=track.album,
+                    duration=track.duration_display,
+                    thumbnail_url=track.thumbnail_url,
+                    view_count=track.view_count,
+                )
+                for track in tracks
+            ],
+        }
+    except Exception as e:
+        logger.error("Failed to get playlist tracks: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to get playlist tracks: {str(e)}")
 
 
 # Cookie management endpoints

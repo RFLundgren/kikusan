@@ -49,6 +49,7 @@
         <div class="search-tabs">
             <button class="tab-btn active" data-tab="songs">Songs</button>
             <button class="tab-btn" data-tab="albums">Albums</button>
+            <button class="tab-btn" data-tab="explore">Explore</button>
         </div>
 
         <div id="status" class="status"></div>
@@ -64,6 +65,7 @@
 
         <div id="songs-results" class="results active"></div>
         <div id="albums-results" class="albums-grid"></div>
+        <div id="explore-results" class="explore-section"></div>
     </div>
 
     <!-- Settings Modal -->
@@ -312,12 +314,14 @@
         // Initialize tab from URL
         function initTabFromUrl() {
             const tab = getQueryParam('tab') || 'songs';
-            if (tab === 'songs' || tab === 'albums') {
+            if (tab === 'songs' || tab === 'albums' || tab === 'explore') {
                 setActiveTab(tab);
             }
         }
 
         // Set active tab (updates UI and currentTab variable)
+        const exploreResults = document.getElementById('explore-results');
+
         function setActiveTab(tab) {
             currentTab = tab;
             tabButtons.forEach(b => {
@@ -328,12 +332,17 @@
                 }
             });
 
+            songsResults.classList.remove('active');
+            albumsResults.classList.remove('active');
+            exploreResults.classList.remove('active');
+
             if (tab === 'songs') {
                 songsResults.classList.add('active');
-                albumsResults.classList.remove('active');
-            } else {
-                songsResults.classList.remove('active');
+            } else if (tab === 'albums') {
                 albumsResults.classList.add('active');
+            } else if (tab === 'explore') {
+                exploreResults.classList.add('active');
+                loadExploreContent();
             }
         }
 
@@ -364,10 +373,11 @@
             if (currentTab === 'songs') {
                 songsResults.innerHTML = '';
                 await performSongSearch(query);
-            } else {
+            } else if (currentTab === 'albums') {
                 albumsResults.innerHTML = '';
                 await performAlbumSearch(query);
             }
+            // Explore tab doesn't use search
         }
 
         async function performSongSearch(query) {
@@ -440,7 +450,7 @@
             }
 
             // Restore tab state
-            if (tab === 'songs' || tab === 'albums') {
+            if (tab === 'songs' || tab === 'albums' || tab === 'explore') {
                 setActiveTab(tab);
             }
 
@@ -1002,6 +1012,349 @@
                 deleteCookieBtn.textContent = 'Delete Cookie File';
             }
         });
+
+        // --- Explore functionality ---
+        let exploreLoaded = false;
+        let exploreBreadcrumb = []; // tracks navigation: [{type, title, params?}]
+
+        async function loadExploreContent() {
+            if (exploreLoaded && exploreBreadcrumb.length === 0) return;
+            if (exploreBreadcrumb.length > 0) return; // Don't reload if navigating
+
+            exploreLoaded = true;
+            exploreResults.innerHTML = '<div class="explore-loading">Loading explore content...</div>';
+
+            try {
+                const [moodsRes, chartsRes] = await Promise.all([
+                    fetch('/api/explore/moods'),
+                    fetch('/api/explore/charts?country=ZZ'),
+                ]);
+
+                if (!moodsRes.ok || !chartsRes.ok) {
+                    throw new Error('Failed to load explore content');
+                }
+
+                const moods = await moodsRes.json();
+                const charts = await chartsRes.json();
+
+                renderExploreHome(moods, charts);
+            } catch (error) {
+                exploreResults.innerHTML = `<div class="explore-error">Failed to load: ${escapeHtml(error.message)}</div>`;
+                exploreLoaded = false;
+            }
+        }
+
+        function renderExploreHome(moods, charts) {
+            exploreBreadcrumb = [];
+            let html = '<div class="explore-home">';
+
+            // Charts section
+            if (charts.tracks && charts.tracks.length > 0) {
+                html += `
+                    <div class="explore-charts-section">
+                        <div class="explore-section-header">
+                            <h2>Top Charts (${escapeHtml(charts.country === 'ZZ' ? 'Global' : charts.country)})</h2>
+                            <div class="explore-section-actions">
+                                <select id="charts-country-selector" class="country-selector">
+                                    <option value="ZZ" ${charts.country === 'ZZ' ? 'selected' : ''}>Global</option>
+                                    <option value="US">United States</option>
+                                    <option value="GB">United Kingdom</option>
+                                    <option value="DE">Germany</option>
+                                    <option value="FR">France</option>
+                                    <option value="JP">Japan</option>
+                                    <option value="KR">South Korea</option>
+                                    <option value="BR">Brazil</option>
+                                    <option value="IN">India</option>
+                                    <option value="AU">Australia</option>
+                                    <option value="CA">Canada</option>
+                                </select>
+                                <button class="download-all-btn" id="download-all-charts">Download All</button>
+                            </div>
+                        </div>
+                        <div class="chart-tracks-list">
+                            ${charts.tracks.map((track, idx) => `
+                                <div class="chart-track">
+                                    <span class="chart-rank">${track.rank || (idx + 1)}</span>
+                                    <img class="chart-thumb" src="${track.thumbnail_url || ''}" alt="" loading="lazy" onerror="this.style.display='none'">
+                                    <div class="chart-track-info">
+                                        <div class="chart-track-title">${escapeHtml(track.title)}</div>
+                                        <div class="chart-track-artist">${escapeHtml(track.artist)}</div>
+                                    </div>
+                                    ${track.trend ? `<span class="chart-trend trend-${track.trend}">${track.trend === 'up' ? '▲' : track.trend === 'down' ? '▼' : '—'}</span>` : ''}
+                                    <div class="chart-track-actions">
+                                        <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Moods & Genres section
+            if (moods && moods.length > 0) {
+                html += '<div class="explore-moods-section">';
+                for (const section of moods) {
+                    html += `
+                        <div class="mood-section">
+                            <h2>${escapeHtml(section.title)}</h2>
+                            <div class="mood-categories-grid">
+                                ${section.categories.map(cat => `
+                                    <button class="mood-category-card" data-params="${escapeHtml(cat.params)}" data-title="${escapeHtml(cat.title)}">
+                                        ${escapeHtml(cat.title)}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
+            html += '</div>';
+            exploreResults.innerHTML = html;
+            attachExploreHandlers(charts);
+        }
+
+        function attachExploreHandlers(charts) {
+            // Country selector
+            const countrySelector = document.getElementById('charts-country-selector');
+            if (countrySelector) {
+                countrySelector.addEventListener('change', async (e) => {
+                    const country = e.target.value;
+                    showStatus('Loading charts...');
+                    try {
+                        const res = await fetch(`/api/explore/charts?country=${encodeURIComponent(country)}`);
+                        if (!res.ok) throw new Error('Failed to load charts');
+                        const newCharts = await res.json();
+                        // Re-fetch moods to re-render full page
+                        const moodsRes = await fetch('/api/explore/moods');
+                        const moods = await moodsRes.json();
+                        showStatus('');
+                        renderExploreHome(moods, newCharts);
+                    } catch (error) {
+                        showStatus('Failed to load charts: ' + error.message, true);
+                    }
+                });
+            }
+
+            // Download all charts
+            const downloadAllChartsBtn = document.getElementById('download-all-charts');
+            if (downloadAllChartsBtn && charts.tracks) {
+                downloadAllChartsBtn.addEventListener('click', () => {
+                    queueMultipleTracks(charts.tracks, downloadAllChartsBtn);
+                });
+            }
+
+            // Mood category cards
+            document.querySelectorAll('.mood-category-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const params = card.dataset.params;
+                    const title = card.dataset.title;
+                    loadMoodPlaylists(params, title);
+                });
+            });
+
+            // Download buttons in chart tracks
+            exploreResults.querySelectorAll('.download-btn').forEach(btn => {
+                btn.addEventListener('click', handleDownload);
+            });
+        }
+
+        async function loadMoodPlaylists(params, categoryTitle) {
+            showStatus('Loading playlists...');
+            try {
+                const res = await fetch(`/api/explore/mood-playlists?params=${encodeURIComponent(params)}`);
+                if (!res.ok) throw new Error('Failed to load playlists');
+                const playlists = await res.json();
+                showStatus('');
+                renderMoodPlaylists(playlists, categoryTitle, params);
+            } catch (error) {
+                showStatus('Failed to load playlists: ' + error.message, true);
+            }
+        }
+
+        function renderMoodPlaylists(playlists, categoryTitle, params) {
+            exploreBreadcrumb = [{type: 'category', title: categoryTitle, params}];
+            let html = `
+                <div class="explore-breadcrumb">
+                    <button class="breadcrumb-link" id="breadcrumb-home">Explore</button>
+                    <span class="breadcrumb-sep">›</span>
+                    <span class="breadcrumb-current">${escapeHtml(categoryTitle)}</span>
+                </div>
+                <div class="mood-playlists-grid">
+                    ${playlists.map(pl => `
+                        <div class="mood-playlist-card" data-playlist-id="${escapeHtml(pl.playlist_id)}" data-title="${escapeHtml(pl.title)}">
+                            <img class="mood-playlist-thumb" src="${pl.thumbnail_url || ''}" alt="${escapeHtml(pl.title)}" loading="lazy" onerror="this.style.display='none'">
+                            <div class="mood-playlist-info">
+                                <div class="mood-playlist-title">${escapeHtml(pl.title)}</div>
+                                ${pl.author ? `<div class="mood-playlist-author">${escapeHtml(pl.author)}</div>` : ''}
+                            </div>
+                            <div class="mood-playlist-actions">
+                                <button class="view-playlist-btn" data-playlist-id="${escapeHtml(pl.playlist_id)}" data-title="${escapeHtml(pl.title)}">View Tracks</button>
+                                <button class="download-playlist-btn" data-playlist-id="${escapeHtml(pl.playlist_id)}" data-title="${escapeHtml(pl.title)}">Download All</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            exploreResults.innerHTML = html;
+
+            // Breadcrumb home link
+            document.getElementById('breadcrumb-home').addEventListener('click', () => {
+                exploreBreadcrumb = [];
+                exploreLoaded = false;
+                loadExploreContent();
+            });
+
+            // View playlist tracks
+            document.querySelectorAll('.view-playlist-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    loadPlaylistTracks(btn.dataset.playlistId, btn.dataset.title);
+                });
+            });
+
+            // Download all tracks from playlist
+            document.querySelectorAll('.download-playlist-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    btn.disabled = true;
+                    btn.textContent = 'Loading...';
+                    try {
+                        const res = await fetch(`/api/explore/playlist/${encodeURIComponent(btn.dataset.playlistId)}/tracks`);
+                        if (!res.ok) throw new Error('Failed to load tracks');
+                        const data = await res.json();
+                        await queueMultipleTracks(data.tracks, btn);
+                    } catch (error) {
+                        btn.textContent = 'Failed';
+                        showStatus('Failed: ' + error.message, true);
+                        setTimeout(() => { btn.disabled = false; btn.textContent = 'Download All'; }, 3000);
+                    }
+                });
+            });
+        }
+
+        async function loadPlaylistTracks(playlistId, playlistTitle) {
+            showStatus('Loading tracks...');
+            try {
+                const res = await fetch(`/api/explore/playlist/${encodeURIComponent(playlistId)}/tracks`);
+                if (!res.ok) throw new Error('Failed to load tracks');
+                const data = await res.json();
+                showStatus('');
+                renderPlaylistTracks(data.tracks, playlistTitle, playlistId);
+            } catch (error) {
+                showStatus('Failed to load tracks: ' + error.message, true);
+            }
+        }
+
+        function renderPlaylistTracks(tracks, playlistTitle, playlistId) {
+            const prevBreadcrumb = [...exploreBreadcrumb];
+            exploreBreadcrumb.push({type: 'playlist', title: playlistTitle, playlistId});
+
+            let html = `
+                <div class="explore-breadcrumb">
+                    <button class="breadcrumb-link" id="breadcrumb-home">Explore</button>
+                    <span class="breadcrumb-sep">›</span>
+                    ${prevBreadcrumb.length > 0 ? `
+                        <button class="breadcrumb-link" id="breadcrumb-category">${escapeHtml(prevBreadcrumb[0].title)}</button>
+                        <span class="breadcrumb-sep">›</span>
+                    ` : ''}
+                    <span class="breadcrumb-current">${escapeHtml(playlistTitle)}</span>
+                </div>
+                <div class="explore-playlist-header">
+                    <h2>${escapeHtml(playlistTitle)}</h2>
+                    <span class="explore-track-count">${tracks.length} tracks</span>
+                    <button class="download-all-btn" id="download-all-playlist">Download All</button>
+                </div>
+                <div class="explore-tracks-list">
+            `;
+
+            html += tracks.map(track => `
+                <div class="track">
+                    <div class="track-main">
+                        <img class="track-cover" src="${track.thumbnail_url || ''}" alt="" loading="lazy">
+                        <div class="track-info">
+                            <div class="track-title">${escapeHtml(track.title)}</div>
+                            <div class="track-artist">${escapeHtml(track.artist)}${track.album ? ' - ' + escapeHtml(track.album) : ''}</div>
+                            <div class="track-meta">
+                                <span class="track-duration">${track.duration}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="track-actions">
+                        <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>
+                    </div>
+                </div>
+            `).join('');
+
+            html += '</div>';
+            exploreResults.innerHTML = html;
+
+            // Breadcrumb navigation
+            document.getElementById('breadcrumb-home').addEventListener('click', () => {
+                exploreBreadcrumb = [];
+                exploreLoaded = false;
+                loadExploreContent();
+            });
+
+            const catBtn = document.getElementById('breadcrumb-category');
+            if (catBtn && prevBreadcrumb.length > 0) {
+                catBtn.addEventListener('click', () => {
+                    loadMoodPlaylists(prevBreadcrumb[0].params, prevBreadcrumb[0].title);
+                });
+            }
+
+            // Download all tracks
+            document.getElementById('download-all-playlist').addEventListener('click', () => {
+                queueMultipleTracks(tracks, document.getElementById('download-all-playlist'));
+            });
+
+            // Individual download buttons
+            exploreResults.querySelectorAll('.download-btn').forEach(btn => {
+                btn.addEventListener('click', handleDownload);
+            });
+        }
+
+        async function queueMultipleTracks(tracks, btn) {
+            if (!tracks || tracks.length === 0) {
+                showStatus('No tracks to download');
+                return;
+            }
+
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            const format = formatSelector.value;
+            let queued = 0;
+
+            for (let i = 0; i < tracks.length; i++) {
+                btn.textContent = `Queueing ${i + 1}/${tracks.length}...`;
+                const track = tracks[i];
+                try {
+                    const response = await fetch('/api/queue/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            video_id: track.video_id,
+                            title: track.title,
+                            artist: track.artist,
+                            artists: track.artists || [],
+                            audio_format: format,
+                        })
+                    });
+                    if (response.ok) queued++;
+                } catch (error) {
+                    console.error(`Failed to queue ${track.title}:`, error);
+                }
+            }
+
+            btn.textContent = `Queued ${queued}/${tracks.length}`;
+            showStatus(`Added ${queued} tracks to queue`);
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 3000);
+        }
 
         function escapeHtml(text) {
             const div = document.createElement('div');

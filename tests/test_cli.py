@@ -150,6 +150,65 @@ class TestPluginsRunOptions:
         assert result.exit_code == 0
 
 
+class TestExploreOptions:
+    """Test explore command group options."""
+
+    def test_explore_help(self):
+        """Test explore --help exits 0."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "--help"])
+        assert result.exit_code == 0
+        assert "moods" in result.output.lower()
+        assert "charts" in result.output.lower()
+        assert "mood-playlists" in result.output.lower()
+
+    def test_explore_moods_help(self):
+        """Test explore moods --help exits 0."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "moods", "--help"])
+        assert result.exit_code == 0
+
+    def test_explore_charts_help(self):
+        """Test explore charts --help exits 0."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "charts", "--help"])
+        assert result.exit_code == 0
+        assert "country" in result.output.lower()
+
+    def test_explore_charts_country_option(self):
+        """Test explore charts --country is accepted."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "charts", "--country", "US", "--help"])
+        assert result.exit_code == 0
+
+    def test_explore_charts_download_option(self):
+        """Test explore charts --download is accepted."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "charts", "--download", "--help"])
+        assert result.exit_code == 0
+
+    def test_explore_mood_playlists_help(self):
+        """Test explore mood-playlists --help exits 0."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "mood-playlists", "--help"])
+        assert result.exit_code == 0
+        assert "download" in result.output.lower()
+
+    def test_explore_mood_playlists_format_option(self):
+        """Test explore mood-playlists --format validates choices."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "mood-playlists", "--format", "wav", "params"])
+        assert result.exit_code != 0
+        assert "Invalid value" in result.output
+
+    def test_explore_charts_format_option(self):
+        """Test explore charts --format validates choices."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["explore", "charts", "--format", "wav"])
+        assert result.exit_code != 0
+        assert "Invalid value" in result.output
+
+
 class TestEnvVarIntegration:
     """Test that CLI options properly interact with environment variables."""
 

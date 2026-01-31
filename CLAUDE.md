@@ -12,6 +12,12 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Download button for each track
 - Dark/light theme toggle
 - Version display in header (dynamically loaded from `pyproject.toml` via `importlib.metadata`)
+- **Explore tab**: Browse moods, genres, and music charts from YouTube Music
+  - Three-level navigation: Categories -> Playlists -> Tracks (with breadcrumb nav)
+  - Mood/genre categories displayed as clickable grid cards
+  - Charts with country selector (11 countries + global)
+  - "Download All" buttons for bulk queueing of playlist tracks and chart tracks
+  - Reuses existing download queue infrastructure (`/api/queue/add`)
 - **Multi-user playlist support**: When `KIKUSAN_MULTI_USER=true` (or `--multi-user` flag), parses the `Remote-User` header (set by reverse proxy SSO like Authelia) and prefixes the M3U playlist name with the username (e.g., `alice-webplaylist.m3u`)
   - Opt-in: requires `KIKUSAN_MULTI_USER=true` env var or `--multi-user` CLI flag
   - Falls back to shared playlist when header is absent or feature is disabled
@@ -57,10 +63,14 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Corrupted unavailable files are backed up and reset (same pattern as state files)
 
 ### Architecture Notes
-- `kikusan/search.py`: Uses ytmusicapi to search YouTube Music, extracts view_count from search results
-- `kikusan/web/app.py`: FastAPI backend with search and download endpoints
-- `kikusan/web/templates/index.html`: Single-page frontend with embedded JavaScript
-- `kikusan/web/static/style.css`: Responsive CSS with dark/light themes
+- `kikusan/search.py`: Uses ytmusicapi to search and explore YouTube Music
+  - Search: `search()`, `search_albums()`, `get_album_tracks()` — song/album search with view_count extraction
+  - Explore: `get_mood_categories()`, `get_mood_playlists()`, `get_charts()`, `get_playlist_tracks()` — mood/genre browsing and chart data
+  - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`
+- `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
+  - Explore endpoints: `GET /api/explore/moods`, `GET /api/explore/mood-playlists`, `GET /api/explore/charts`, `GET /api/explore/playlist/{playlist_id}/tracks`
+- `kikusan/web/templates/index.html`: Single-page frontend with embedded JavaScript (Songs, Albums, Explore tabs)
+- `kikusan/web/static/style.css`: Responsive CSS with dark/light themes, explore grid layouts
 - `kikusan/reference_checker.py`: Cross-playlist/plugin reference checking for safe file deletion
   - Includes metadata extraction using mutagen
   - Navidrome protection checks via batch caching
@@ -117,5 +127,19 @@ All major configuration variables have corresponding CLI flags:
 - `--format`: Audio format
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
+
+**explore command group:**
+- `explore moods` — list available mood & genre categories
+- `explore mood-playlists <PARAMS>` — list playlists for a category (PARAMS from `explore moods`)
+  - `--download/-d`: Download all tracks from all playlists in the category
+  - `--output/-o`: Output directory
+  - `--format/-f`: Audio format (opus, mp3, flac)
+  - `--add-to-playlist/-p`: Add to M3U playlist
+- `explore charts` — show current music charts
+  - `--country/-c <CODE>`: ISO 3166-1 Alpha-2 country code (default: ZZ for global)
+  - `--download/-d`: Download all chart tracks
+  - `--output/-o`: Output directory
+  - `--format/-f`: Audio format (opus, mp3, flac)
+  - `--add-to-playlist/-p`: Add to M3U playlist
 
 CLI flags take precedence over environment variables. Options with `envvar` attribute automatically read from the corresponding environment variable if not specified on the command line.
