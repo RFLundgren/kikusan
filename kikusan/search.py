@@ -51,9 +51,16 @@ def search(query: str, limit: int = 20) -> list[Track]:
 
     Returns:
         List of Track objects matching the query
+
+    Raises:
+        Exception: If YouTube Music API fails (e.g., JSONDecodeError, network error)
     """
     yt = YTMusic()
-    results = yt.search(query, filter="songs", limit=limit)
+    try:
+        results = yt.search(query, filter="songs", limit=limit)
+    except Exception as e:
+        logger.error("YouTube Music search failed for query '%s': %s", query, e)
+        raise
 
     tracks = []
     for item in results:
@@ -107,9 +114,16 @@ def search_albums(query: str, limit: int = 20) -> list[Album]:
 
     Returns:
         List of Album objects matching the query
+
+    Raises:
+        Exception: If YouTube Music API fails (e.g., JSONDecodeError, network error)
     """
     yt = YTMusic()
-    results = yt.search(query, filter="albums", limit=limit)
+    try:
+        results = yt.search(query, filter="albums", limit=limit)
+    except Exception as e:
+        logger.error("YouTube Music album search failed for query '%s': %s", query, e)
+        raise
 
     albums = []
     for item in results:
@@ -155,9 +169,16 @@ def get_album_tracks(browse_id: str) -> list[Track]:
 
     Returns:
         List of Track objects from the album
+
+    Raises:
+        Exception: If YouTube Music API fails (e.g., JSONDecodeError, network error)
     """
     yt = YTMusic()
-    album_info = yt.get_album(browse_id)
+    try:
+        album_info = yt.get_album(browse_id)
+    except Exception as e:
+        logger.error("YouTube Music get_album failed for browse_id '%s': %s", browse_id, e)
+        raise
 
     tracks = []
     for item in album_info.get("tracks", []):

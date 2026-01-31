@@ -373,6 +373,12 @@
         async function performSongSearch(query) {
             try {
                 const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
                 const data = await response.json();
 
                 if (data.results.length === 0) {
@@ -390,6 +396,12 @@
         async function performAlbumSearch(query) {
             try {
                 const response = await fetch(`/api/search/albums?q=${encodeURIComponent(query)}`);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
                 const data = await response.json();
                 if (data.results.length === 0) {
                     showStatus('No albums found.');
@@ -448,9 +460,13 @@
             try {
                 showStatus('Loading album tracks...');
                 const response = await fetch(`/api/album/${browseId}/tracks`);
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Failed to load album');
 
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
                 showStatus('');
                 viewingAlbum = {
                     id: browseId,
@@ -511,9 +527,13 @@
             try {
                 showStatus('Loading album tracks...');
                 const response = await fetch(`/api/album/${browseId}/tracks`);
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Failed to load album');
 
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
                 showStatus('');
 
                 // Store album view state

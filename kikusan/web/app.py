@@ -141,7 +141,16 @@ async def index(request: Request):
 @app.get("/api/search", response_model=SearchResponse)
 async def api_search(q: str = Query(..., min_length=1, description="Search query")):
     """Search for music on YouTube Music."""
-    results = search(q, limit=20)
+    try:
+        results = search(q, limit=20)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("Search failed for query '%s': %s", q, e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Search failed: {str(e)}"
+        )
 
     return SearchResponse(
         query=q,
@@ -165,8 +174,19 @@ async def api_search(q: str = Query(..., min_length=1, description="Search query
 async def api_search_albums(q: str = Query(..., min_length=1)):
     """Search YouTube Music for albums."""
     from kikusan.search import search_albums
+    import logging
 
-    results = search_albums(q, limit=20)
+    logger = logging.getLogger(__name__)
+
+    try:
+        results = search_albums(q, limit=20)
+    except Exception as e:
+        logger.error("Album search failed for query '%s': %s", q, e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Album search failed: {str(e)}"
+        )
+
     return AlbumSearchResponse(
         query=q,
         results=[AlbumResponse(**album.__dict__) for album in results],
