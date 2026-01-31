@@ -44,6 +44,7 @@ class DownloadJob:
     file_path: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
+    playlist_name: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert job to dict for JSON serialization."""
@@ -100,6 +101,7 @@ class QueueManager:
         artist: str,
         format: str = "opus",
         artists: Optional[list[str]] = None,
+        playlist_name: Optional[str] = None,
     ) -> str:
         """
         Add a download job to the queue.
@@ -110,6 +112,7 @@ class QueueManager:
             artist: Track artist
             format: Audio format (opus, mp3, flac)
             artists: List of individual artist names for multi-value tags
+            playlist_name: Resolved playlist name for this job (from Remote-User header)
 
         Returns:
             Job ID
@@ -123,6 +126,7 @@ class QueueManager:
             format=format,
             status=JobStatus.QUEUED,
             artists=artists,
+            playlist_name=playlist_name,
         )
         self.jobs[job_id] = job
         await self.queue.put(job)
@@ -187,9 +191,10 @@ class QueueManager:
             )
 
             # Add to playlist if configured
-            if audio_path and config.web_playlist_name:
+            playlist_name = job.playlist_name or config.web_playlist_name
+            if audio_path and playlist_name:
                 await loop.run_in_executor(
-                    None, lambda: add_to_m3u([audio_path], config.web_playlist_name, config.download_dir)
+                    None, lambda: add_to_m3u([audio_path], playlist_name, config.download_dir)
                 )
 
             job.status = JobStatus.COMPLETED

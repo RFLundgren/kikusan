@@ -326,6 +326,7 @@ docker compose up -d
 | `NAVIDROME_PASSWORD`                 | `None`                            | Navidrome password (optional)                                   |
 | `NAVIDROME_KEEP_PLAYLIST`            | `keep`                            | Playlist name for protection (optional)                         |
 | `YT_DLP_COOKIE_FILE`                 | `None`                            | Path to cookies.txt file for yt-dlp (optional)                  |
+| `KIKUSAN_MULTI_USER`                 | `false`                           | Enable per-user M3U playlists via `Remote-User` header          |
 | `KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS` | `168`                             | Hours to wait before retrying unavailable videos (0 = disabled) |
 
 ### Cookie Authentication
@@ -511,6 +512,7 @@ kikusan web [OPTIONS]
 | `-p, --port`                                   | `KIKUSAN_WEB_PORT`           | Port to listen on. Default: `8000`                          |
 | `--cors-origins`                               | `KIKUSAN_CORS_ORIGINS`       | CORS allowed origins (comma-separated or `*`). Default: `*` |
 | `--web-playlist`                               | `KIKUSAN_WEB_PLAYLIST`       | M3U playlist name for web downloads (optional)              |
+| `--multi-user/--no-multi-user`                 | `KIKUSAN_MULTI_USER`         | Per-user playlists via `Remote-User` header. Default: off   |
 | `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`       |
 | `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode      |
 
@@ -574,6 +576,16 @@ kikusan.foobar.test {
   reverse_proxy http://192.168.1.11:8007
 }
 ```
+
+### Multi-User Playlists
+
+When running behind a reverse proxy with SSO (e.g. Authelia), kikusan can create separate M3U playlists per user by reading the `Remote-User` header. Each user's playlist is prefixed with their username (e.g. `alice-webplaylist.m3u`).
+
+```bash
+kikusan web --web-playlist webplaylist --multi-user
+```
+
+If the header is absent (e.g. direct access without the proxy), the shared playlist is used as fallback.
 
 ## Requirements
 

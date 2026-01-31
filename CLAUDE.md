@@ -12,6 +12,12 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Download button for each track
 - Dark/light theme toggle
 - Version display in header (dynamically loaded from `pyproject.toml` via `importlib.metadata`)
+- **Multi-user playlist support**: When `KIKUSAN_MULTI_USER=true` (or `--multi-user` flag), parses the `Remote-User` header (set by reverse proxy SSO like Authelia) and prefixes the M3U playlist name with the username (e.g., `alice-webplaylist.m3u`)
+  - Opt-in: requires `KIKUSAN_MULTI_USER=true` env var or `--multi-user` CLI flag
+  - Falls back to shared playlist when header is absent or feature is disabled
+  - Username sanitization: only `[a-zA-Z0-9._-]` allowed, max 64 chars
+  - Implementation: `_get_remote_user()` in `kikusan/web/app.py`, `Config.effective_playlist_name()` in `kikusan/config.py`
+  - Playlist name is resolved at request time and stored on `DownloadJob.playlist_name` for queue-based downloads
 
 ### Sync Safety Features
 - **Cross-Reference Protection**: When `sync=True` for a playlist/plugin, songs are only deleted from disk if they are not referenced by any other playlist or plugin
@@ -100,6 +106,7 @@ All major configuration variables have corresponding CLI flags:
 **web command:**
 - `--cors-origins`: CORS allowed origins
 - `--web-playlist`: M3U playlist name for web downloads
+- `--multi-user / --no-multi-user`: Enable per-user M3U playlists via Remote-User header (env: `KIKUSAN_MULTI_USER`)
 
 **cron command:**
 - `--format`: Audio format

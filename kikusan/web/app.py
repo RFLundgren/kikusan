@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import urllib.parse
 from pathlib import Path
 
@@ -42,6 +43,19 @@ static_dir = Path(__file__).parent / "static"
 
 templates = Jinja2Templates(directory=str(templates_dir))
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+_SAFE_USERNAME_RE = re.compile(r"[^a-zA-Z0-9._-]")
+
+
+def _get_remote_user(http_request: Request, config) -> str | None:
+    """Extract and sanitize Remote-User header. Returns None if multi-user disabled or header absent."""
+    if not config.multi_user:
+        return None
+    raw = http_request.headers.get("Remote-User")
+    if not raw:
+        return None
+    sanitized = _SAFE_USERNAME_RE.sub("_", raw.strip())[:64]
+    return sanitized if sanitized else None
 
 
 @app.on_event("startup")
@@ -231,7 +245,7 @@ async def api_get_album_tracks(browse_id: str):
 
 
 @app.post("/api/download", response_model=DownloadResponse)
-async def api_download(request: DownloadRequest):
+async def api_download(request: DownloadRequest, http_request: Request):
     """Download a track by video ID."""
     config = get_config()
 
@@ -258,8 +272,10 @@ async def api_download(request: DownloadRequest):
         )
 
         # Add to playlist if configured
-        if audio_path and config.web_playlist_name:
-            add_to_m3u([audio_path], config.web_playlist_name, config.download_dir)
+        remote_user = _get_remote_user(http_request, config)
+        playlist_name = config.effective_playlist_name(remote_user)
+        if audio_path and playlist_name:
+            add_to_m3u([audio_path], playlist_name, config.download_dir)
 
         return DownloadResponse(
             success=True,
@@ -377,7 +393,7 @@ class QueueAddResponse(BaseModel):
 
 
 @app.post("/api/queue/add", response_model=QueueAddResponse)
-async def add_to_queue(request: QueueAddRequest):
+async def add_to_queue(request: QueueAddRequest, http_request: Request):
     """Add a download job to the queue."""
     if not queue_manager:
         raise HTTPException(status_code=500, detail="Queue manager not initialized")
@@ -390,19 +406,24 @@ async def add_to_queue(request: QueueAddRequest):
             status_code=400, detail=f"Invalid format. Must be one of: {', '.join(valid_formats)}"
         )
 
+    config = get_config()
+    remote_user = _get_remote_user(http_request, config)
+    playlist_name = config.effective_playlist_name(remote_user)
+
     job_id = await queue_manager.add_job(
         video_id=request.video_id,
         title=request.title,
         artist=request.artist,
         format=audio_format,
         artists=request.artists,
+        playlist_name=playlist_name,
     )
 
     return QueueAddResponse(job_id=job_id, status="queued")
 
 
 @app.post("/api/queue/add-album")
-async def add_album_to_queue(request: QueueAddAlbumRequest):
+async def add_album_to_queue(request: QueueAddAlbumRequest, http_request: Request):
     """Add all tracks from an album to the download queue."""
     if not queue_manager:
         raise HTTPException(status_code=500, detail="Queue manager not initialized")
@@ -425,6 +446,10 @@ async def add_album_to_queue(request: QueueAddAlbumRequest):
                 status_code=400, detail=f"Invalid format. Must be one of: {', '.join(valid_formats)}"
             )
 
+        config = get_config()
+        remote_user = _get_remote_user(http_request, config)
+        playlist_name = config.effective_playlist_name(remote_user)
+
         job_ids = []
         for track in tracks:
             job_id = await queue_manager.add_job(
@@ -433,6 +458,7 @@ async def add_album_to_queue(request: QueueAddAlbumRequest):
                 artist=track.artist,
                 format=audio_format,
                 artists=track.artists,
+                playlist_name=playlist_name,
             )
             job_ids.append(job_id)
 

@@ -34,6 +34,15 @@ class Config:
     log_cookie_usage: bool = True
     cors_origins: list[str] = field(default_factory=lambda: ["*"])
     unavailable_cooldown_hours: int = 168  # 7 days
+    multi_user: bool = False
+
+    def effective_playlist_name(self, remote_user: str | None) -> str | None:
+        """Return the playlist name, optionally prefixed with the remote user."""
+        if not self.web_playlist_name:
+            return None
+        if not self.multi_user or not remote_user:
+            return self.web_playlist_name
+        return f"{remote_user}-{self.web_playlist_name}"
 
     @property
     def cookie_file_path(self) -> str | None:
@@ -77,6 +86,9 @@ class Config:
         # Parse unavailable cooldown hours (0 = disabled)
         unavailable_cooldown_hours = int(os.getenv("KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS", "168"))
 
+        # Parse multi-user mode flag
+        multi_user = os.getenv("KIKUSAN_MULTI_USER", "false").lower() in ("true", "1", "yes")
+
         return cls(
             download_dir=Path(os.getenv("KIKUSAN_DOWNLOAD_DIR", "./downloads")),
             audio_format=os.getenv("KIKUSAN_AUDIO_FORMAT", "opus"),
@@ -95,6 +107,7 @@ class Config:
             log_cookie_usage=log_cookie_usage,
             cors_origins=cors_origins,
             unavailable_cooldown_hours=unavailable_cooldown_hours,
+            multi_user=multi_user,
         )
 
     @property

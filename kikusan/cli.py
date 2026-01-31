@@ -371,6 +371,11 @@ main.add_command(plugins, name="plugins")
     default=None,
     help="Use only primary artist for folder names in album mode (strips 'feat.', etc.)",
 )
+@click.option(
+    "--multi-user/--no-multi-user",
+    default=None,
+    help="Enable per-user M3U playlists via Remote-User header (for reverse proxy SSO). Default: disabled",
+)
 def web(
     host: str,
     port: int | None,
@@ -378,6 +383,7 @@ def web(
     web_playlist: str | None,
     organization_mode: str | None,
     use_primary_artist: bool | None,
+    multi_user: bool | None,
 ):
     """Start the web interface."""
     import uvicorn
@@ -393,6 +399,8 @@ def web(
         os.environ["KIKUSAN_ORGANIZATION_MODE"] = organization_mode
     if use_primary_artist is not None:
         os.environ["KIKUSAN_USE_PRIMARY_ARTIST"] = "true" if use_primary_artist else "false"
+    if multi_user is not None:
+        os.environ["KIKUSAN_MULTI_USER"] = "true" if multi_user else "false"
 
     config = get_config()
     server_port = port or config.web_port
