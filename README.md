@@ -304,28 +304,29 @@ docker compose up -d
 
 ### Environment Variables
 
-| Variable                     | Default                           | Description                                    |
-| ---------------------------- | --------------------------------- | ---------------------------------------------- |
-| `KIKUSAN_DOWNLOAD_DIR`       | `./downloads`                     | Download directory                             |
-| `KIKUSAN_AUDIO_FORMAT`       | `opus`                            | Audio format (opus, mp3, flac)                 |
-| `KIKUSAN_FILENAME_TEMPLATE`  | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format)              |
-| `KIKUSAN_ORGANIZATION_MODE`  | `flat`                            | File organization mode (flat, album)           |
-| `KIKUSAN_USE_PRIMARY_ARTIST` | `false`                           | Use primary artist for folders (true, false)   |
-| `KIKUSAN_WEB_PORT`           | `8000`                            | Web server port                                |
-| `KIKUSAN_WEB_PLAYLIST`       | `None`                            | M3U playlist name for web downloads (optional) |
-| `KIKUSAN_CORS_ORIGINS`       | `*`                               | CORS allowed origins (comma-separated)         |
-| `KIKUSAN_COOKIE_MODE`        | `auto`                            | Cookie usage: auto, always, or never           |
-| `KIKUSAN_COOKIE_RETRY_DELAY` | `1.0`                             | Delay in seconds before retrying with cookies  |
-| `KIKUSAN_LOG_COOKIE_USAGE`   | `true`                            | Log cookie usage statistics (true, false)      |
-| `SPOTIFY_CLIENT_ID`          | `None`                            | Spotify API client ID (for Spotify playlists)  |
-| `SPOTIFY_CLIENT_SECRET`      | `None`                            | Spotify API client secret (optional)           |
-| `GOTIFY_URL`                 | `None`                            | Gotify server URL for notifications (optional) |
-| `GOTIFY_TOKEN`               | `None`                            | Gotify application token (optional)            |
-| `NAVIDROME_URL`              | `None`                            | Navidrome server URL for protection (optional) |
-| `NAVIDROME_USER`             | `None`                            | Navidrome username (optional)                  |
-| `NAVIDROME_PASSWORD`         | `None`                            | Navidrome password (optional)                  |
-| `NAVIDROME_KEEP_PLAYLIST`    | `keep`                            | Playlist name for protection (optional)        |
-| `YT_DLP_COOKIE_FILE`         | `None`                            | Path to cookies.txt file for yt-dlp (optional) |
+| Variable                             | Default                           | Description                                                     |
+| ------------------------------------ | --------------------------------- | --------------------------------------------------------------- |
+| `KIKUSAN_DOWNLOAD_DIR`               | `./downloads`                     | Download directory                                              |
+| `KIKUSAN_AUDIO_FORMAT`               | `opus`                            | Audio format (opus, mp3, flac)                                  |
+| `KIKUSAN_FILENAME_TEMPLATE`          | `%(artist,uploader)s - %(title)s` | Filename template (yt-dlp format)                               |
+| `KIKUSAN_ORGANIZATION_MODE`          | `flat`                            | File organization mode (flat, album)                            |
+| `KIKUSAN_USE_PRIMARY_ARTIST`         | `false`                           | Use primary artist for folders (true, false)                    |
+| `KIKUSAN_WEB_PORT`                   | `8000`                            | Web server port                                                 |
+| `KIKUSAN_WEB_PLAYLIST`               | `None`                            | M3U playlist name for web downloads (optional)                  |
+| `KIKUSAN_CORS_ORIGINS`               | `*`                               | CORS allowed origins (comma-separated)                          |
+| `KIKUSAN_COOKIE_MODE`                | `auto`                            | Cookie usage: auto, always, or never                            |
+| `KIKUSAN_COOKIE_RETRY_DELAY`         | `1.0`                             | Delay in seconds before retrying with cookies                   |
+| `KIKUSAN_LOG_COOKIE_USAGE`           | `true`                            | Log cookie usage statistics (true, false)                       |
+| `SPOTIFY_CLIENT_ID`                  | `None`                            | Spotify API client ID (for Spotify playlists)                   |
+| `SPOTIFY_CLIENT_SECRET`              | `None`                            | Spotify API client secret (optional)                            |
+| `GOTIFY_URL`                         | `None`                            | Gotify server URL for notifications (optional)                  |
+| `GOTIFY_TOKEN`                       | `None`                            | Gotify application token (optional)                             |
+| `NAVIDROME_URL`                      | `None`                            | Navidrome server URL for protection (optional)                  |
+| `NAVIDROME_USER`                     | `None`                            | Navidrome username (optional)                                   |
+| `NAVIDROME_PASSWORD`                 | `None`                            | Navidrome password (optional)                                   |
+| `NAVIDROME_KEEP_PLAYLIST`            | `keep`                            | Playlist name for protection (optional)                         |
+| `YT_DLP_COOKIE_FILE`                 | `None`                            | Path to cookies.txt file for yt-dlp (optional)                  |
+| `KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS` | `168`                             | Hours to wait before retrying unavailable videos (0 = disabled) |
 
 ### Cookie Authentication
 
@@ -436,6 +437,18 @@ Kikusan tracks downloaded files and generates M3U playlists automatically:
 - **State Files**: Stored in `{download_dir}/.kikusan/state/` (for playlists) and `{download_dir}/.kikusan/plugin_state/` (for plugins)
 - **M3U Playlists**: Generated at `{download_dir}/{name}.m3u` for each sync configuration
 
+### Unavailable Video Cooldown
+
+Kikusan automatically prevents repeated failed downloads of unavailable videos to reduce wasted bandwidth and API requests.
+
+**How it works:**
+
+When a video returns a "Video unavailable" error (distinct from authentication or network errors), Kikusan records the video ID with a timestamp in `{download_dir}/.kikusan/unavailable.json`. The video will be skipped during subsequent sync operations until the cooldown period expires.
+
+### Filename Length Safety
+
+Kikusan automatically truncates long filenames to prevent filesystem errors while preserving readability.
+
 ## CLI Reference
 
 This section documents all CLI commands and their options.
@@ -444,12 +457,13 @@ This section documents all CLI commands and their options.
 
 These options apply to all commands:
 
-| Option                  | Env Variable                            | Description                                                                     |
-| ----------------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
-| `--cookie-mode`         | `KIKUSAN_COOKIE_MODE`                   | Cookie usage: `auto` (retry on auth errors), `always`, `never`. Default: `auto` |
-| `--cookie-retry-delay`  | `KIKUSAN_COOKIE_RETRY_DELAY`            | Delay in seconds before retrying with cookies. Default: `1.0`                   |
-| `--no-log-cookie-usage` | (inverse of `KIKUSAN_LOG_COOKIE_USAGE`) | Disable logging of cookie usage statistics                                      |
-| `--version`             | -                                       | Show version and exit                                                           |
+| Option                   | Env Variable                            | Description                                                                     |
+| ------------------------ | --------------------------------------- | ------------------------------------------------------------------------------- |
+| `--cookie-mode`          | `KIKUSAN_COOKIE_MODE`                   | Cookie usage: `auto` (retry on auth errors), `always`, `never`. Default: `auto` |
+| `--cookie-retry-delay`   | `KIKUSAN_COOKIE_RETRY_DELAY`            | Delay in seconds before retrying with cookies. Default: `1.0`                   |
+| `--no-log-cookie-usage`  | (inverse of `KIKUSAN_LOG_COOKIE_USAGE`) | Disable logging of cookie usage statistics                                      |
+| `--unavailable-cooldown` | `KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS`    | Hours to wait before retrying unavailable videos (0 = disabled). Default: `168` |
+| `--version`              | -                                       | Show version and exit                                                           |
 
 ### kikusan search
 
