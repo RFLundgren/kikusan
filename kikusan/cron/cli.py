@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--once",
     is_flag=True,
-    help="Run all playlists once and exit (skip scheduling)",
+    help="Run all sync jobs once and exit (skip scheduling)",
 )
 @click.option(
     "--format",
@@ -61,10 +61,11 @@ def cron(
     use_primary_artist: bool | None,
 ):
     """
-    Run continuous playlist sync based on cron.yaml.
+    Run continuous sync based on cron.yaml.
 
-    This command monitors configured playlists and automatically downloads
-    new tracks according to the cron schedule defined for each playlist.
+    Monitors configured playlists, plugins, and explore sources (charts,
+    moods/genres) and automatically downloads new tracks according to the
+    cron schedule defined for each entry.
 
     Configuration file format (cron.yaml):
 
@@ -74,6 +75,19 @@ def cron(
         url: <YouTube, YouTube Music, or Spotify playlist URL>
         sync: <true to delete removed tracks, false to keep them>
         schedule: <cron expression, e.g., "5 4 * * *">
+
+    \b
+    explore:
+      us-charts:
+        type: charts
+        country: US
+        sync: true
+        schedule: "0 6 * * *"
+      chill-vibes:
+        type: mood
+        params: <params from 'explore moods'>
+        sync: false
+        schedule: "0 12 * * 0"
 
     Examples:
 
@@ -86,7 +100,7 @@ def cron(
       kikusan cron --config /path/to/cron.yaml
 
     \b
-      # Run all playlists once and exit
+      # Run all sync jobs once and exit
       kikusan cron --once
 
     \b
@@ -113,8 +127,8 @@ def cron(
         scheduler = CronScheduler(config_path, download_dir)
 
         if once:
-            # Run all playlists once and exit
-            click.echo("Running all playlists once...")
+            # Run all sync jobs once and exit
+            click.echo("Running all sync jobs once...")
             scheduler.sync_all_once()
             click.echo("Done.")
         else:

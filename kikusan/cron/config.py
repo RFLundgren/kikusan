@@ -35,11 +35,32 @@ class PluginInstanceConfig:
 
 
 @dataclass
+class ExploreConfig:
+    """Configuration for a single explore sync entry (charts or mood).
+
+    type: "charts" or "mood"
+    country: ISO 3166-1 Alpha-2 code (only for type="charts", default "ZZ")
+    params: Mood/genre params string (only for type="mood")
+    sync: If True, delete tracks removed from the source
+    schedule: Cron expression
+    name: Internal name for state/playlist files
+    """
+
+    name: str
+    type: str  # "charts" or "mood"
+    sync: bool
+    schedule: str
+    country: str = "ZZ"
+    params: str = ""
+
+
+@dataclass
 class CronConfig:
-    """Root configuration for cron playlists and plugins."""
+    """Root configuration for cron playlists, plugins, and explore entries."""
 
     playlists: dict[str, PlaylistConfig]
     plugins: dict[str, PluginInstanceConfig]
+    explore: dict[str, ExploreConfig] = field(default_factory=dict)
     hooks: list[HookConfig] = field(default_factory=list)
 
 
@@ -69,9 +90,9 @@ def load_config(path: Path) -> CronConfig:
     if not data:
         raise ValueError("Config file is empty")
 
-    # Check that at least playlists or plugins are defined
-    if "playlists" not in data and "plugins" not in data:
-        raise ValueError("Config must have 'playlists' or 'plugins' key")
+    # Check that at least playlists, plugins, or explore are defined
+    if "playlists" not in data and "plugins" not in data and "explore" not in data:
+        raise ValueError("Config must have 'playlists', 'plugins', or 'explore' key")
 
     # Load playlists (optional, defaults to empty)
     playlists = {}
@@ -177,6 +198,65 @@ def load_config(path: Path) -> CronConfig:
                 config=config["config"],
             )
 
+    # Load explore entries (optional, defaults to empty)
+    explore = {}
+    if "explore" in data and data["explore"] is not None:
+        explore_data = data["explore"]
+        if not isinstance(explore_data, dict):
+            raise ValueError("'explore' must be a dictionary")
+
+        for name, config in explore_data.items():
+            sanitized_name = validate_playlist_name(name)
+
+            if not isinstance(config, dict):
+                raise ValueError(f"Explore '{name}' config must be a dictionary")
+
+            if "type" not in config:
+                raise ValueError(f"Explore '{name}' missing required field: type")
+            if "sync" not in config:
+                raise ValueError(f"Explore '{name}' missing required field: sync")
+            if "schedule" not in config:
+                raise ValueError(f"Explore '{name}' missing required field: schedule")
+
+            explore_type = config["type"]
+            if explore_type not in ("charts", "mood"):
+                raise ValueError(
+                    f"Explore '{name}' type must be 'charts' or 'mood', got '{explore_type}'"
+                )
+
+            if not isinstance(config["sync"], bool):
+                raise ValueError(f"Explore '{name}' sync must be a boolean")
+            if not isinstance(config["schedule"], str):
+                raise ValueError(f"Explore '{name}' schedule must be a string")
+
+            # Type-specific validation
+            country = "ZZ"
+            params = ""
+
+            if explore_type == "charts":
+                country = config.get("country", "ZZ")
+                if not isinstance(country, str):
+                    raise ValueError(f"Explore '{name}' country must be a string")
+                validate_country_code(country, name)
+
+            elif explore_type == "mood":
+                if "params" not in config:
+                    raise ValueError(f"Explore '{name}' (type=mood) missing required field: params")
+                params = config["params"]
+                if not isinstance(params, str) or not params.strip():
+                    raise ValueError(f"Explore '{name}' params must be a non-empty string")
+
+            validate_cron_schedule(config["schedule"], name)
+
+            explore[sanitized_name] = ExploreConfig(
+                name=sanitized_name,
+                type=explore_type,
+                sync=config["sync"],
+                schedule=config["schedule"],
+                country=country,
+                params=params,
+            )
+
     # Load hooks (optional, defaults to empty)
     hooks = []
     if "hooks" in data:
@@ -186,12 +266,13 @@ def load_config(path: Path) -> CronConfig:
         hooks = parse_hooks_config(hooks_data)
 
     logger.info(
-        "Loaded configuration for %d playlist(s), %d plugin(s), and %d hook(s)",
+        "Loaded configuration for %d playlist(s), %d plugin(s), %d explore source(s), and %d hook(s)",
         len(playlists),
         len(plugins),
+        len(explore),
         len(hooks),
     )
-    return CronConfig(playlists=playlists, plugins=plugins, hooks=hooks)
+    return CronConfig(playlists=playlists, plugins=plugins, explore=explore, hooks=hooks)
 
 
 def validate_playlist_name(name: str) -> str:
@@ -277,4 +358,24 @@ def validate_cron_schedule(schedule: str, playlist_name: str) -> None:
     except Exception as e:
         raise ValueError(
             f"Playlist '{playlist_name}' has invalid cron schedule '{schedule}': {e}"
+        )
+
+
+def validate_country_code(country: str, explore_name: str) -> None:
+    """
+    Validate ISO 3166-1 Alpha-2 country code.
+
+    Allows standard 2-letter codes plus 'ZZ' for global charts.
+
+    Args:
+        country: Country code string
+        explore_name: Explore entry name for error messages
+
+    Raises:
+        ValueError: If country code is invalid
+    """
+    if not re.match(r"^[A-Z]{2}$", country):
+        raise ValueError(
+            f"Explore '{explore_name}' has invalid country code '{country}': "
+            "must be a 2-letter uppercase ISO 3166-1 Alpha-2 code (e.g., 'US', 'GB', 'ZZ')"
         )

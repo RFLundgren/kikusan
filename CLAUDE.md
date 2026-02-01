@@ -82,13 +82,25 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Two-tier song matching (path-based + metadata-based)
   - Environment-based configuration: NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD
 - `kikusan/cron/sync.py`: Playlist synchronization with reference-aware deletion and Navidrome protection
+- `kikusan/cron/explore_sync.py`: Explore (charts/moods/genres) synchronization for cron mode
+  - `sync_explore()`: Main entry point, reuses `download_new_tracks`, `remove_old_tracks`, `update_m3u_playlist` from `sync.py`
+  - `fetch_explore_tracks()`: Routes to `_fetch_chart_tracks()` or `_fetch_mood_tracks()` based on type
+  - `_fetch_chart_tracks()`: Fetches tracks from YouTube Music charts via `get_charts()`
+  - `_fetch_mood_tracks()`: Fetches playlists for a mood/genre category, then fetches tracks from each playlist, deduplicating by video_id
+  - State is stored using the same `PlaylistState` model in `.kikusan/state/`
+  - All safety features apply: cross-reference protection, Navidrome protection, unavailable cooldown
+- `kikusan/cron/config.py`: Cron configuration loading with support for `playlists`, `plugins`, `explore`, and `hooks` sections
+  - `ExploreConfig`: Dataclass for explore entries (type, country, params, sync, schedule)
+  - `validate_country_code()`: Validates ISO 3166-1 Alpha-2 country codes
 - `kikusan/plugins/sync.py`: Plugin synchronization with reference-aware deletion and Navidrome protection
 - `kikusan/hooks.py`: Generic hook system for running commands on events
   - Supports `playlist_updated` and `sync_completed` events
   - Configured via `hooks` section in `cron.yaml`
   - Passes context data via environment variables (KIKUSAN_*)
   - Supports timeout and run_on_error options
-- `kikusan/cron/scheduler.py`: Orchestrates sync jobs and triggers hooks after completion
+- `kikusan/cron/scheduler.py`: Orchestrates sync jobs (playlists, plugins, explore) and triggers hooks after completion
+  - `_schedule_explore()` / `_explore_sync_job()`: Schedule and execute explore sync jobs
+  - `sync_all_once()`: Runs all playlists, plugins, and explore sources once immediately
 - `kikusan/download.py`: Core download logic with unavailable video protection
   - `download()`: Single video download with cooldown check at entry and error recording on failure
   - `UnavailableCooldownError`: Raised when video is on cooldown (avoids hitting YouTube)
@@ -123,6 +135,11 @@ All major configuration variables have corresponding CLI flags:
 - `--format`: Audio format
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
+- Supports `explore` section in `cron.yaml` for syncing charts and moods/genres:
+  - `type: charts` with optional `country` (ISO 3166-1 Alpha-2, default ZZ)
+  - `type: mood` with required `params` (from `explore moods` command)
+  - Each entry has `sync` (bool) and `schedule` (cron expression)
+  - State stored in `.kikusan/state/` using same format as playlist state
 
 **plugins run command:**
 - `--format`: Audio format

@@ -96,6 +96,30 @@ plugins:
   #     limit: 20
   #     min_score: 50
 
+# Explore sources - sync charts and mood/genre categories from YouTube Music
+explore:
+  # Sync global music charts daily
+  global-charts:
+    type: charts
+    country: ZZ           # ISO 3166-1 Alpha-2 code (ZZ = global)
+    sync: true            # Remove tracks that fall off the charts
+    schedule: "0 6 * * *" # Daily at 06:00
+
+  # Sync US charts weekly
+  # us-charts:
+  #   type: charts
+  #   country: US
+  #   sync: true
+  #   schedule: "0 6 * * 1"  # Every Monday at 06:00
+
+  # Sync a mood/genre category
+  # Use 'kikusan explore moods' to discover available categories and their params
+  # chill-vibes:
+  #   type: mood
+  #   params: "ggMPOg1uX1J"  # Params string from 'kikusan explore moods'
+  #   sync: false             # Keep tracks even if removed from the category
+  #   schedule: "0 12 * * 0"  # Weekly on Sunday at noon
+
 # Hooks - run commands when events occur
 # Useful for integrating with external systems like Navidrome
 hooks:

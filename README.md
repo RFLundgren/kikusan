@@ -121,7 +121,7 @@ kikusan web
 
 ### Scheduled Sync (Cron)
 
-Automatically monitor and sync playlists or plugins on a schedule:
+Automatically monitor and sync playlists, plugins, and explore sources on a schedule:
 
 ```bash
 # Run continuously with cron.yaml configuration
@@ -138,8 +138,32 @@ Create a `cron.yaml` file to configure:
 
 - **Playlists**: YouTube Music, YouTube, or Spotify playlists
 - **Plugins**: Listenbrainz, Reddit, Billboard, RSS feeds
+- **Explore**: YouTube Music charts and mood/genre categories
 - **Schedule**: Standard cron expressions (e.g., "0 9 \* \* \*" for daily at 9am)
 - **Sync Mode**: Keep or delete files when removed from source
+
+#### Explore Sources
+
+Sync tracks from YouTube Music charts or mood/genre categories:
+
+```yaml
+explore:
+  # Sync US music charts daily
+  us-charts:
+    type: charts
+    country: US          # ISO 3166-1 Alpha-2 code (ZZ = global)
+    sync: true           # Remove tracks that fall off the charts
+    schedule: "0 6 * * *"
+
+  # Sync a mood/genre category weekly
+  chill-vibes:
+    type: mood
+    params: "ggMPOg1uX1J"  # Get params from: kikusan explore moods
+    sync: false
+    schedule: "0 12 * * 0"
+```
+
+Use `kikusan explore moods` to discover available mood/genre categories and their `params` values, and `kikusan explore charts --country XX` to preview chart contents.
 
 See `cron.example.yaml` for detailed configuration examples.
 
@@ -166,6 +190,7 @@ Kikusan can send push notifications via [Gotify](https://gotify.net/) for schedu
 
 - Scheduled playlist syncs (via `kikusan cron`)
 - Scheduled plugin syncs (via `kikusan cron`)
+- Scheduled explore syncs (via `kikusan cron`)
 
 Notifications are **not** sent for CLI operations or web UI downloads, as these are interactive and the user already sees the results.
 
@@ -255,7 +280,7 @@ Hooks receive context via environment variables:
 | `KIKUSAN_EVENT`         | Event type (playlist_updated, sync_completed) |
 | `KIKUSAN_PLAYLIST_NAME` | Name of the playlist/plugin                   |
 | `KIKUSAN_PLAYLIST_PATH` | Absolute path to the M3U file (if exists)     |
-| `KIKUSAN_SYNC_TYPE`     | Type: "playlist" or "plugin"                  |
+| `KIKUSAN_SYNC_TYPE`     | Type: "playlist", "plugin", or "explore"      |
 | `KIKUSAN_DOWNLOADED`    | Number of tracks downloaded                   |
 | `KIKUSAN_SKIPPED`       | Number of tracks skipped                      |
 | `KIKUSAN_DELETED`       | Number of tracks deleted                      |
@@ -518,7 +543,7 @@ kikusan web [OPTIONS]
 
 ### kikusan cron
 
-Run continuous playlist sync based on cron.yaml.
+Run continuous sync based on cron.yaml (playlists, plugins, and explore sources).
 
 ```bash
 kikusan cron [OPTIONS]
@@ -528,7 +553,7 @@ kikusan cron [OPTIONS]
 | ---------------------------------------------- | ---------------------------- | ------------------------------------------------------ |
 | `-c, --config`                                 | -                            | Path to cron configuration file. Default: `cron.yaml`  |
 | `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Override download directory                            |
-| `--once`                                       | -                            | Run all playlists once and exit (skip scheduling)      |
+| `--once`                                       | -                            | Run all sync jobs once and exit (skip scheduling)      |
 | `-f, --format`                                 | `KIKUSAN_AUDIO_FORMAT`       | Audio format: `opus`, `mp3`, `flac`. Default: `opus`   |
 | `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`  |
 | `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode |

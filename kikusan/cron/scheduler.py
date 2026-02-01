@@ -10,6 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from kikusan.config import get_config
 from kikusan.cron.config import CronConfig, load_config
+from kikusan.cron.explore_sync import sync_explore
 from kikusan.cron.sync import sync_playlist
 from kikusan.hooks import HookContext, HookRunner
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class CronScheduler:
-    """Manages cron-based playlist synchronization."""
+    """Manages cron-based playlist, plugin, and explore synchronization."""
 
     def __init__(self, config_path: Path, download_dir: Path | None = None):
         """
@@ -70,6 +71,10 @@ class CronScheduler:
         # Schedule each plugin
         for plugin_name, plugin_config in self.cron_config.plugins.items():
             self._schedule_plugin(plugin_config)
+
+        # Schedule each explore source
+        for explore_name, explore_config in self.cron_config.explore.items():
+            self._schedule_explore(explore_config)
 
         self.scheduler.start()
         logger.info("Scheduler started successfully")
@@ -241,6 +246,82 @@ class CronScheduler:
             success=success,
         )
 
+    def _schedule_explore(self, explore_config) -> None:
+        """Schedule an explore source for synchronization.
+
+        Args:
+            explore_config: Explore configuration
+        """
+        trigger = CronTrigger.from_crontab(explore_config.schedule)
+
+        self.scheduler.add_job(
+            func=self._explore_sync_job,
+            trigger=trigger,
+            args=[explore_config],
+            id=f"explore_{explore_config.name}",
+            name=f"Explore sync: {explore_config.name}",
+            replace_existing=True,
+        )
+
+        logger.info(
+            "Scheduled explore '%s' (type=%s) with cron: %s",
+            explore_config.name,
+            explore_config.type,
+            explore_config.schedule,
+        )
+
+    def _explore_sync_job(self, explore_config) -> None:
+        """Job function to sync an explore source.
+
+        This is called by APScheduler on schedule.
+
+        Args:
+            explore_config: Explore configuration
+        """
+        result = None
+        success = False
+
+        try:
+            result = sync_explore(
+                explore_config=explore_config,
+                download_dir=self.download_dir,
+                audio_format=self.audio_format,
+                filename_template=self.filename_template,
+                organization_mode=self.organization_mode,
+                use_primary_artist=self.use_primary_artist,
+            )
+            success = True
+
+            from kikusan.notifications import send_sync_notification
+
+            send_sync_notification(
+                name=explore_config.name,
+                sync_type="explore",
+                result=result,
+                success=True,
+            )
+
+        except Exception as e:
+            logger.error("Explore sync job failed for %s: %s", explore_config.name, e)
+
+            from kikusan.notifications import send_sync_notification
+
+            send_sync_notification(
+                name=explore_config.name,
+                sync_type="explore",
+                result=None,
+                success=False,
+                error=str(e),
+            )
+
+        # Run hooks after sync
+        self._run_sync_hooks(
+            playlist_name=explore_config.name,
+            sync_type="explore",
+            result=result,
+            success=success,
+        )
+
     def _run_sync_hooks(
         self,
         playlist_name: str,
@@ -251,8 +332,8 @@ class CronScheduler:
         """Run hooks after a sync operation.
 
         Args:
-            playlist_name: Name of the playlist/plugin
-            sync_type: Type of sync ("playlist" or "plugin")
+            playlist_name: Name of the playlist/plugin/explore
+            sync_type: Type of sync ("playlist", "plugin", or "explore")
             result: Sync result object (SyncResult)
             success: Whether the sync was successful
         """
@@ -304,7 +385,7 @@ class CronScheduler:
         self.hook_runner.run_hooks(context)
 
     def sync_all_once(self) -> None:
-        """Sync all playlists and plugins once immediately."""
+        """Sync all playlists, plugins, and explore sources once immediately."""
         if not self.cron_config:
             self.load_configuration()
 
@@ -313,7 +394,7 @@ class CronScheduler:
 
         discover_plugins()
 
-        logger.info("Syncing all playlists and plugins once")
+        logger.info("Syncing all playlists, plugins, and explore sources once")
 
         for playlist_config in self.cron_config.playlists.values():
             self._sync_job(playlist_config)
@@ -321,7 +402,10 @@ class CronScheduler:
         for plugin_config in self.cron_config.plugins.values():
             self._plugin_sync_job(plugin_config)
 
-        logger.info("All playlists and plugins synced")
+        for explore_config in self.cron_config.explore.values():
+            self._explore_sync_job(explore_config)
+
+        logger.info("All playlists, plugins, and explore sources synced")
 
     def stop(self) -> None:
         """Stop the scheduler gracefully."""
