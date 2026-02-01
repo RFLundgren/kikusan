@@ -120,37 +120,43 @@ class TestGetMoodPlaylists:
 
 
 class TestGetCharts:
-    """Test get_charts()."""
+    """Test get_charts().
+
+    ytmusicapi get_charts returns:
+      - videos: list of playlist references [{title, playlistId, thumbnails}, ...]
+      - artists: flat list of artist objects [{title, browseId, rank, trend, ...}, ...]
+    The function fetches tracks from the first working video playlist via get_playlist.
+    """
 
     @patch("kikusan.search.YTMusic")
     def test_returns_charts(self, mock_ytmusic_cls):
         mock_yt = MagicMock()
         mock_ytmusic_cls.return_value = mock_yt
         mock_yt.get_charts.return_value = {
-            "videos": {
-                "items": [
-                    {
-                        "videoId": "abc123",
-                        "title": "Hit Song",
-                        "artists": [{"name": "Artist A"}],
-                        "album": {"name": "Album X"},
-                        "thumbnails": [{"url": "https://example.com/thumb.jpg"}],
-                        "rank": "1",
-                        "trend": "up",
-                    },
-                ],
-            },
-            "artists": {
-                "items": [
-                    {
-                        "browseId": "UC123",
-                        "title": "Top Artist",
-                        "thumbnails": [{"url": "https://example.com/artist.jpg"}],
-                        "rank": "1",
-                        "trend": "neutral",
-                    },
-                ],
-            },
+            "videos": [
+                {"title": "Daily Top Music Videos", "playlistId": "PL_test123", "thumbnails": []},
+            ],
+            "artists": [
+                {
+                    "browseId": "UC123",
+                    "title": "Top Artist",
+                    "thumbnails": [{"url": "https://example.com/artist.jpg"}],
+                    "rank": "1",
+                    "trend": "neutral",
+                },
+            ],
+        }
+        mock_yt.get_playlist.return_value = {
+            "title": "Daily Top Music Videos",
+            "tracks": [
+                {
+                    "videoId": "abc123",
+                    "title": "Hit Song",
+                    "artists": [{"name": "Artist A"}],
+                    "album": {"name": "Album X"},
+                    "thumbnails": [{"url": "https://example.com/thumb.jpg"}],
+                },
+            ],
         }
 
         charts = get_charts("US")
@@ -162,9 +168,9 @@ class TestGetCharts:
         assert charts.tracks[0].artist == "Artist A"
         assert charts.tracks[0].album == "Album X"
         assert charts.tracks[0].rank == "1"
-        assert charts.tracks[0].trend == "up"
         assert len(charts.artists) == 1
         assert charts.artists[0].browse_id == "UC123"
+        mock_yt.get_playlist.assert_called_once_with("PL_test123", limit=100)
 
     @patch("kikusan.search.YTMusic")
     def test_empty_charts(self, mock_ytmusic_cls):
@@ -181,16 +187,20 @@ class TestGetCharts:
         mock_yt = MagicMock()
         mock_ytmusic_cls.return_value = mock_yt
         mock_yt.get_charts.return_value = {
-            "videos": {
-                "items": [
-                    {
-                        "videoId": "xyz",
-                        "title": "No Album",
-                        "artists": [{"name": "Solo"}],
-                        "thumbnails": [],
-                    },
-                ],
-            },
+            "videos": [
+                {"title": "Top Videos", "playlistId": "PL_test456", "thumbnails": []},
+            ],
+        }
+        mock_yt.get_playlist.return_value = {
+            "title": "Top Videos",
+            "tracks": [
+                {
+                    "videoId": "xyz",
+                    "title": "No Album",
+                    "artists": [{"name": "Solo"}],
+                    "thumbnails": [],
+                },
+            ],
         }
 
         charts = get_charts()
@@ -202,11 +212,67 @@ class TestGetCharts:
     def test_default_country(self, mock_ytmusic_cls):
         mock_yt = MagicMock()
         mock_ytmusic_cls.return_value = mock_yt
-        mock_yt.get_charts.return_value = {"videos": {"items": []}, "artists": {"items": []}}
+        mock_yt.get_charts.return_value = {"videos": [], "artists": []}
 
         charts = get_charts()
         assert charts.country == "ZZ"
         mock_yt.get_charts.assert_called_once_with("ZZ")
+
+    @patch("kikusan.search.YTMusic")
+    def test_falls_back_to_next_playlist_on_error(self, mock_ytmusic_cls):
+        """When the first playlist fails (e.g. album-style ID), the next one is tried."""
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_charts.return_value = {
+            "videos": [
+                {"title": "Trending 20", "playlistId": "OLAK5uy_bad", "thumbnails": []},
+                {"title": "Daily Top", "playlistId": "PL_good", "thumbnails": []},
+            ],
+            "artists": [],
+        }
+        mock_yt.get_playlist.side_effect = [
+            Exception("not a playlist"),
+            {
+                "title": "Daily Top",
+                "tracks": [
+                    {
+                        "videoId": "v1",
+                        "title": "Fallback Song",
+                        "artists": [{"name": "Artist B"}],
+                        "thumbnails": [],
+                    },
+                ],
+            },
+        ]
+
+        charts = get_charts("US")
+        assert len(charts.tracks) == 1
+        assert charts.tracks[0].video_id == "v1"
+        assert charts.tracks[0].title == "Fallback Song"
+        assert mock_yt.get_playlist.call_count == 2
+
+    @patch("kikusan.search.YTMusic")
+    def test_skips_tracks_without_video_id(self, mock_ytmusic_cls):
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_charts.return_value = {
+            "videos": [
+                {"title": "Charts", "playlistId": "PL_test", "thumbnails": []},
+            ],
+            "artists": [],
+        }
+        mock_yt.get_playlist.return_value = {
+            "title": "Charts",
+            "tracks": [
+                {"videoId": "good_id", "title": "Good", "artists": [{"name": "A"}], "thumbnails": []},
+                {"videoId": "", "title": "Empty ID", "artists": [{"name": "B"}], "thumbnails": []},
+                {"title": "No ID", "artists": [{"name": "C"}], "thumbnails": []},
+            ],
+        }
+
+        charts = get_charts()
+        assert len(charts.tracks) == 1
+        assert charts.tracks[0].video_id == "good_id"
 
 
 class TestGetPlaylistTracks:

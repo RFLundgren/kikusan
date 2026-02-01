@@ -1024,72 +1024,101 @@
             exploreLoaded = true;
             exploreResults.innerHTML = '<div class="explore-loading">Loading explore content...</div>';
 
-            try {
-                const [moodsRes, chartsRes] = await Promise.all([
-                    fetch('/api/explore/moods'),
-                    fetch('/api/explore/charts?country=ZZ'),
-                ]);
+            // Fetch moods and charts independently so one failure does not block the other
+            let moods = null;
+            let charts = null;
 
-                if (!moodsRes.ok || !chartsRes.ok) {
-                    throw new Error('Failed to load explore content');
-                }
+            const [moodsResult, chartsResult] = await Promise.allSettled([
+                fetch('/api/explore/moods').then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                }),
+                fetch('/api/explore/charts?country=ZZ').then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                }),
+            ]);
 
-                const moods = await moodsRes.json();
-                const charts = await chartsRes.json();
-
-                renderExploreHome(moods, charts);
-            } catch (error) {
-                exploreResults.innerHTML = `<div class="explore-error">Failed to load: ${escapeHtml(error.message)}</div>`;
-                exploreLoaded = false;
+            if (moodsResult.status === 'fulfilled') {
+                moods = moodsResult.value;
+            } else {
+                console.error('Failed to load moods:', moodsResult.reason);
             }
+
+            if (chartsResult.status === 'fulfilled') {
+                charts = chartsResult.value;
+            } else {
+                console.error('Failed to load charts:', chartsResult.reason);
+            }
+
+            if (!moods && !charts) {
+                exploreResults.innerHTML = '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
+                exploreLoaded = false;
+                return;
+            }
+
+            renderExploreHome(moods, charts);
         }
 
         function renderExploreHome(moods, charts) {
             exploreBreadcrumb = [];
+            // Cache moods so country selector changes skip re-fetching them
+            if (moods) {
+                cachedMoods = moods;
+            }
             let html = '<div class="explore-home">';
 
-            // Charts section
-            if (charts.tracks && charts.tracks.length > 0) {
-                html += `
-                    <div class="explore-charts-section">
-                        <div class="explore-section-header">
-                            <h2>Top Charts (${escapeHtml(charts.country === 'ZZ' ? 'Global' : charts.country)})</h2>
-                            <div class="explore-section-actions">
-                                <select id="charts-country-selector" class="country-selector">
-                                    <option value="ZZ" ${charts.country === 'ZZ' ? 'selected' : ''}>Global</option>
-                                    <option value="US">United States</option>
-                                    <option value="GB">United Kingdom</option>
-                                    <option value="DE">Germany</option>
-                                    <option value="FR">France</option>
-                                    <option value="JP">Japan</option>
-                                    <option value="KR">South Korea</option>
-                                    <option value="BR">Brazil</option>
-                                    <option value="IN">India</option>
-                                    <option value="AU">Australia</option>
-                                    <option value="CA">Canada</option>
-                                </select>
-                                <button class="download-all-btn" id="download-all-charts">Download All</button>
-                            </div>
-                        </div>
-                        <div class="chart-tracks-list">
-                            ${charts.tracks.map((track, idx) => `
-                                <div class="chart-track">
-                                    <span class="chart-rank">${track.rank || (idx + 1)}</span>
-                                    <img class="chart-thumb" src="${track.thumbnail_url || ''}" alt="" loading="lazy" onerror="this.style.display='none'">
-                                    <div class="chart-track-info">
-                                        <div class="chart-track-title">${escapeHtml(track.title)}</div>
-                                        <div class="chart-track-artist">${escapeHtml(track.artist)}</div>
-                                    </div>
-                                    ${track.trend ? `<span class="chart-trend trend-${track.trend}">${track.trend === 'up' ? '▲' : track.trend === 'down' ? '▼' : '—'}</span>` : ''}
-                                    <div class="chart-track-actions">
-                                        <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>
-                                    </div>
-                                </div>
-                            `).join('')}
+            // Charts section -- always render the header with country selector
+            const chartsCountry = (charts && charts.country) ? charts.country : 'ZZ';
+            const chartTracks = (charts && charts.tracks) ? charts.tracks : [];
+
+            html += `
+                <div class="explore-charts-section">
+                    <div class="explore-section-header">
+                        <h2>Top Charts (${escapeHtml(chartsCountry === 'ZZ' ? 'Global' : chartsCountry)})</h2>
+                        <div class="explore-section-actions">
+                            <select id="charts-country-selector" class="country-selector">
+                                <option value="ZZ" ${chartsCountry === 'ZZ' ? 'selected' : ''}>Global</option>
+                                <option value="US" ${chartsCountry === 'US' ? 'selected' : ''}>United States</option>
+                                <option value="GB" ${chartsCountry === 'GB' ? 'selected' : ''}>United Kingdom</option>
+                                <option value="DE" ${chartsCountry === 'DE' ? 'selected' : ''}>Germany</option>
+                                <option value="FR" ${chartsCountry === 'FR' ? 'selected' : ''}>France</option>
+                                <option value="JP" ${chartsCountry === 'JP' ? 'selected' : ''}>Japan</option>
+                                <option value="KR" ${chartsCountry === 'KR' ? 'selected' : ''}>South Korea</option>
+                                <option value="BR" ${chartsCountry === 'BR' ? 'selected' : ''}>Brazil</option>
+                                <option value="IN" ${chartsCountry === 'IN' ? 'selected' : ''}>India</option>
+                                <option value="AU" ${chartsCountry === 'AU' ? 'selected' : ''}>Australia</option>
+                                <option value="CA" ${chartsCountry === 'CA' ? 'selected' : ''}>Canada</option>
+                            </select>
+                            ${chartTracks.length > 0 ? '<button class="download-all-btn" id="download-all-charts">Download All</button>' : ''}
                         </div>
                     </div>
+            `;
+
+            if (chartTracks.length > 0) {
+                html += `
+                    <div class="chart-tracks-list">
+                        ${chartTracks.map((track, idx) => `
+                            <div class="chart-track">
+                                <span class="chart-rank">${track.rank || (idx + 1)}</span>
+                                <img class="chart-thumb" src="${track.thumbnail_url || ''}" alt="" loading="lazy" onerror="this.style.display='none'">
+                                <div class="chart-track-info">
+                                    <div class="chart-track-title">${escapeHtml(track.title)}</div>
+                                    <div class="chart-track-artist">${escapeHtml(track.artist)}</div>
+                                </div>
+                                ${track.trend ? `<span class="chart-trend trend-${track.trend}">${track.trend === 'up' ? '&#9650;' : track.trend === 'down' ? '&#9660;' : '&#8212;'}</span>` : ''}
+                                <div class="chart-track-actions">
+                                    <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
                 `;
+            } else {
+                html += '<div class="explore-charts-empty">No chart tracks available. Try selecting a different country.</div>';
             }
+
+            html += '</div>';
 
             // Moods & Genres section
             if (moods && moods.length > 0) {
@@ -1116,6 +1145,9 @@
             attachExploreHandlers(charts);
         }
 
+        // Cache moods data so country selector changes do not re-fetch moods
+        let cachedMoods = null;
+
         function attachExploreHandlers(charts) {
             // Country selector
             const countrySelector = document.getElementById('charts-country-selector');
@@ -1127,11 +1159,8 @@
                         const res = await fetch(`/api/explore/charts?country=${encodeURIComponent(country)}`);
                         if (!res.ok) throw new Error('Failed to load charts');
                         const newCharts = await res.json();
-                        // Re-fetch moods to re-render full page
-                        const moodsRes = await fetch('/api/explore/moods');
-                        const moods = await moodsRes.json();
                         showStatus('');
-                        renderExploreHome(moods, newCharts);
+                        renderExploreHome(cachedMoods, newCharts);
                     } catch (error) {
                         showStatus('Failed to load charts: ' + error.message, true);
                     }
@@ -1139,10 +1168,11 @@
             }
 
             // Download all charts
+            const chartTracks = (charts && charts.tracks) ? charts.tracks : [];
             const downloadAllChartsBtn = document.getElementById('download-all-charts');
-            if (downloadAllChartsBtn && charts.tracks) {
+            if (downloadAllChartsBtn && chartTracks.length > 0) {
                 downloadAllChartsBtn.addEventListener('click', () => {
-                    queueMultipleTracks(charts.tracks, downloadAllChartsBtn);
+                    queueMultipleTracks(chartTracks, downloadAllChartsBtn);
                 });
             }
 

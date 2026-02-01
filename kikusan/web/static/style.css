@@ -1133,7 +1133,7 @@ header p {
     color: var(--text-secondary);
 }
 .explore-error {
-    color: var(--error);
+    color: var(--error-text);
 }
 
 /* Section headers */
@@ -1159,9 +1159,9 @@ header p {
 .country-selector {
     padding: 0.4rem 0.6rem;
     border-radius: 6px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-color);
     background: var(--bg-secondary);
-    color: var(--text);
+    color: var(--text-primary);
     font-size: 0.85rem;
 }
 
@@ -1192,6 +1192,12 @@ header p {
 /* Charts section */
 .explore-charts-section {
     margin-bottom: 2rem;
+}
+.explore-charts-empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
 }
 .chart-tracks-list {
     display: flex;
@@ -1275,17 +1281,17 @@ header p {
 .mood-category-card {
     padding: 0.75rem 1rem;
     border-radius: 8px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-color);
     background: var(--bg-secondary);
-    color: var(--text);
+    color: var(--text-primary);
     cursor: pointer;
     text-align: center;
     font-size: 0.9rem;
     transition: background 0.15s, border-color 0.15s;
 }
 .mood-category-card:hover {
-    background: var(--bg-hover, var(--bg-secondary));
-    border-color: var(--accent);
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary);
 }
 
 /* Mood playlists grid */
@@ -1297,7 +1303,7 @@ header p {
 }
 .mood-playlist-card {
     border-radius: 8px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-color);
     background: var(--bg-secondary);
     overflow: hidden;
 }
@@ -1327,19 +1333,19 @@ header p {
     flex: 1;
     padding: 0.4rem 0.5rem;
     border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--text);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
     cursor: pointer;
     font-size: 0.8rem;
 }
 .mood-playlist-actions button:hover {
-    border-color: var(--accent);
+    border-color: var(--accent-primary);
 }
 .mood-playlist-actions .download-playlist-btn {
-    background: var(--accent);
+    background: var(--accent-primary);
     color: #fff;
-    border-color: var(--accent);
+    border-color: var(--accent-primary);
 }
 
 /* Breadcrumb navigation */
@@ -1353,7 +1359,7 @@ header p {
 .breadcrumb-link {
     background: none;
     border: none;
-    color: var(--accent);
+    color: var(--accent-primary);
     cursor: pointer;
     padding: 0;
     font-size: inherit;
@@ -1365,7 +1371,7 @@ header p {
     color: var(--text-secondary);
 }
 .breadcrumb-current {
-    color: var(--text);
+    color: var(--text-primary);
     font-weight: 500;
 }
 

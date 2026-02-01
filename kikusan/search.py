@@ -333,6 +333,14 @@ def get_mood_playlists(params: str) -> list[MoodPlaylist]:
 def get_charts(country: str = "ZZ") -> Charts:
     """Fetch chart data (top songs, artists) for a country.
 
+    ytmusicapi get_charts returns:
+      - videos: list of playlist references [{title, playlistId, thumbnails}, ...]
+      - artists: flat list of artist objects [{title, browseId, rank, trend, ...}, ...]
+      - genres: (country-specific) list of genre playlist references
+      - countries: {selected, options}
+
+    We fetch tracks from the first video playlist to populate chart tracks.
+
     Args:
         country: ISO 3166-1 Alpha-2 country code. Default 'ZZ' for global charts.
 
@@ -346,41 +354,57 @@ def get_charts(country: str = "ZZ") -> Charts:
         logger.error("YouTube Music get_charts failed for country '%s': %s", country, e)
         raise
 
+    # Videos section is a list of playlist references -- try each until one succeeds.
+    # Some entries use album-style IDs (OLAK5uy_...) that fail with get_playlist,
+    # so we iterate through all playlist references and use the first that works.
     tracks = []
-    videos_section = raw.get("videos", {})
-    video_items = videos_section.get("items", []) if isinstance(videos_section, dict) else []
-    for item in video_items:
-        artist_objects = item.get("artists", [])
-        artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
-        thumbnails = item.get("thumbnails", [])
-        album_obj = item.get("album")
-        tracks.append(
-            ChartTrack(
-                video_id=item.get("videoId", ""),
-                title=item.get("title", "Unknown"),
-                artist=artist_names[0],
-                artists=artist_names,
-                album=album_obj.get("name") if isinstance(album_obj, dict) else None,
-                thumbnail_url=thumbnails[-1]["url"] if thumbnails else None,
-                rank=item.get("rank"),
-                trend=item.get("trend"),
-            )
-        )
+    video_playlists = raw.get("videos", [])
+    if isinstance(video_playlists, list):
+        for playlist_ref in video_playlists:
+            playlist_id = playlist_ref.get("playlistId", "")
+            if not playlist_id:
+                continue
+            try:
+                playlist_data = yt.get_playlist(playlist_id, limit=100)
+                for rank_idx, item in enumerate(playlist_data.get("tracks", []), 1):
+                    video_id = item.get("videoId", "")
+                    if not video_id:
+                        continue
+                    artist_objects = item.get("artists", [])
+                    artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
+                    thumbnails = item.get("thumbnails", [])
+                    album_obj = item.get("album")
+                    tracks.append(
+                        ChartTrack(
+                            video_id=video_id,
+                            title=item.get("title", "Unknown"),
+                            artist=artist_names[0],
+                            artists=artist_names,
+                            album=album_obj.get("name") if isinstance(album_obj, dict) else None,
+                            thumbnail_url=thumbnails[-1]["url"] if thumbnails else None,
+                            rank=str(rank_idx),
+                            trend=None,
+                        )
+                    )
+                break  # Successfully fetched tracks, stop trying other playlists
+            except Exception as e:
+                logger.warning("Failed to fetch chart playlist '%s': %s, trying next", playlist_id, e)
 
+    # Artists section is a flat list of artist objects (not a dict with 'items')
     artists = []
-    artists_section = raw.get("artists", {})
-    artist_items = artists_section.get("items", []) if isinstance(artists_section, dict) else []
-    for item in artist_items:
-        thumbnails = item.get("thumbnails", [])
-        artists.append(
-            ChartArtist(
-                browse_id=item.get("browseId", ""),
-                title=item.get("title", "Unknown"),
-                thumbnail_url=thumbnails[-1]["url"] if thumbnails else None,
-                rank=item.get("rank"),
-                trend=item.get("trend"),
+    artist_list = raw.get("artists", [])
+    if isinstance(artist_list, list):
+        for item in artist_list:
+            thumbnails = item.get("thumbnails", [])
+            artists.append(
+                ChartArtist(
+                    browse_id=item.get("browseId", ""),
+                    title=item.get("title", "Unknown"),
+                    thumbnail_url=thumbnails[-1]["url"] if thumbnails else None,
+                    rank=item.get("rank"),
+                    trend=item.get("trend"),
+                )
             )
-        )
 
     logger.info("Found %d chart tracks and %d chart artists for %s", len(tracks), len(artists), country)
     return Charts(country=country, tracks=tracks, artists=artists)

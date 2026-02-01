@@ -66,6 +66,7 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - `kikusan/search.py`: Uses ytmusicapi to search and explore YouTube Music
   - Search: `search()`, `search_albums()`, `get_album_tracks()` — song/album search with view_count extraction
   - Explore: `get_mood_categories()`, `get_mood_playlists()`, `get_charts()`, `get_playlist_tracks()` — mood/genre browsing and chart data
+  - `get_charts()`: ytmusicapi returns `videos` as a list of playlist references (not individual tracks) and `artists` as a flat list. The function fetches tracks from the first working video playlist via `get_playlist()`, with fallback to subsequent playlists if one fails (e.g. album-style IDs like `OLAK5uy_...` are not fetchable via `get_playlist`).
   - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`
 - `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
   - Explore endpoints: `GET /api/explore/moods`, `GET /api/explore/mood-playlists`, `GET /api/explore/charts`, `GET /api/explore/playlist/{playlist_id}/tracks`
