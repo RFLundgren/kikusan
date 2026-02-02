@@ -1286,6 +1286,42 @@ header p {
     min-width: unset;
 }
 
+/* Cron config button */
+.cron-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    min-height: 44px;
+}
+.cron-btn:hover:not(:disabled) {
+    background: var(--accent-primary);
+    color: white;
+    border-color: var(--accent-primary);
+}
+.cron-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+.cron-btn.cron-copied {
+    background: #22c55e;
+    color: white;
+    border-color: #22c55e;
+}
+/* Inline variant for breadcrumb rows */
+.cron-btn-inline {
+    margin-left: auto;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.85rem;
+    min-height: 32px;
+}
+
 /* Moods & Genres section */
 .explore-moods-section {
     margin-top: 1.5rem;

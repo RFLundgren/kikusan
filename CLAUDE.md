@@ -20,6 +20,13 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Play preview button and Copy URL button on all explore track listings (charts and playlists)
   - Duration displayed alongside view counts in chart track metadata
   - "Download All" buttons for bulk queueing of playlist tracks and chart tracks
+  - "Cron" button (+ Cron) on charts header and mood/genre breadcrumb for copying cron.yaml config snippets to clipboard
+    - Charts: generates `type: charts` config with selected country, sync, schedule, and limit
+    - Moods: generates `type: mood` config with category params, sync, and schedule
+    - Sanitizes category titles into valid cron config keys (lowercase, alphanumeric + dashes)
+    - Clipboard copy with "Copied!" feedback and fallback for older browsers
+    - CSS: `.cron-btn` (standard) and `.cron-btn-inline` (breadcrumb variant) in `style.css`
+    - JS: `generateCronYaml()` and `copyCronConfig()` in embedded script
   - Reuses existing download queue infrastructure (`/api/queue/add`)
 - **Multi-user playlist support**: When `KIKUSAN_MULTI_USER=true` (or `--multi-user` flag), parses the `Remote-User` header (set by reverse proxy SSO like Authelia) and prefixes the M3U playlist name with the username (e.g., `alice-webplaylist.m3u`)
   - Opt-in: requires `KIKUSAN_MULTI_USER=true` env var or `--multi-user` CLI flag

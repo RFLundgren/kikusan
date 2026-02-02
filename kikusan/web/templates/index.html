@@ -1013,6 +1013,80 @@
             }
         });
 
+        // --- Cron config generation ---
+
+        // Country code to human-readable name mapping for cron config key generation
+        const COUNTRY_NAMES = {
+            'ZZ': 'global', 'US': 'united-states', 'GB': 'united-kingdom',
+            'DE': 'germany', 'FR': 'france', 'JP': 'japan', 'KR': 'south-korea',
+            'BR': 'brazil', 'IN': 'india', 'AU': 'australia', 'CA': 'canada'
+        };
+
+        function generateCronYaml(type, options) {
+            // Generate a YAML snippet for cron.yaml explore section
+            // type: "charts" or "mood"
+            // options: { country, title, params }
+            if (type === 'charts') {
+                const country = options.country || 'ZZ';
+                const nameBase = COUNTRY_NAMES[country] || country.toLowerCase();
+                const key = nameBase + '-charts';
+                let yaml = `${key}:\n`;
+                yaml += `  type: charts\n`;
+                if (country !== 'ZZ') {
+                    yaml += `  country: ${country}\n`;
+                }
+                yaml += `  sync: true\n`;
+                yaml += `  schedule: "0 6 * * *"\n`;
+                yaml += `  limit: 10`;
+                return yaml;
+            } else if (type === 'mood') {
+                const title = options.title || 'mood';
+                const params = options.params || '';
+                // Sanitize title into a valid cron key: lowercase, replace spaces/special chars with dashes
+                const key = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mood';
+                let yaml = `${key}:\n`;
+                yaml += `  type: mood\n`;
+                yaml += `  params: "${params}"\n`;
+                yaml += `  sync: true\n`;
+                yaml += `  schedule: "0 6 * * *"`;
+                return yaml;
+            }
+            return '';
+        }
+
+        async function copyCronConfig(yamlSnippet, btn) {
+            const originalText = btn.textContent;
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(yamlSnippet);
+                } else {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = yamlSnippet;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    const success = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (!success) throw new Error('Copy command failed');
+                }
+
+                btn.textContent = 'Copied!';
+                btn.classList.add('cron-copied');
+                showStatus('Cron config copied to clipboard');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('cron-copied');
+                }, 2000);
+            } catch (error) {
+                console.error('Failed to copy cron config:', error);
+                btn.textContent = 'Failed';
+                showStatus('Failed to copy cron config: ' + error.message, true);
+                setTimeout(() => { btn.textContent = originalText; }, 2000);
+            }
+        }
+
         // --- Explore functionality ---
         let exploreLoaded = false;
         let exploreBreadcrumb = []; // tracks navigation: [{type, title, params?}]
@@ -1091,6 +1165,7 @@
                                 <option value="CA" ${chartsCountry === 'CA' ? 'selected' : ''}>Canada</option>
                             </select>
                             ${chartTracks.length > 0 ? '<button class="download-all-btn" id="download-all-charts">Download All</button>' : ''}
+                            <button class="cron-btn" id="cron-charts-btn" data-country="${chartsCountry}" aria-label="Copy cron config" title="Copy cron.yaml config for this chart">+ Cron</button>
                         </div>
                     </div>
             `;
@@ -1173,6 +1248,17 @@
                 });
             }
 
+            // Cron config button for charts
+            const cronChartsBtn = document.getElementById('cron-charts-btn');
+            if (cronChartsBtn) {
+                cronChartsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const country = cronChartsBtn.dataset.country;
+                    const yaml = generateCronYaml('charts', { country });
+                    copyCronConfig(yaml, cronChartsBtn);
+                });
+            }
+
             // Download all charts
             const chartTracks = (charts && charts.tracks) ? charts.tracks : [];
             const downloadAllChartsBtn = document.getElementById('download-all-charts');
@@ -1231,6 +1317,7 @@
                     <button class="breadcrumb-link" id="breadcrumb-home">Explore</button>
                     <span class="breadcrumb-sep">›</span>
                     <span class="breadcrumb-current">${escapeHtml(categoryTitle)}</span>
+                    <button class="cron-btn cron-btn-inline" id="cron-mood-btn" data-params="${escapeHtml(params)}" data-title="${escapeHtml(categoryTitle)}" aria-label="Copy cron config" title="Copy cron.yaml config for this mood/genre">+ Cron</button>
                 </div>
                 <div class="mood-playlists-grid">
                     ${playlists.map(pl => `
@@ -1256,6 +1343,18 @@
                 exploreLoaded = false;
                 loadExploreContent();
             });
+
+            // Cron config button for mood/genre category
+            const cronMoodBtn = document.getElementById('cron-mood-btn');
+            if (cronMoodBtn) {
+                cronMoodBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const moodParams = cronMoodBtn.dataset.params;
+                    const moodTitle = cronMoodBtn.dataset.title;
+                    const yaml = generateCronYaml('mood', { params: moodParams, title: moodTitle });
+                    copyCronConfig(yaml, cronMoodBtn);
+                });
+            }
 
             // View playlist tracks
             document.querySelectorAll('.view-playlist-btn').forEach(btn => {
