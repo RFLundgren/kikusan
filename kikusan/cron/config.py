@@ -44,6 +44,7 @@ class ExploreConfig:
     sync: If True, delete tracks removed from the source
     schedule: Cron expression
     name: Internal name for state/playlist files
+    limit: Maximum number of tracks to sync (0 = no limit)
     """
 
     name: str
@@ -52,6 +53,7 @@ class ExploreConfig:
     schedule: str
     country: str = "ZZ"
     params: str = ""
+    limit: int = 0
 
 
 @dataclass
@@ -248,6 +250,13 @@ def load_config(path: Path) -> CronConfig:
 
             validate_cron_schedule(config["schedule"], name)
 
+            # Parse optional limit (default: 0 = no limit)
+            limit = config.get("limit", 0)
+            if not isinstance(limit, int) or isinstance(limit, bool):
+                raise ValueError(f"Explore '{name}' limit must be an integer")
+            if limit < 0:
+                raise ValueError(f"Explore '{name}' limit must be >= 0 (0 = no limit)")
+
             explore[sanitized_name] = ExploreConfig(
                 name=sanitized_name,
                 type=explore_type,
@@ -255,6 +264,7 @@ def load_config(path: Path) -> CronConfig:
                 schedule=config["schedule"],
                 country=country,
                 params=params,
+                limit=limit,
             )
 
     # Load hooks (optional, defaults to empty)

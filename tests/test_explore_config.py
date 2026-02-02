@@ -347,6 +347,132 @@ class TestValidateCountryCode:
             validate_country_code("", "test")
 
 
+class TestExploreConfigLimit:
+    """Test parsing and validation of the limit field in explore entries."""
+
+    def _write_yaml(self, tmp_path: Path, content: str) -> Path:
+        config_path = tmp_path / "cron.yaml"
+        config_path.write_text(textwrap.dedent(content))
+        return config_path
+
+    def test_limit_parsed(self, tmp_path):
+        """Test that limit is correctly parsed from config."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              top10-de:
+                type: charts
+                country: DE
+                sync: true
+                schedule: "0 6 * * *"
+                limit: 10
+        """)
+
+        config = load_config(config_path)
+        entry = config.explore["top10-de"]
+        assert entry.limit == 10
+
+    def test_limit_defaults_to_zero(self, tmp_path):
+        """Test that limit defaults to 0 (no limit) when not specified."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              us-charts:
+                type: charts
+                country: US
+                sync: true
+                schedule: "0 6 * * *"
+        """)
+
+        config = load_config(config_path)
+        assert config.explore["us-charts"].limit == 0
+
+    def test_limit_zero_is_valid(self, tmp_path):
+        """Test that explicitly setting limit to 0 is valid (means no limit)."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              all-charts:
+                type: charts
+                sync: true
+                schedule: "0 6 * * *"
+                limit: 0
+        """)
+
+        config = load_config(config_path)
+        assert config.explore["all-charts"].limit == 0
+
+    def test_limit_negative_raises(self, tmp_path):
+        """Test that negative limit raises ValueError."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              bad-limit:
+                type: charts
+                sync: true
+                schedule: "0 6 * * *"
+                limit: -5
+        """)
+
+        with pytest.raises(ValueError, match="limit must be >= 0"):
+            load_config(config_path)
+
+    def test_limit_non_integer_raises(self, tmp_path):
+        """Test that non-integer limit raises ValueError."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              bad-limit:
+                type: charts
+                sync: true
+                schedule: "0 6 * * *"
+                limit: "ten"
+        """)
+
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            load_config(config_path)
+
+    def test_limit_boolean_raises(self, tmp_path):
+        """Test that boolean limit raises ValueError (YAML true/false are booleans)."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              bad-limit:
+                type: charts
+                sync: true
+                schedule: "0 6 * * *"
+                limit: true
+        """)
+
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            load_config(config_path)
+
+    def test_limit_with_mood_type(self, tmp_path):
+        """Test that limit works with mood type explore entries."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              chill-top20:
+                type: mood
+                params: "ggMPOg1uX1J"
+                sync: true
+                schedule: "0 12 * * 0"
+                limit: 20
+        """)
+
+        config = load_config(config_path)
+        entry = config.explore["chill-top20"]
+        assert entry.type == "mood"
+        assert entry.limit == 20
+
+    def test_limit_large_value(self, tmp_path):
+        """Test that large limit values are accepted."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              big-limit:
+                type: charts
+                sync: true
+                schedule: "0 6 * * *"
+                limit: 1000
+        """)
+
+        config = load_config(config_path)
+        assert config.explore["big-limit"].limit == 1000
+
+
 class TestExploreConfigBackwardCompatibility:
     """Test that existing configs without explore still work."""
 

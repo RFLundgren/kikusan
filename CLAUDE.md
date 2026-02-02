@@ -88,14 +88,14 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Environment-based configuration: NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD
 - `kikusan/cron/sync.py`: Playlist synchronization with reference-aware deletion and Navidrome protection
 - `kikusan/cron/explore_sync.py`: Explore (charts/moods/genres) synchronization for cron mode
-  - `sync_explore()`: Main entry point, reuses `download_new_tracks`, `remove_old_tracks`, `update_m3u_playlist` from `sync.py`
+  - `sync_explore()`: Main entry point, reuses `download_new_tracks`, `remove_old_tracks`, `update_m3u_playlist` from `sync.py`. Applies `limit` truncation after fetching tracks (before compare/download).
   - `fetch_explore_tracks()`: Routes to `_fetch_chart_tracks()` or `_fetch_mood_tracks()` based on type
   - `_fetch_chart_tracks()`: Fetches tracks from YouTube Music charts via `get_charts()`
   - `_fetch_mood_tracks()`: Fetches playlists for a mood/genre category, then fetches tracks from each playlist, deduplicating by video_id
   - State is stored using the same `PlaylistState` model in `.kikusan/state/`
   - All safety features apply: cross-reference protection, Navidrome protection, unavailable cooldown
 - `kikusan/cron/config.py`: Cron configuration loading with support for `playlists`, `plugins`, `explore`, and `hooks` sections
-  - `ExploreConfig`: Dataclass for explore entries (type, country, params, sync, schedule)
+  - `ExploreConfig`: Dataclass for explore entries (type, country, params, sync, schedule, limit)
   - `validate_country_code()`: Validates ISO 3166-1 Alpha-2 country codes
 - `kikusan/plugins/sync.py`: Plugin synchronization with reference-aware deletion and Navidrome protection
 - `kikusan/hooks.py`: Generic hook system for running commands on events
@@ -144,6 +144,7 @@ All major configuration variables have corresponding CLI flags:
   - `type: charts` with optional `country` (ISO 3166-1 Alpha-2, default ZZ)
   - `type: mood` with required `params` (from `explore moods` command)
   - Each entry has `sync` (bool) and `schedule` (cron expression)
+  - Optional `limit` (int, default 0 = no limit): Maximum number of tracks to sync. Tracks are truncated from the end, preserving the top-ranked entries (e.g., `limit: 10` keeps the top 10 chart tracks).
   - State stored in `.kikusan/state/` using same format as playlist state
 
 **plugins run command:**

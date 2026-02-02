@@ -59,6 +59,16 @@ def sync_explore(
             logger.warning("No tracks found for explore source: %s", explore_config.name)
             return SyncResult(downloaded=0, skipped=0, deleted=0, failed=0)
 
+        # Apply limit if configured (0 = no limit)
+        if explore_config.limit > 0 and len(current_tracks) > explore_config.limit:
+            logger.info(
+                "Applying limit: %d -> %d tracks for %s",
+                len(current_tracks),
+                explore_config.limit,
+                explore_config.name,
+            )
+            current_tracks = current_tracks[: explore_config.limit]
+
         logger.info("Found %d track(s) from explore source", len(current_tracks))
 
         # Load existing state (reuses the same PlaylistState model)

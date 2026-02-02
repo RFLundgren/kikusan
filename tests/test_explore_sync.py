@@ -441,3 +441,163 @@ class TestSyncExplore:
 
         assert result.failed == 1
         assert result.downloaded == 0
+
+
+class TestSyncExploreLimit:
+    """Test that the limit configuration truncates the track list."""
+
+    @patch("kikusan.cron.explore_sync.save_state")
+    @patch("kikusan.cron.explore_sync.update_m3u_playlist")
+    @patch("kikusan.cron.explore_sync.download_new_tracks")
+    @patch("kikusan.cron.explore_sync.compare_tracks")
+    @patch("kikusan.cron.explore_sync.load_state")
+    @patch("kikusan.cron.explore_sync.fetch_explore_tracks")
+    def test_limit_truncates_tracks(
+        self, mock_fetch, mock_load_state, mock_compare,
+        mock_download, mock_update_m3u, mock_save_state, tmp_path,
+    ):
+        """Test that limit=2 only keeps the first 2 tracks."""
+        all_tracks = [
+            ("vid1", "Song 1", "Artist 1"),
+            ("vid2", "Song 2", "Artist 2"),
+            ("vid3", "Song 3", "Artist 3"),
+            ("vid4", "Song 4", "Artist 4"),
+            ("vid5", "Song 5", "Artist 5"),
+        ]
+        mock_fetch.return_value = all_tracks
+        mock_load_state.return_value = None
+        mock_compare.return_value = (
+            [("vid1", "Song 1", "Artist 1"), ("vid2", "Song 2", "Artist 2")],
+            [],
+        )
+        mock_download.return_value = {"downloaded": 2, "skipped": 0, "failed": 0}
+
+        config = ExploreConfig(
+            name="de-top2", type="charts", sync=True,
+            schedule="0 6 * * *", country="DE", limit=2,
+        )
+
+        result = sync_explore(
+            explore_config=config,
+            download_dir=tmp_path,
+            audio_format="opus",
+            filename_template="%(artist,uploader)s - %(title)s",
+        )
+
+        # compare_tracks should receive only the first 2 tracks
+        compare_args = mock_compare.call_args[0]
+        assert len(compare_args[0]) == 2
+        assert compare_args[0][0][0] == "vid1"
+        assert compare_args[0][1][0] == "vid2"
+
+        assert result.downloaded == 2
+
+    @patch("kikusan.cron.explore_sync.save_state")
+    @patch("kikusan.cron.explore_sync.update_m3u_playlist")
+    @patch("kikusan.cron.explore_sync.download_new_tracks")
+    @patch("kikusan.cron.explore_sync.compare_tracks")
+    @patch("kikusan.cron.explore_sync.load_state")
+    @patch("kikusan.cron.explore_sync.fetch_explore_tracks")
+    def test_limit_zero_means_no_limit(
+        self, mock_fetch, mock_load_state, mock_compare,
+        mock_download, mock_update_m3u, mock_save_state, tmp_path,
+    ):
+        """Test that limit=0 (default) passes all tracks through."""
+        all_tracks = [
+            ("vid1", "Song 1", "Artist 1"),
+            ("vid2", "Song 2", "Artist 2"),
+            ("vid3", "Song 3", "Artist 3"),
+        ]
+        mock_fetch.return_value = all_tracks
+        mock_load_state.return_value = None
+        mock_compare.return_value = (all_tracks, [])
+        mock_download.return_value = {"downloaded": 3, "skipped": 0, "failed": 0}
+
+        config = ExploreConfig(
+            name="all-charts", type="charts", sync=True,
+            schedule="0 6 * * *", country="US", limit=0,
+        )
+
+        sync_explore(
+            explore_config=config,
+            download_dir=tmp_path,
+            audio_format="opus",
+            filename_template="%(artist,uploader)s - %(title)s",
+        )
+
+        # compare_tracks should receive all 3 tracks (no truncation)
+        compare_args = mock_compare.call_args[0]
+        assert len(compare_args[0]) == 3
+
+    @patch("kikusan.cron.explore_sync.save_state")
+    @patch("kikusan.cron.explore_sync.update_m3u_playlist")
+    @patch("kikusan.cron.explore_sync.download_new_tracks")
+    @patch("kikusan.cron.explore_sync.compare_tracks")
+    @patch("kikusan.cron.explore_sync.load_state")
+    @patch("kikusan.cron.explore_sync.fetch_explore_tracks")
+    def test_limit_larger_than_tracks_passes_all(
+        self, mock_fetch, mock_load_state, mock_compare,
+        mock_download, mock_update_m3u, mock_save_state, tmp_path,
+    ):
+        """Test that limit > track count passes all tracks through."""
+        all_tracks = [
+            ("vid1", "Song 1", "Artist 1"),
+            ("vid2", "Song 2", "Artist 2"),
+        ]
+        mock_fetch.return_value = all_tracks
+        mock_load_state.return_value = None
+        mock_compare.return_value = (all_tracks, [])
+        mock_download.return_value = {"downloaded": 2, "skipped": 0, "failed": 0}
+
+        config = ExploreConfig(
+            name="charts-100", type="charts", sync=True,
+            schedule="0 6 * * *", country="US", limit=100,
+        )
+
+        sync_explore(
+            explore_config=config,
+            download_dir=tmp_path,
+            audio_format="opus",
+            filename_template="%(artist,uploader)s - %(title)s",
+        )
+
+        # compare_tracks should receive all 2 tracks (limit > count)
+        compare_args = mock_compare.call_args[0]
+        assert len(compare_args[0]) == 2
+
+    @patch("kikusan.cron.explore_sync.save_state")
+    @patch("kikusan.cron.explore_sync.update_m3u_playlist")
+    @patch("kikusan.cron.explore_sync.download_new_tracks")
+    @patch("kikusan.cron.explore_sync.compare_tracks")
+    @patch("kikusan.cron.explore_sync.load_state")
+    @patch("kikusan.cron.explore_sync.fetch_explore_tracks")
+    def test_limit_one_keeps_only_first_track(
+        self, mock_fetch, mock_load_state, mock_compare,
+        mock_download, mock_update_m3u, mock_save_state, tmp_path,
+    ):
+        """Test that limit=1 keeps only the first (top) track."""
+        all_tracks = [
+            ("vid1", "Song 1", "Artist 1"),
+            ("vid2", "Song 2", "Artist 2"),
+            ("vid3", "Song 3", "Artist 3"),
+        ]
+        mock_fetch.return_value = all_tracks
+        mock_load_state.return_value = None
+        mock_compare.return_value = ([("vid1", "Song 1", "Artist 1")], [])
+        mock_download.return_value = {"downloaded": 1, "skipped": 0, "failed": 0}
+
+        config = ExploreConfig(
+            name="top1", type="charts", sync=True,
+            schedule="0 6 * * *", country="DE", limit=1,
+        )
+
+        sync_explore(
+            explore_config=config,
+            download_dir=tmp_path,
+            audio_format="opus",
+            filename_template="%(artist,uploader)s - %(title)s",
+        )
+
+        compare_args = mock_compare.call_args[0]
+        assert len(compare_args[0]) == 1
+        assert compare_args[0][0][0] == "vid1"
