@@ -6,7 +6,7 @@ from pathlib import Path
 import yt_dlp
 
 from kikusan.config import DEFAULT_FILENAME_TEMPLATE, MAX_FILENAME_BYTES, get_config
-from kikusan.lyrics import get_lyrics, save_lyrics
+from kikusan.lyrics import get_lyrics_for_video, save_lyrics
 from kikusan.tags import write_multi_artist_tags
 from kikusan.unavailable import is_on_cooldown, is_unavailable_error, record_unavailable
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
@@ -400,9 +400,9 @@ def download(
         if artists:
             write_multi_artist_tags(audio_path, artists)
 
-        # Fetch and save lyrics
+        # Fetch and save lyrics using ytmusicapi metadata for better matching
         if fetch_lyrics:
-            lyrics = get_lyrics(title, artist, duration)
+            lyrics = get_lyrics_for_video(video_id, title, artist, duration)
             if lyrics:
                 save_lyrics(lyrics, audio_path)
 
@@ -514,7 +514,7 @@ def _download_single(
     audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
 
     if audio_path and fetch_lyrics:
-        lyrics = get_lyrics(title, artist, duration)
+        lyrics = get_lyrics_for_video(video_id, title, artist, duration) if video_id else None
         if lyrics:
             save_lyrics(lyrics, audio_path)
 
@@ -586,8 +586,8 @@ def _download_playlist(
 
             if audio_path:
                 downloaded.append(audio_path)
-                if fetch_lyrics:
-                    lyrics = get_lyrics(title, artist, duration)
+                if fetch_lyrics and video_id:
+                    lyrics = get_lyrics_for_video(video_id, title, artist, duration)
                     if lyrics:
                         save_lyrics(lyrics, audio_path)
 

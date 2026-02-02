@@ -592,6 +592,143 @@ def get_playlist_tracks(playlist_id: str) -> list[Track]:
     return tracks
 
 
+@dataclass
+class SongMetadata:
+    """Clean metadata for a song, fetched from YouTube Music API.
+
+    Used for lyrics lookup where accurate title/artist/album/duration
+    are critical for matching against lrclib.net.
+    """
+
+    title: str
+    artist: str
+    album: str | None
+    duration_seconds: int
+
+
+def get_song_metadata(video_id: str) -> SongMetadata | None:
+    """Fetch clean song metadata from YouTube Music via get_song().
+
+    This returns metadata directly from YouTube Music's database, which
+    is more accurate than yt-dlp's metadata extracted from video titles.
+    The clean metadata significantly improves lyrics lookup success rates
+    on lrclib.net.
+
+    Args:
+        video_id: YouTube video ID
+
+    Returns:
+        SongMetadata with clean title/artist/album/duration, or None if fetch fails.
+    """
+    yt = YTMusic()
+    try:
+        song_data = yt.get_song(video_id)
+    except Exception as e:
+        logger.warning("Failed to fetch song metadata for video_id '%s': %s", video_id, e)
+        return None
+
+    video_details = song_data.get("videoDetails", {})
+    title = video_details.get("title")
+    author = video_details.get("author")
+    length_seconds_str = video_details.get("lengthSeconds", "0")
+
+    if not title or not author:
+        logger.debug("Incomplete videoDetails for video_id '%s', trying watch playlist", video_id)
+        return _get_metadata_from_watch_playlist(yt, video_id)
+
+    duration_seconds = int(length_seconds_str) if length_seconds_str.isdigit() else 0
+
+    # videoDetails does not include album; try watch playlist for album info
+    album = _get_album_from_watch_playlist(yt, video_id)
+
+    logger.debug(
+        "Got song metadata for '%s': title='%s', artist='%s', album='%s', duration=%ds",
+        video_id, title, author, album, duration_seconds,
+    )
+
+    return SongMetadata(
+        title=title,
+        artist=author,
+        album=album,
+        duration_seconds=duration_seconds,
+    )
+
+
+def _get_album_from_watch_playlist(yt: YTMusic, video_id: str) -> str | None:
+    """Extract album name from watch playlist data.
+
+    The get_song() endpoint does not include album info in videoDetails,
+    but get_watch_playlist() returns it per track.
+
+    Args:
+        yt: YTMusic instance (reused to avoid re-initialization)
+        video_id: YouTube video ID
+
+    Returns:
+        Album name string, or None if not available.
+    """
+    try:
+        watch_data = yt.get_watch_playlist(videoId=video_id, limit=1)
+        tracks = watch_data.get("tracks", [])
+        if tracks:
+            album_obj = tracks[0].get("album")
+            if isinstance(album_obj, dict):
+                return album_obj.get("name")
+    except Exception as e:
+        logger.debug("Failed to get album from watch playlist for '%s': %s", video_id, e)
+    return None
+
+
+def _get_metadata_from_watch_playlist(yt: YTMusic, video_id: str) -> SongMetadata | None:
+    """Fallback: extract full metadata from watch playlist.
+
+    Used when get_song() returns incomplete videoDetails.
+
+    Args:
+        yt: YTMusic instance (reused to avoid re-initialization)
+        video_id: YouTube video ID
+
+    Returns:
+        SongMetadata from watch playlist data, or None if fetch fails.
+    """
+    try:
+        watch_data = yt.get_watch_playlist(videoId=video_id, limit=1)
+        tracks = watch_data.get("tracks", [])
+        if not tracks:
+            return None
+
+        track = tracks[0]
+        title = track.get("title")
+        if not title:
+            return None
+
+        artist_objects = track.get("artists", [])
+        artist = artist_objects[0]["name"] if artist_objects else None
+        if not artist:
+            return None
+
+        album_obj = track.get("album")
+        album = album_obj.get("name") if isinstance(album_obj, dict) else None
+
+        length_text = track.get("length", "0:00")
+        duration_seconds = _parse_duration(length_text)
+
+        logger.debug(
+            "Got metadata from watch playlist for '%s': title='%s', artist='%s', album='%s'",
+            video_id, title, artist, album,
+        )
+
+        return SongMetadata(
+            title=title,
+            artist=artist,
+            album=album,
+            duration_seconds=duration_seconds,
+        )
+    except Exception as e:
+        logger.warning("Failed to get metadata from watch playlist for '%s': %s", video_id, e)
+        return None
+
+
 def _parse_duration(duration_text: str) -> int:
     """Parse duration string (e.g., '3:45') to seconds."""
     parts = duration_text.split(":")

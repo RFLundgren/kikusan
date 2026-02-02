@@ -72,7 +72,11 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - `get_mood_playlists()`: Has fallback parsing (`_get_mood_playlists_fallback()`) for when ytmusicapi crashes with KeyError on `musicTwoRowItemRenderer`. Some mood/genre categories return mixed content: some sections contain playlist items (`musicTwoRowItemRenderer`) while others contain song items (`musicResponsiveListItemRenderer`). The fallback manually parses the raw YouTube Music API response, skipping incompatible sections and handling individual item parse failures gracefully.
   - `get_charts()`: ytmusicapi returns `videos` as a list of playlist references (not individual tracks) and `artists` as a flat list. The function fetches tracks from the first working video playlist via `get_playlist()`, with fallback to subsequent playlists if one fails (e.g. album-style IDs like `OLAK5uy_...` are not fetchable via `get_playlist`).
   - `ChartTrack` includes `view_count` (str|None) and `duration_seconds` (int) with a `duration_display` property (MM:SS format), extracted from playlist data in `get_charts()`
-  - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`
+  - Metadata: `get_song_metadata()` — fetches clean title/artist/album/duration from `YTMusic().get_song()` and `get_watch_playlist()` for lyrics lookup enhancement
+  - `SongMetadata` dataclass: title, artist, album (optional), duration_seconds — used by `lyrics.py` for lrclib.net lookups
+  - `_get_album_from_watch_playlist()`: Extracts album name from watch playlist (not available in `get_song()` videoDetails)
+  - `_get_metadata_from_watch_playlist()`: Full fallback when `get_song()` returns incomplete videoDetails
+  - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`, `SongMetadata`
 - `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
   - Explore endpoints: `GET /api/explore/moods`, `GET /api/explore/mood-playlists`, `GET /api/explore/charts`, `GET /api/explore/playlist/{playlist_id}/tracks`
 - `kikusan/web/templates/index.html`: Single-page frontend with embedded JavaScript (Songs, Albums, Explore tabs)
@@ -106,6 +110,15 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - `kikusan/cron/scheduler.py`: Orchestrates sync jobs (playlists, plugins, explore) and triggers hooks after completion
   - `_schedule_explore()` / `_explore_sync_job()`: Schedule and execute explore sync jobs
   - `sync_all_once()`: Runs all playlists, plugins, and explore sources once immediately
+- `kikusan/lyrics.py`: Lyrics fetching from lrclib.net with multi-strategy lookup
+  - `get_lyrics_for_video()`: Primary function — fetches clean metadata from ytmusicapi, then tries multiple lrclib.net strategies:
+    1. Exact match (`/api/get`) with ytmusicapi metadata (clean title/artist/duration)
+    2. Search (`/api/search`) with ytmusicapi metadata (fuzzy match, includes album)
+    3. Exact match (`/api/get`) with yt-dlp fallback metadata (original behavior)
+  - `get_lyrics()`: Original function preserved for backward compatibility, delegates to `_get_lyrics_exact()`
+  - `_search_lyrics()`: Uses `/api/search` endpoint with duration-based filtering (3s tolerance)
+  - `save_lyrics()`: Saves LRC file alongside audio file
+  - The ytmusicapi metadata enhancement dramatically improves lyrics hit rate because yt-dlp often extracts metadata from video titles (e.g., "Artist - Song (Official Video)") rather than clean music metadata
 - `kikusan/download.py`: Core download logic with unavailable video protection
   - `download()`: Single video download with cooldown check at entry and error recording on failure
   - `UnavailableCooldownError`: Raised when video is on cooldown (avoids hitting YouTube)
