@@ -1246,6 +1246,14 @@ header p {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.chart-track-meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    margin-top: 0.1rem;
+}
 .chart-trend {
     font-size: 0.85rem;
     min-width: 1.5rem;
@@ -1255,11 +1263,27 @@ header p {
 .chart-trend.trend-down { color: #ef4444; }
 .chart-trend.trend-neutral { color: var(--text-secondary); }
 .chart-track-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    align-items: center;
     flex-shrink: 0;
+}
+.chart-track-actions .play-btn,
+.chart-track-actions .copy-url-btn {
+    min-height: 32px;
+    min-width: 32px;
+    max-height: 32px;
+    max-width: 32px;
+    font-size: 0.9rem;
+    padding: 0;
 }
 .chart-track-actions .download-btn {
     padding: 0.3rem 0.75rem;
     font-size: 0.8rem;
+    min-height: 32px;
+    min-width: unset;
 }
 
 /* Moods & Genres section */

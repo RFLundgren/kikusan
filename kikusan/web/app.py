@@ -173,6 +173,8 @@ class ChartTrackResponse(BaseModel):
     thumbnail_url: str | None
     rank: str | None
     trend: str | None
+    view_count: str | None = None
+    duration: str | None = None
 
 class ChartArtistResponse(BaseModel):
     """A chart artist."""
@@ -655,6 +657,8 @@ async def api_explore_charts(country: str = Query("ZZ", description="ISO 3166-1 
                     thumbnail_url=t.thumbnail_url,
                     rank=t.rank,
                     trend=t.trend,
+                    view_count=t.view_count,
+                    duration=t.duration_display,
                 )
                 for t in charts.tracks
             ],

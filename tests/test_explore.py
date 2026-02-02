@@ -11,6 +11,7 @@ from kikusan.search import (
     MoodCategory,
     MoodPlaylist,
     MoodSection,
+    _get_mood_playlists_fallback,
     get_charts,
     get_mood_categories,
     get_mood_playlists,
@@ -117,6 +118,208 @@ class TestGetMoodPlaylists:
         assert playlists[0].title == "Minimal"
         assert playlists[0].thumbnail_url is None
         assert playlists[0].author is None
+
+    @patch("kikusan.search._get_mood_playlists_fallback")
+    @patch("kikusan.search.YTMusic")
+    def test_falls_back_on_key_error(self, mock_ytmusic_cls, mock_fallback):
+        """When ytmusicapi raises KeyError (musicTwoRowItemRenderer), fallback is used."""
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_mood_playlists.side_effect = KeyError("musicTwoRowItemRenderer")
+        mock_fallback.return_value = [
+            {
+                "playlistId": "RDCLAK5uy_recovered",
+                "title": "Recovered Playlist",
+                "thumbnails": [{"url": "https://example.com/thumb.jpg"}],
+            }
+        ]
+
+        playlists = get_mood_playlists("ggMPOg1uX_test")
+        assert len(playlists) == 1
+        assert playlists[0].playlist_id == "RDCLAK5uy_recovered"
+        assert playlists[0].title == "Recovered Playlist"
+        mock_fallback.assert_called_once_with(mock_yt, "ggMPOg1uX_test")
+
+    @patch("kikusan.search.YTMusic")
+    def test_non_key_error_still_raises(self, mock_ytmusic_cls):
+        """Non-KeyError exceptions from ytmusicapi should still propagate."""
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_mood_playlists.side_effect = ValueError("API error")
+
+        with pytest.raises(ValueError, match="API error"):
+            get_mood_playlists("params")
+
+
+class TestGetMoodPlaylistsFallback:
+    """Test _get_mood_playlists_fallback() for manual response parsing."""
+
+    def _make_section(self, renderer_type, items):
+        """Helper to create a musicCarouselShelfRenderer section."""
+        return {
+            "musicCarouselShelfRenderer": {
+                "contents": [{renderer_type: item} for item in items]
+            }
+        }
+
+    def _make_playlist_item(self, title, playlist_id):
+        """Helper to create a musicTwoRowItemRenderer playlist item."""
+        return {
+            "title": {
+                "runs": [
+                    {
+                        "text": title,
+                        "navigationEndpoint": {
+                            "browseEndpoint": {"browseId": "VL" + playlist_id}
+                        },
+                    }
+                ]
+            },
+            "subtitle": {"runs": [{"text": "YouTube Music"}]},
+            "thumbnailRenderer": {
+                "musicThumbnailRenderer": {
+                    "thumbnail": {
+                        "thumbnails": [{"url": "https://example.com/thumb.jpg"}]
+                    }
+                }
+            },
+            "navigationEndpoint": {
+                "browseEndpoint": {"browseId": "VL" + playlist_id}
+            },
+        }
+
+    def _make_response(self, sections):
+        """Helper to wrap sections in the standard response structure."""
+        return {
+            "contents": {
+                "singleColumnBrowseResultsRenderer": {
+                    "tabs": [
+                        {
+                            "tabRenderer": {
+                                "content": {
+                                    "sectionListRenderer": {"contents": sections}
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+
+    def test_skips_non_playlist_sections(self):
+        """Sections with musicResponsiveListItemRenderer (songs) should be skipped."""
+        song_section = self._make_section(
+            "musicResponsiveListItemRenderer",
+            [{"flexColumns": []}],
+        )
+        playlist_section = self._make_section(
+            "musicTwoRowItemRenderer",
+            [self._make_playlist_item("My Playlist", "RDCLAK5uy_k123")],
+        )
+        response = self._make_response([song_section, playlist_section])
+
+        mock_yt = MagicMock()
+        mock_yt._send_request.return_value = response
+
+        result = _get_mood_playlists_fallback(mock_yt, "test_params")
+        assert len(result) == 1
+        assert result[0]["title"] == "My Playlist"
+        assert result[0]["playlistId"] == "RDCLAK5uy_k123"
+
+    def test_handles_empty_sections(self):
+        """Empty response sections should not crash."""
+        empty_section = {"musicCarouselShelfRenderer": {"contents": []}}
+        response = self._make_response([empty_section])
+
+        mock_yt = MagicMock()
+        mock_yt._send_request.return_value = response
+
+        result = _get_mood_playlists_fallback(mock_yt, "test_params")
+        assert result == []
+
+    def test_handles_parse_errors_gracefully(self):
+        """Individual item parse failures should not crash the whole function."""
+        # Create one good item and one bad item (missing required fields)
+        good_item = self._make_playlist_item("Good Playlist", "RDCLAK5uy_good")
+        bad_item = {"title": {"runs": [{"text": "Bad Item"}]}}  # Missing navigationEndpoint
+        section = {
+            "musicCarouselShelfRenderer": {
+                "contents": [
+                    {"musicTwoRowItemRenderer": good_item},
+                    {"musicTwoRowItemRenderer": bad_item},
+                ]
+            }
+        }
+        response = self._make_response([section])
+
+        mock_yt = MagicMock()
+        mock_yt._send_request.return_value = response
+
+        result = _get_mood_playlists_fallback(mock_yt, "test_params")
+        assert len(result) == 1
+        assert result[0]["title"] == "Good Playlist"
+
+    def test_handles_failed_response_navigation(self):
+        """If the response structure is unexpected, return empty list."""
+        mock_yt = MagicMock()
+        mock_yt._send_request.return_value = {"unexpected": "structure"}
+
+        result = _get_mood_playlists_fallback(mock_yt, "test_params")
+        assert result == []
+
+    def test_handles_multiple_valid_sections(self):
+        """Multiple sections with musicTwoRowItemRenderer should all be parsed."""
+        section1 = self._make_section(
+            "musicTwoRowItemRenderer",
+            [self._make_playlist_item("Playlist A", "RDCLAK5uy_a")],
+        )
+        section2 = self._make_section(
+            "musicTwoRowItemRenderer",
+            [self._make_playlist_item("Playlist B", "RDCLAK5uy_b")],
+        )
+        response = self._make_response([section1, section2])
+
+        mock_yt = MagicMock()
+        mock_yt._send_request.return_value = response
+
+        result = _get_mood_playlists_fallback(mock_yt, "test_params")
+        assert len(result) == 2
+        titles = [r["title"] for r in result]
+        assert "Playlist A" in titles
+        assert "Playlist B" in titles
+
+    def test_handles_grid_renderer_sections(self):
+        """Sections using gridRenderer should also be parsed."""
+        section = {
+            "gridRenderer": {
+                "items": [
+                    {
+                        "musicTwoRowItemRenderer": self._make_playlist_item(
+                            "Grid Playlist", "RDCLAK5uy_grid"
+                        )
+                    }
+                ]
+            }
+        }
+        response = self._make_response([section])
+
+        mock_yt = MagicMock()
+        mock_yt._send_request.return_value = response
+
+        result = _get_mood_playlists_fallback(mock_yt, "test_params")
+        assert len(result) == 1
+        assert result[0]["title"] == "Grid Playlist"
+
+    def test_skips_unknown_section_types(self):
+        """Sections with unknown renderer types should be skipped."""
+        section = {"unknownRenderer": {"contents": []}}
+        response = self._make_response([section])
+
+        mock_yt = MagicMock()
+        mock_yt._send_request.return_value = response
+
+        result = _get_mood_playlists_fallback(mock_yt, "test_params")
+        assert result == []
 
 
 class TestGetCharts:
@@ -273,6 +476,78 @@ class TestGetCharts:
         charts = get_charts()
         assert len(charts.tracks) == 1
         assert charts.tracks[0].video_id == "good_id"
+
+    @patch("kikusan.search.YTMusic")
+    def test_chart_tracks_include_view_count_and_duration(self, mock_ytmusic_cls):
+        """Chart tracks should include view_count and duration_seconds from playlist data."""
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_charts.return_value = {
+            "videos": [
+                {"title": "Charts", "playlistId": "PL_test", "thumbnails": []},
+            ],
+            "artists": [],
+        }
+        mock_yt.get_playlist.return_value = {
+            "title": "Charts",
+            "tracks": [
+                {
+                    "videoId": "v1",
+                    "title": "Hit Song",
+                    "artists": [{"name": "Artist A"}],
+                    "thumbnails": [],
+                    "duration": "3:45",
+                    "duration_seconds": 225,
+                    "views": "1.5B views",
+                },
+                {
+                    "videoId": "v2",
+                    "title": "New Song",
+                    "artists": [{"name": "Artist B"}],
+                    "thumbnails": [],
+                    "duration": "4:10",
+                },
+            ],
+        }
+
+        charts = get_charts()
+        assert len(charts.tracks) == 2
+
+        assert charts.tracks[0].view_count == "1.5B views"
+        assert charts.tracks[0].duration_seconds == 225
+        assert charts.tracks[0].duration_display == "3:45"
+
+        assert charts.tracks[1].view_count is None
+        assert charts.tracks[1].duration_seconds == 250
+        assert charts.tracks[1].duration_display == "4:10"
+
+    @patch("kikusan.search.YTMusic")
+    def test_chart_track_defaults(self, mock_ytmusic_cls):
+        """Chart tracks should have sensible defaults for view_count and duration_seconds."""
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_charts.return_value = {
+            "videos": [
+                {"title": "Charts", "playlistId": "PL_test", "thumbnails": []},
+            ],
+            "artists": [],
+        }
+        mock_yt.get_playlist.return_value = {
+            "title": "Charts",
+            "tracks": [
+                {
+                    "videoId": "v1",
+                    "title": "Minimal Track",
+                    "artists": [{"name": "Artist"}],
+                    "thumbnails": [],
+                },
+            ],
+        }
+
+        charts = get_charts()
+        assert charts.tracks[0].view_count is None
+        assert charts.tracks[0].duration_seconds == 0
+        assert charts.tracks[0].duration_display == "0:00"
 
 
 class TestGetPlaylistTracks:

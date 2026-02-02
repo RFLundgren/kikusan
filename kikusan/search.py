@@ -79,6 +79,15 @@ class ChartTrack:
     thumbnail_url: str | None
     rank: str | None
     trend: str | None
+    view_count: str | None = None
+    duration_seconds: int = 0
+
+    @property
+    def duration_display(self) -> str:
+        """Format duration as MM:SS."""
+        minutes = self.duration_seconds // 60
+        seconds = self.duration_seconds % 60
+        return f"{minutes}:{seconds:02d}"
 
 
 @dataclass
@@ -300,6 +309,16 @@ def get_mood_categories() -> list[MoodSection]:
 def get_mood_playlists(params: str) -> list[MoodPlaylist]:
     """Fetch playlists for a mood/genre category.
 
+    Some mood/genre categories return mixed content: some sections contain
+    playlist items (musicTwoRowItemRenderer) while others contain song items
+    (musicResponsiveListItemRenderer). The upstream ytmusicapi library crashes
+    with a KeyError when it encounters the unexpected renderer type.
+
+    This function first attempts the standard ytmusicapi call. If it fails
+    with a KeyError (the musicTwoRowItemRenderer issue), it falls back to
+    manual response parsing that skips sections with incompatible renderers
+    and handles individual item parse failures gracefully.
+
     Args:
         params: Category params string from get_mood_categories()
 
@@ -309,6 +328,14 @@ def get_mood_playlists(params: str) -> list[MoodPlaylist]:
     yt = YTMusic()
     try:
         raw = yt.get_mood_playlists(params)
+    except KeyError as e:
+        logger.warning(
+            "ytmusicapi get_mood_playlists KeyError for params '%s': %s. "
+            "Falling back to manual parsing.",
+            params,
+            e,
+        )
+        raw = _get_mood_playlists_fallback(yt, params)
     except Exception as e:
         logger.error("YouTube Music get_mood_playlists failed for params '%s': %s", params, e)
         raise
@@ -327,6 +354,99 @@ def get_mood_playlists(params: str) -> list[MoodPlaylist]:
         )
 
     logger.info("Found %d playlists for mood/genre params", len(playlists))
+    return playlists
+
+
+def _get_mood_playlists_fallback(yt: YTMusic, params: str) -> list[dict]:
+    """Manually parse mood playlists from the raw YouTube Music API response.
+
+    This fallback handles cases where the upstream ytmusicapi get_mood_playlists
+    crashes because some response sections contain musicResponsiveListItemRenderer
+    items (individual songs) instead of musicTwoRowItemRenderer items (playlists).
+
+    The function skips sections with incompatible renderers and handles individual
+    item parse failures within valid sections.
+
+    Args:
+        yt: YTMusic instance (reused from caller to avoid re-initialization)
+        params: Category params string from get_mood_categories()
+
+    Returns:
+        List of raw playlist dictionaries (same format as ytmusicapi output).
+    """
+    from ytmusicapi.navigation import nav, SINGLE_COLUMN_TAB, SECTION_LIST
+    from ytmusicapi.parsers.browsing import (
+        CAROUSEL_CONTENTS,
+        GRID_ITEMS,
+        parse_playlist,
+    )
+
+    MTRIR_KEY = "musicTwoRowItemRenderer"
+
+    response = yt._send_request(
+        "browse",
+        {"browseId": "FEmusic_moods_and_genres_category", "params": params},
+    )
+
+    playlists: list[dict] = []
+
+    try:
+        sections = nav(response, SINGLE_COLUMN_TAB + SECTION_LIST)
+    except Exception as e:
+        logger.error("Fallback: failed to navigate mood playlists response: %s", e)
+        return []
+
+    for section_idx, section in enumerate(sections):
+        # Determine content path based on section renderer type
+        path: list[str] = []
+        if "gridRenderer" in section:
+            path = list(GRID_ITEMS)
+        elif "musicCarouselShelfRenderer" in section:
+            path = list(CAROUSEL_CONTENTS)
+        elif "musicImmersiveCarouselShelfRenderer" in section:
+            path = ["musicImmersiveCarouselShelfRenderer", "contents"]
+
+        if not path:
+            continue
+
+        try:
+            results = nav(section, path)
+        except Exception:
+            logger.debug("Fallback: failed to navigate section %d, skipping", section_idx)
+            continue
+
+        if not results:
+            continue
+
+        # Skip sections that don't contain playlist items (musicTwoRowItemRenderer)
+        if MTRIR_KEY not in results[0]:
+            logger.debug(
+                "Fallback: section %d uses %s, skipping (not playlist items)",
+                section_idx,
+                list(results[0].keys()),
+            )
+            continue
+
+        # Parse each item individually, skipping items that fail
+        for item_idx, result in enumerate(results):
+            if MTRIR_KEY not in result:
+                continue
+            try:
+                parsed = parse_playlist(result[MTRIR_KEY])
+                playlists.append(parsed)
+            except Exception as e:
+                logger.debug(
+                    "Fallback: failed to parse playlist item %d in section %d: %s",
+                    item_idx,
+                    section_idx,
+                    e,
+                )
+
+    logger.info(
+        "Fallback parsing recovered %d playlists for mood/genre params '%s'",
+        len(playlists),
+        params,
+    )
     return playlists
 
 
@@ -374,6 +494,14 @@ def get_charts(country: str = "ZZ") -> Charts:
                     artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
                     thumbnails = item.get("thumbnails", [])
                     album_obj = item.get("album")
+
+                    # Extract duration
+                    duration_text = item.get("duration", "0:00")
+                    duration_seconds = item.get("duration_seconds") or _parse_duration(duration_text)
+
+                    # Extract view count (ytmusicapi playlist tracks may have views)
+                    view_count = item.get("views")
+
                     tracks.append(
                         ChartTrack(
                             video_id=video_id,
@@ -384,6 +512,8 @@ def get_charts(country: str = "ZZ") -> Charts:
                             thumbnail_url=thumbnails[-1]["url"] if thumbnails else None,
                             rank=str(rank_idx),
                             trend=None,
+                            view_count=view_count,
+                            duration_seconds=duration_seconds,
                         )
                     )
                 break  # Successfully fetched tracks, stop trying other playlists

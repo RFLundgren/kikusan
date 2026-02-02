@@ -16,6 +16,9 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Three-level navigation: Categories -> Playlists -> Tracks (with breadcrumb nav)
   - Mood/genre categories displayed as clickable grid cards
   - Charts with country selector (11 countries + global)
+  - View counts displayed for chart tracks and playlist tracks (when available from API)
+  - Play preview button and Copy URL button on all explore track listings (charts and playlists)
+  - Duration displayed alongside view counts in chart track metadata
   - "Download All" buttons for bulk queueing of playlist tracks and chart tracks
   - Reuses existing download queue infrastructure (`/api/queue/add`)
 - **Multi-user playlist support**: When `KIKUSAN_MULTI_USER=true` (or `--multi-user` flag), parses the `Remote-User` header (set by reverse proxy SSO like Authelia) and prefixes the M3U playlist name with the username (e.g., `alice-webplaylist.m3u`)
@@ -66,7 +69,9 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - `kikusan/search.py`: Uses ytmusicapi to search and explore YouTube Music
   - Search: `search()`, `search_albums()`, `get_album_tracks()` — song/album search with view_count extraction
   - Explore: `get_mood_categories()`, `get_mood_playlists()`, `get_charts()`, `get_playlist_tracks()` — mood/genre browsing and chart data
+  - `get_mood_playlists()`: Has fallback parsing (`_get_mood_playlists_fallback()`) for when ytmusicapi crashes with KeyError on `musicTwoRowItemRenderer`. Some mood/genre categories return mixed content: some sections contain playlist items (`musicTwoRowItemRenderer`) while others contain song items (`musicResponsiveListItemRenderer`). The fallback manually parses the raw YouTube Music API response, skipping incompatible sections and handling individual item parse failures gracefully.
   - `get_charts()`: ytmusicapi returns `videos` as a list of playlist references (not individual tracks) and `artists` as a flat list. The function fetches tracks from the first working video playlist via `get_playlist()`, with fallback to subsequent playlists if one fails (e.g. album-style IDs like `OLAK5uy_...` are not fetchable via `get_playlist`).
+  - `ChartTrack` includes `view_count` (str|None) and `duration_seconds` (int) with a `duration_display` property (MM:SS format), extracted from playlist data in `get_charts()`
   - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`
 - `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
   - Explore endpoints: `GET /api/explore/moods`, `GET /api/explore/mood-playlists`, `GET /api/explore/charts`, `GET /api/explore/playlist/{playlist_id}/tracks`
