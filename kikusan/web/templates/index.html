@@ -1,664 +1,735 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kikusan</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico" />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
     <div class="container">
-        <header>
-            <div>
-                <div>
-                    <h1>Kikusan <span class="version">v{{ version }}</span></h1>
-                    <p>Search and download music from YouTube Music</p>
-                </div>
-                <div class="header-controls">
-                    <a href="https://github.com/dadav/kikusan" target="_blank" class="github-star" aria-label="Star on GitHub">
-                        ⭐ Star on GitHub
-                    </a>
-                    <select id="format-selector" class="format-selector" aria-label="Audio format">
-                        <option value="opus">Opus</option>
-                        <option value="mp3">MP3</option>
-                        <option value="flac">FLAC</option>
-                    </select>
-                    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
-                        <span class="theme-icon">🌙</span>
-                    </button>
-                    <button id="settings-btn" class="icon-btn" aria-label="Settings" title="Settings">
-                        ⚙️
-                    </button>
-                </div>
-            </div>
-        </header>
-
-        <form id="search-form" class="search-form">
-            <input
-                type="text"
-                id="search-input"
-                name="q"
-                placeholder="Search for music..."
-                autocomplete="off"
-                required
+      <header>
+        <a
+          href="https://github.com/dadav/kikusan"
+          target="_blank"
+          class="github-star"
+          aria-label="Star on GitHub"
+        >
+          ⭐ GitHub
+        </a>
+        <div class="header-content">
+          <div class="header-title">
+            <h1>Kikusan <span class="version">v{{ version }}</span></h1>
+            <p>Search and download music from YouTube Music</p>
+          </div>
+          <div class="header-controls">
+            <select
+              id="format-selector"
+              class="format-selector"
+              aria-label="Audio format"
             >
-            <button type="submit">Search</button>
-        </form>
-
-        <div class="search-tabs">
-            <button class="tab-btn active" data-tab="songs">Songs</button>
-            <button class="tab-btn" data-tab="albums">Albums</button>
-            <button class="tab-btn" data-tab="explore">Explore</button>
+              <option value="opus">Opus</option>
+              <option value="mp3">MP3</option>
+              <option value="flac">FLAC</option>
+            </select>
+            <button
+              id="theme-toggle"
+              class="theme-toggle"
+              aria-label="Toggle theme"
+            >
+              <span class="theme-icon">🌙</span>
+            </button>
+            <button
+              id="settings-btn"
+              class="icon-btn"
+              aria-label="Settings"
+              title="Settings"
+            >
+              ⚙️
+            </button>
+          </div>
         </div>
+      </header>
 
-        <div id="status" class="status"></div>
+      <form id="search-form" class="search-form">
+        <input
+          type="text"
+          id="search-input"
+          name="q"
+          placeholder="Search for music..."
+          autocomplete="off"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
 
-        <!-- Queue Section -->
-        <div id="queue-section" class="queue-section">
-            <div class="queue-header">
-                <h2>Download Queue</h2>
-                <button id="clear-completed-btn" class="clear-btn">Clear Completed</button>
-            </div>
-            <div id="queue-list" class="queue-list"></div>
+      <div class="search-tabs">
+        <button class="tab-btn active" data-tab="songs">Songs</button>
+        <button class="tab-btn" data-tab="albums">Albums</button>
+        <button class="tab-btn" data-tab="explore">Explore</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <!-- Queue Section -->
+      <div id="queue-section" class="queue-section">
+        <div class="queue-header">
+          <h2>Download Queue</h2>
+          <button id="clear-completed-btn" class="clear-btn">
+            Clear Completed
+          </button>
         </div>
+        <div id="queue-list" class="queue-list"></div>
+      </div>
 
-        <div id="songs-results" class="results active"></div>
-        <div id="albums-results" class="albums-grid"></div>
-        <div id="explore-results" class="explore-section"></div>
+      <div id="songs-results" class="results active"></div>
+      <div id="albums-results" class="albums-grid"></div>
+      <div id="explore-results" class="explore-section"></div>
     </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Settings</h2>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <section class="settings-section">
-                    <h3>Cookie Authentication</h3>
-                    <p class="settings-description">
-                        Upload a cookies.txt file to access age-restricted or region-locked content.
-                        <a href="https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp" target="_blank">Learn more</a>
-                    </p>
-
-                    <div id="cookie-status" class="cookie-status">
-                        <span class="status-indicator"></span>
-                        <span class="status-text">Checking...</span>
-                    </div>
-
-                    <div class="cookie-actions">
-                        <input type="file" id="cookie-file-input" accept=".txt" style="display: none;">
-                        <button id="upload-cookie-btn" class="btn btn-primary">Upload cookies.txt</button>
-                        <button id="delete-cookie-btn" class="btn btn-danger" style="display: none;">Delete Cookie File</button>
-                    </div>
-                </section>
-            </div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button class="modal-close">&times;</button>
         </div>
+        <div class="modal-body">
+          <section class="settings-section">
+            <h3>Cookie Authentication</h3>
+            <p class="settings-description">
+              Upload a cookies.txt file to access age-restricted or
+              region-locked content.
+              <a
+                href="https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
+                target="_blank"
+                >Learn more</a
+              >
+            </p>
+
+            <div id="cookie-status" class="cookie-status">
+              <span class="status-indicator"></span>
+              <span class="status-text">Checking...</span>
+            </div>
+
+            <div class="cookie-actions">
+              <input
+                type="file"
+                id="cookie-file-input"
+                accept=".txt"
+                style="display: none"
+              />
+              <button id="upload-cookie-btn" class="btn btn-primary">
+                Upload cookies.txt
+              </button>
+              <button
+                id="delete-cookie-btn"
+                class="btn btn-danger"
+                style="display: none"
+              >
+                Delete Cookie File
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
 
     <script>
-        // Theme management
-        const themeToggle = document.getElementById('theme-toggle');
-        const themeIcon = document.querySelector('.theme-icon');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+      // Theme management
+      const themeToggle = document.getElementById("theme-toggle");
+      const themeIcon = document.querySelector(".theme-icon");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)");
 
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme');
-            const theme = savedTheme || (prefersDark.matches ? 'dark' : 'light');
-            setTheme(theme);
+      function initTheme() {
+        const savedTheme = localStorage.getItem("theme");
+        const theme = savedTheme || (prefersDark.matches ? "dark" : "light");
+        setTheme(theme);
+      }
+
+      function setTheme(theme) {
+        if (theme === "light") {
+          document.body.classList.add("light-theme");
+          themeIcon.textContent = "☀️";
+        } else {
+          document.body.classList.remove("light-theme");
+          themeIcon.textContent = "🌙";
+        }
+        localStorage.setItem("theme", theme);
+      }
+
+      function toggleTheme() {
+        const isLight = document.body.classList.contains("light-theme");
+        setTheme(isLight ? "dark" : "light");
+      }
+
+      themeToggle.addEventListener("click", toggleTheme);
+      initTheme();
+
+      // Listen for system preference changes
+      prefersDark.addEventListener("change", (e) => {
+        if (!localStorage.getItem("theme")) {
+          setTheme(e.matches ? "dark" : "light");
+        }
+      });
+
+      // Format management
+      const formatSelector = document.getElementById("format-selector");
+
+      function initFormat() {
+        const savedFormat = localStorage.getItem("audioFormat") || "opus";
+        formatSelector.value = savedFormat;
+      }
+
+      function saveFormat() {
+        localStorage.setItem("audioFormat", formatSelector.value);
+      }
+
+      formatSelector.addEventListener("change", saveFormat);
+      initFormat();
+
+      // Audio playback management
+      let currentAudio = null;
+      let currentPlayingButton = null;
+
+      function stopCurrentAudio() {
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio = null;
+        }
+        if (currentPlayingButton) {
+          currentPlayingButton.textContent = "▶";
+          currentPlayingButton.disabled = false;
+          currentPlayingButton = null;
+        }
+      }
+
+      async function togglePlay(videoId, button) {
+        if (currentPlayingButton === button) {
+          stopCurrentAudio();
+          return;
         }
 
-        function setTheme(theme) {
-            if (theme === 'light') {
-                document.body.classList.add('light-theme');
-                themeIcon.textContent = '☀️';
-            } else {
-                document.body.classList.remove('light-theme');
-                themeIcon.textContent = '🌙';
-            }
-            localStorage.setItem('theme', theme);
-        }
+        stopCurrentAudio();
+        button.disabled = true;
+        button.textContent = "⏳";
 
-        function toggleTheme() {
-            const isLight = document.body.classList.contains('light-theme');
-            setTheme(isLight ? 'dark' : 'light');
-        }
+        try {
+          const response = await fetch(`/api/stream-url/${videoId}`);
+          if (!response.ok) throw new Error("Failed to get stream URL");
+          const data = await response.json();
 
-        themeToggle.addEventListener('click', toggleTheme);
-        initTheme();
+          currentAudio = new Audio(data.url);
+          currentPlayingButton = button;
 
-        // Listen for system preference changes
-        prefersDark.addEventListener('change', (e) => {
-            if (!localStorage.getItem('theme')) {
-                setTheme(e.matches ? 'dark' : 'light');
-            }
-        });
+          currentAudio.addEventListener("loadedmetadata", () => {
+            button.textContent = "⏸";
+            button.disabled = false;
+          });
 
-        // Format management
-        const formatSelector = document.getElementById('format-selector');
-
-        function initFormat() {
-            const savedFormat = localStorage.getItem('audioFormat') || 'opus';
-            formatSelector.value = savedFormat;
-        }
-
-        function saveFormat() {
-            localStorage.setItem('audioFormat', formatSelector.value);
-        }
-
-        formatSelector.addEventListener('change', saveFormat);
-        initFormat();
-
-        // Audio playback management
-        let currentAudio = null;
-        let currentPlayingButton = null;
-
-        function stopCurrentAudio() {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio = null;
-            }
-            if (currentPlayingButton) {
-                currentPlayingButton.textContent = '▶';
-                currentPlayingButton.disabled = false;
-                currentPlayingButton = null;
-            }
-        }
-
-        async function togglePlay(videoId, button) {
-            if (currentPlayingButton === button) {
-                stopCurrentAudio();
-                return;
-            }
-
+          currentAudio.addEventListener("ended", () => {
             stopCurrentAudio();
-            button.disabled = true;
-            button.textContent = '⏳';
+          });
 
-            try {
-                const response = await fetch(`/api/stream-url/${videoId}`);
-                if (!response.ok) throw new Error('Failed to get stream URL');
-                const data = await response.json();
+          currentAudio.addEventListener("error", (e) => {
+            console.error("Audio playback error:", e);
+            showStatus("Playback failed", true);
+            stopCurrentAudio();
+          });
 
-                currentAudio = new Audio(data.url);
-                currentPlayingButton = button;
-
-                currentAudio.addEventListener('loadedmetadata', () => {
-                    button.textContent = '⏸';
-                    button.disabled = false;
-                });
-
-                currentAudio.addEventListener('ended', () => {
-                    stopCurrentAudio();
-                });
-
-                currentAudio.addEventListener('error', (e) => {
-                    console.error('Audio playback error:', e);
-                    showStatus('Playback failed', true);
-                    stopCurrentAudio();
-                });
-
-                await currentAudio.play();
-            } catch (error) {
-                console.error('Failed to play:', error);
-                showStatus('Failed to start playback: ' + error.message, true);
-                button.textContent = '▶';
-                button.disabled = false;
-            }
+          await currentAudio.play();
+        } catch (error) {
+          console.error("Failed to play:", error);
+          showStatus("Failed to start playback: " + error.message, true);
+          button.textContent = "▶";
+          button.disabled = false;
         }
+      }
 
-        // Search functionality
-        const searchForm = document.getElementById('search-form');
-        const searchInput = document.getElementById('search-input');
-        const resultsDiv = document.getElementById('songs-results');
-        const statusDiv = document.getElementById('status');
+      // Search functionality
+      const searchForm = document.getElementById("search-form");
+      const searchInput = document.getElementById("search-input");
+      const resultsDiv = document.getElementById("songs-results");
+      const statusDiv = document.getElementById("status");
 
-        // Tab management
-        const tabButtons = document.querySelectorAll('.tab-btn');
-        const songsResults = document.getElementById('songs-results');
-        const albumsResults = document.getElementById('albums-results');
-        let currentTab = 'songs';
-        let viewingAlbum = null; // Tracks current album view mode { id, title, query }
+      // Tab management
+      const tabButtons = document.querySelectorAll(".tab-btn");
+      const songsResults = document.getElementById("songs-results");
+      const albumsResults = document.getElementById("albums-results");
+      let currentTab = "songs";
+      let viewingAlbum = null; // Tracks current album view mode { id, title, query }
 
-        tabButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tab = btn.dataset.tab;
-                exitAlbumViewMode(); // Clear album view mode when switching tabs
+      tabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tab = btn.dataset.tab;
+          exitAlbumViewMode(); // Clear album view mode when switching tabs
 
-                if (tab === 'explore') {
-                    // Explore tab manages its own URL params via updateExploreUrlParams
-                    // Reset explore state so it reloads fresh
-                    exploreLoaded = false;
-                    exploreBreadcrumb = [];
-                    setActiveTab(tab);
-                } else {
-                    setActiveTab(tab);
-                    const query = searchInput.value.trim();
-                    updateUrlParams(query, tab);
-                    if (query) performSearch(query);
-                }
-            });
-        });
-
-        // Exit album view mode and return to normal search
-        function exitAlbumViewMode() {
-            if (viewingAlbum) {
-                viewingAlbum = null;
-                hideBackToAlbumsButton();
-            }
-        }
-
-        // Show a "Back to Albums" button when viewing album tracks
-        function showBackToAlbumsButton(albumTitle) {
-            let backBtn = document.getElementById('back-to-albums-btn');
-            if (!backBtn) {
-                backBtn = document.createElement('button');
-                backBtn.id = 'back-to-albums-btn';
-                backBtn.className = 'back-to-albums-btn';
-                backBtn.addEventListener('click', handleBackToAlbums);
-                // Insert after the search tabs
-                const searchTabs = document.querySelector('.search-tabs');
-                searchTabs.parentNode.insertBefore(backBtn, searchTabs.nextSibling);
-            }
-            backBtn.textContent = 'Back to Albums';
-            backBtn.style.display = 'block';
-        }
-
-        function hideBackToAlbumsButton() {
-            const backBtn = document.getElementById('back-to-albums-btn');
-            if (backBtn) {
-                backBtn.style.display = 'none';
-            }
-        }
-
-        function handleBackToAlbums() {
-            if (viewingAlbum && viewingAlbum.query) {
-                const query = viewingAlbum.query;
-                exitAlbumViewMode();
-                setActiveTab('albums');
-                updateUrlParams(query, 'albums');
-                performSearch(query);
-            } else {
-                exitAlbumViewMode();
-                setActiveTab('albums');
-                updateUrlParams(searchInput.value.trim(), 'albums');
-            }
-        }
-
-        function showStatus(message, isError = false) {
-            statusDiv.textContent = message;
-            statusDiv.className = 'status ' + (isError ? 'error' : 'info');
-            statusDiv.style.display = message ? 'block' : 'none';
-        }
-
-        // URL query parameter handling
-        function getQueryParam(name) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(name);
-        }
-
-        function updateUrlParams(query, tab, albumId = null) {
-            const url = new URL(window.location);
-            // Clear all explore-specific params when updating search/tab params
-            url.searchParams.delete('view');
-            url.searchParams.delete('country');
-            url.searchParams.delete('params');
-            url.searchParams.delete('title');
-            url.searchParams.delete('playlistId');
-            url.searchParams.delete('playlistTitle');
-            url.searchParams.delete('moodParams');
-            url.searchParams.delete('moodTitle');
-
-            if (query) {
-                url.searchParams.set('q', query);
-            } else {
-                url.searchParams.delete('q');
-            }
-            if (tab && tab !== 'songs') {
-                url.searchParams.set('tab', tab);
-            } else {
-                url.searchParams.delete('tab');
-            }
-            if (albumId) {
-                url.searchParams.set('album', albumId);
-            } else {
-                url.searchParams.delete('album');
-            }
-            window.history.pushState({}, '', url);
-        }
-
-        // Update URL params for explore tab navigation states
-        // view: 'home' | 'charts' | 'mood' | 'playlist'
-        function updateExploreUrlParams(view, options = {}) {
-            const url = new URL(window.location);
-            // Clear search-specific params
-            url.searchParams.delete('q');
-            url.searchParams.delete('album');
-            // Always set tab=explore
-            url.searchParams.set('tab', 'explore');
-            // Clear all explore-specific params first
-            url.searchParams.delete('view');
-            url.searchParams.delete('country');
-            url.searchParams.delete('params');
-            url.searchParams.delete('title');
-            url.searchParams.delete('playlistId');
-            url.searchParams.delete('playlistTitle');
-            url.searchParams.delete('moodParams');
-            url.searchParams.delete('moodTitle');
-
-            if (view && view !== 'home') {
-                url.searchParams.set('view', view);
-            }
-            if (view === 'charts' && options.country && options.country !== 'ZZ') {
-                url.searchParams.set('country', options.country);
-            }
-            if (view === 'mood') {
-                if (options.params) url.searchParams.set('params', options.params);
-                if (options.title) url.searchParams.set('title', options.title);
-            }
-            if (view === 'playlist') {
-                if (options.playlistId) url.searchParams.set('playlistId', options.playlistId);
-                if (options.playlistTitle) url.searchParams.set('playlistTitle', options.playlistTitle);
-                // Preserve parent mood context for breadcrumb navigation
-                if (options.moodParams) url.searchParams.set('moodParams', options.moodParams);
-                if (options.moodTitle) url.searchParams.set('moodTitle', options.moodTitle);
-            }
-            window.history.pushState({}, '', url);
-        }
-
-        // Initialize tab from URL
-        function initTabFromUrl() {
-            const tab = getQueryParam('tab') || 'songs';
-            if (tab === 'songs' || tab === 'albums' || tab === 'explore') {
-                setActiveTab(tab);
-            }
-        }
-
-        // Set active tab (updates UI and currentTab variable)
-        const exploreResults = document.getElementById('explore-results');
-
-        function setActiveTab(tab, skipExploreLoad = false) {
-            currentTab = tab;
-            tabButtons.forEach(b => {
-                if (b.dataset.tab === tab) {
-                    b.classList.add('active');
-                } else {
-                    b.classList.remove('active');
-                }
-            });
-
-            songsResults.classList.remove('active');
-            albumsResults.classList.remove('active');
-            exploreResults.classList.remove('active');
-
-            if (tab === 'songs') {
-                songsResults.classList.add('active');
-            } else if (tab === 'albums') {
-                albumsResults.classList.add('active');
-            } else if (tab === 'explore') {
-                exploreResults.classList.add('active');
-                if (!skipExploreLoad) {
-                    loadExploreContent();
-                }
-            }
-        }
-
-        // Auto-search on page load
-        function initAutoSearch() {
-            const query = getQueryParam('q');
-            const albumId = getQueryParam('album');
-            const tab = getQueryParam('tab') || 'songs';
-
-            // If we have an album ID, load album tracks directly
-            if (albumId) {
-                if (query) {
-                    searchInput.value = query;
-                }
-                loadAlbumTracks(albumId, query);
-                return;
-            }
-
-            // Restore explore tab state from URL params
-            if (tab === 'explore') {
-                const restored = restoreExploreFromUrl();
-                if (restored) return;
-            }
-
-            initTabFromUrl();
-            if (query) {
-                searchInput.value = query;
-                performSearch(query);
-            }
-        }
-
-        // Restore explore navigation state from URL params on page load
-        // Returns true if a specific explore view was restored, false for default explore home
-        function restoreExploreFromUrl() {
-            const view = getQueryParam('view');
-            const country = getQueryParam('country');
-            const moodParams = getQueryParam('params');
-            const moodTitle = getQueryParam('title');
-            const playlistId = getQueryParam('playlistId');
-            const playlistTitle = getQueryParam('playlistTitle');
-            const parentMoodParams = getQueryParam('moodParams');
-            const parentMoodTitle = getQueryParam('moodTitle');
-
-            if (view === 'charts') {
-                // Restore charts view with specific country (skipUrlUpdate since we're restoring from URL)
-                setActiveTab('explore', true);
-                loadExploreContentWithCountry(country || 'ZZ', true);
-                return true;
-            } else if (view === 'mood' && moodParams) {
-                // Restore mood playlists view (skipUrlUpdate since we're restoring from URL)
-                setActiveTab('explore', true);
-                loadMoodPlaylists(moodParams, moodTitle || 'Category', true);
-                return true;
-            } else if (view === 'playlist' && playlistId) {
-                // Restore playlist tracks view (with parent mood context if available)
-                setActiveTab('explore', true);
-                if (parentMoodParams) {
-                    exploreBreadcrumb = [{type: 'category', title: parentMoodTitle || 'Category', params: parentMoodParams}];
-                }
-                loadPlaylistTracks(playlistId, playlistTitle || 'Playlist', true);
-                return true;
-            }
-
-            // No specific explore view to restore; default explore home will load via setActiveTab
-            return false;
-        }
-
-        // Load explore home with a specific country for charts (used by URL restore and country selector)
-        // skipUrlUpdate: true when restoring from URL to avoid redundant pushState
-        async function loadExploreContentWithCountry(country, skipUrlUpdate = false) {
-            exploreLoaded = true;
+          if (tab === "explore") {
+            // Explore tab manages its own URL params via updateExploreUrlParams
+            // Reset explore state so it reloads fresh
+            exploreLoaded = false;
             exploreBreadcrumb = [];
-            exploreResults.innerHTML = '<div class="explore-loading">Loading explore content...</div>';
-
-            const [moodsResult, chartsResult] = await Promise.allSettled([
-                fetch('/api/explore/moods').then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
-                }),
-                fetch(`/api/explore/charts?country=${encodeURIComponent(country)}`).then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
-                }),
-            ]);
-
-            let moods = moodsResult.status === 'fulfilled' ? moodsResult.value : null;
-            let charts = chartsResult.status === 'fulfilled' ? chartsResult.value : null;
-
-            if (!moods && !charts) {
-                exploreResults.innerHTML = '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
-                exploreLoaded = false;
-                return;
-            }
-
-            renderExploreHome(moods, charts, skipUrlUpdate);
-        }
-
-        // Extract search logic into reusable function
-        async function performSearch(query) {
-            showStatus('Searching...');
-            if (currentTab === 'songs') {
-                songsResults.innerHTML = '';
-                await performSongSearch(query);
-            } else if (currentTab === 'albums') {
-                albumsResults.innerHTML = '';
-                await performAlbumSearch(query);
-            }
-            // Explore tab doesn't use search
-        }
-
-        async function performSongSearch(query) {
-            try {
-                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
-
-                const data = await response.json();
-
-                if (data.results.length === 0) {
-                    showStatus('No results found.');
-                    return;
-                }
-
-                showStatus('');
-                renderResults(data.results);
-            } catch (error) {
-                showStatus('Search failed: ' + error.message, true);
-            }
-        }
-
-        async function performAlbumSearch(query) {
-            try {
-                const response = await fetch(`/api/search/albums?q=${encodeURIComponent(query)}`);
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
-
-                const data = await response.json();
-                if (data.results.length === 0) {
-                    showStatus('No albums found.');
-                    return;
-                }
-                showStatus('');
-                renderAlbums(data.results);
-            } catch (error) {
-                showStatus('Album search failed: ' + error.message, true);
-            }
-        }
-
-        searchForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+            setActiveTab(tab);
+          } else {
+            setActiveTab(tab);
             const query = searchInput.value.trim();
-            if (!query) return;
+            updateUrlParams(query, tab);
+            if (query) performSearch(query);
+          }
+        });
+      });
 
-            updateUrlParams(query, currentTab);
-            performSearch(query);
+      // Exit album view mode and return to normal search
+      function exitAlbumViewMode() {
+        if (viewingAlbum) {
+          viewingAlbum = null;
+          hideBackToAlbumsButton();
+        }
+      }
+
+      // Show a "Back to Albums" button when viewing album tracks
+      function showBackToAlbumsButton(albumTitle) {
+        let backBtn = document.getElementById("back-to-albums-btn");
+        if (!backBtn) {
+          backBtn = document.createElement("button");
+          backBtn.id = "back-to-albums-btn";
+          backBtn.className = "back-to-albums-btn";
+          backBtn.addEventListener("click", handleBackToAlbums);
+          // Insert after the search tabs
+          const searchTabs = document.querySelector(".search-tabs");
+          searchTabs.parentNode.insertBefore(backBtn, searchTabs.nextSibling);
+        }
+        backBtn.textContent = "Back to Albums";
+        backBtn.style.display = "block";
+      }
+
+      function hideBackToAlbumsButton() {
+        const backBtn = document.getElementById("back-to-albums-btn");
+        if (backBtn) {
+          backBtn.style.display = "none";
+        }
+      }
+
+      function handleBackToAlbums() {
+        if (viewingAlbum && viewingAlbum.query) {
+          const query = viewingAlbum.query;
+          exitAlbumViewMode();
+          setActiveTab("albums");
+          updateUrlParams(query, "albums");
+          performSearch(query);
+        } else {
+          exitAlbumViewMode();
+          setActiveTab("albums");
+          updateUrlParams(searchInput.value.trim(), "albums");
+        }
+      }
+
+      function showStatus(message, isError = false) {
+        statusDiv.textContent = message;
+        statusDiv.className = "status " + (isError ? "error" : "info");
+        statusDiv.style.display = message ? "block" : "none";
+      }
+
+      // URL query parameter handling
+      function getQueryParam(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+      }
+
+      function updateUrlParams(query, tab, albumId = null) {
+        const url = new URL(window.location);
+        // Clear all explore-specific params when updating search/tab params
+        url.searchParams.delete("view");
+        url.searchParams.delete("country");
+        url.searchParams.delete("params");
+        url.searchParams.delete("title");
+        url.searchParams.delete("playlistId");
+        url.searchParams.delete("playlistTitle");
+        url.searchParams.delete("moodParams");
+        url.searchParams.delete("moodTitle");
+
+        if (query) {
+          url.searchParams.set("q", query);
+        } else {
+          url.searchParams.delete("q");
+        }
+        if (tab && tab !== "songs") {
+          url.searchParams.set("tab", tab);
+        } else {
+          url.searchParams.delete("tab");
+        }
+        if (albumId) {
+          url.searchParams.set("album", albumId);
+        } else {
+          url.searchParams.delete("album");
+        }
+        window.history.pushState({}, "", url);
+      }
+
+      // Update URL params for explore tab navigation states
+      // view: 'home' | 'charts' | 'mood' | 'playlist'
+      function updateExploreUrlParams(view, options = {}) {
+        const url = new URL(window.location);
+        // Clear search-specific params
+        url.searchParams.delete("q");
+        url.searchParams.delete("album");
+        // Always set tab=explore
+        url.searchParams.set("tab", "explore");
+        // Clear all explore-specific params first
+        url.searchParams.delete("view");
+        url.searchParams.delete("country");
+        url.searchParams.delete("params");
+        url.searchParams.delete("title");
+        url.searchParams.delete("playlistId");
+        url.searchParams.delete("playlistTitle");
+        url.searchParams.delete("moodParams");
+        url.searchParams.delete("moodTitle");
+
+        if (view && view !== "home") {
+          url.searchParams.set("view", view);
+        }
+        if (view === "charts" && options.country && options.country !== "ZZ") {
+          url.searchParams.set("country", options.country);
+        }
+        if (view === "mood") {
+          if (options.params) url.searchParams.set("params", options.params);
+          if (options.title) url.searchParams.set("title", options.title);
+        }
+        if (view === "playlist") {
+          if (options.playlistId)
+            url.searchParams.set("playlistId", options.playlistId);
+          if (options.playlistTitle)
+            url.searchParams.set("playlistTitle", options.playlistTitle);
+          // Preserve parent mood context for breadcrumb navigation
+          if (options.moodParams)
+            url.searchParams.set("moodParams", options.moodParams);
+          if (options.moodTitle)
+            url.searchParams.set("moodTitle", options.moodTitle);
+        }
+        window.history.pushState({}, "", url);
+      }
+
+      // Initialize tab from URL
+      function initTabFromUrl() {
+        const tab = getQueryParam("tab") || "songs";
+        if (tab === "songs" || tab === "albums" || tab === "explore") {
+          setActiveTab(tab);
+        }
+      }
+
+      // Set active tab (updates UI and currentTab variable)
+      const exploreResults = document.getElementById("explore-results");
+
+      function setActiveTab(tab, skipExploreLoad = false) {
+        currentTab = tab;
+        tabButtons.forEach((b) => {
+          if (b.dataset.tab === tab) {
+            b.classList.add("active");
+          } else {
+            b.classList.remove("active");
+          }
         });
 
-        // Handle browser back/forward
-        window.addEventListener('popstate', () => {
-            const query = getQueryParam('q');
-            const tab = getQueryParam('tab') || 'songs';
-            const albumId = getQueryParam('album');
+        songsResults.classList.remove("active");
+        albumsResults.classList.remove("active");
+        exploreResults.classList.remove("active");
 
-            // Handle album view state
-            if (albumId) {
-                // Restore album view mode
-                viewingAlbum = { id: albumId, query: query };
-                loadAlbumTracks(albumId, query);
-                return;
-            } else {
-                exitAlbumViewMode();
-            }
+        if (tab === "songs") {
+          songsResults.classList.add("active");
+        } else if (tab === "albums") {
+          albumsResults.classList.add("active");
+        } else if (tab === "explore") {
+          exploreResults.classList.add("active");
+          if (!skipExploreLoad) {
+            loadExploreContent();
+          }
+        }
+      }
 
-            // Handle explore tab state restoration from URL params
-            if (tab === 'explore') {
-                const view = getQueryParam('view');
-                if (view) {
-                    // Reset explore state before restoring
-                    exploreLoaded = false;
-                    exploreBreadcrumb = [];
-                    restoreExploreFromUrl();
-                    return;
-                }
-                // No view param means explore home - reset and reload
-                exploreLoaded = false;
-                exploreBreadcrumb = [];
-                setActiveTab('explore');
-                return;
-            }
+      // Auto-search on page load
+      function initAutoSearch() {
+        const query = getQueryParam("q");
+        const albumId = getQueryParam("album");
+        const tab = getQueryParam("tab") || "songs";
 
-            // Restore tab state
-            if (tab === 'songs' || tab === 'albums') {
-                setActiveTab(tab);
-            }
-
-            if (query) {
-                searchInput.value = query;
-                performSearch(query);
-            } else {
-                searchInput.value = '';
-                songsResults.innerHTML = '';
-                albumsResults.innerHTML = '';
-                showStatus('');
-            }
-        });
-
-        // Helper function to load album tracks (used by popstate handler)
-        async function loadAlbumTracks(browseId, originalQuery) {
-            try {
-                showStatus('Loading album tracks...');
-                const response = await fetch(`/api/album/${browseId}/tracks`);
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
-
-                const data = await response.json();
-                showStatus('');
-                viewingAlbum = {
-                    id: browseId,
-                    title: data.album_title,
-                    query: originalQuery
-                };
-
-                setActiveTab('songs');
-                showBackToAlbumsButton(data.album_title);
-                if (originalQuery) {
-                    searchInput.value = originalQuery;
-                }
-
-                renderResults(data.tracks);
-                showStatus(`Showing ${data.tracks.length} tracks from "${data.album_title}"`);
-            } catch (error) {
-                showStatus('Failed to load album: ' + error.message, true);
-                exitAlbumViewMode();
-            }
+        // If we have an album ID, load album tracks directly
+        if (albumId) {
+          if (query) {
+            searchInput.value = query;
+          }
+          loadAlbumTracks(albumId, query);
+          return;
         }
 
-        initAutoSearch();
+        // Restore explore tab state from URL params
+        if (tab === "explore") {
+          const restored = restoreExploreFromUrl();
+          if (restored) return;
+        }
 
-        function renderAlbums(albums) {
-            albumsResults.innerHTML = albums.map(album => `
+        initTabFromUrl();
+        if (query) {
+          searchInput.value = query;
+          performSearch(query);
+        }
+      }
+
+      // Restore explore navigation state from URL params on page load
+      // Returns true if a specific explore view was restored, false for default explore home
+      function restoreExploreFromUrl() {
+        const view = getQueryParam("view");
+        const country = getQueryParam("country");
+        const moodParams = getQueryParam("params");
+        const moodTitle = getQueryParam("title");
+        const playlistId = getQueryParam("playlistId");
+        const playlistTitle = getQueryParam("playlistTitle");
+        const parentMoodParams = getQueryParam("moodParams");
+        const parentMoodTitle = getQueryParam("moodTitle");
+
+        if (view === "charts") {
+          // Restore charts view with specific country (skipUrlUpdate since we're restoring from URL)
+          setActiveTab("explore", true);
+          loadExploreContentWithCountry(country || "ZZ", true);
+          return true;
+        } else if (view === "mood" && moodParams) {
+          // Restore mood playlists view (skipUrlUpdate since we're restoring from URL)
+          setActiveTab("explore", true);
+          loadMoodPlaylists(moodParams, moodTitle || "Category", true);
+          return true;
+        } else if (view === "playlist" && playlistId) {
+          // Restore playlist tracks view (with parent mood context if available)
+          setActiveTab("explore", true);
+          if (parentMoodParams) {
+            exploreBreadcrumb = [
+              {
+                type: "category",
+                title: parentMoodTitle || "Category",
+                params: parentMoodParams,
+              },
+            ];
+          }
+          loadPlaylistTracks(playlistId, playlistTitle || "Playlist", true);
+          return true;
+        }
+
+        // No specific explore view to restore; default explore home will load via setActiveTab
+        return false;
+      }
+
+      // Load explore home with a specific country for charts (used by URL restore and country selector)
+      // skipUrlUpdate: true when restoring from URL to avoid redundant pushState
+      async function loadExploreContentWithCountry(
+        country,
+        skipUrlUpdate = false,
+      ) {
+        exploreLoaded = true;
+        exploreBreadcrumb = [];
+        exploreResults.innerHTML =
+          '<div class="explore-loading">Loading explore content...</div>';
+
+        const [moodsResult, chartsResult] = await Promise.allSettled([
+          fetch("/api/explore/moods").then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          }),
+          fetch(
+            `/api/explore/charts?country=${encodeURIComponent(country)}`,
+          ).then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          }),
+        ]);
+
+        let moods =
+          moodsResult.status === "fulfilled" ? moodsResult.value : null;
+        let charts =
+          chartsResult.status === "fulfilled" ? chartsResult.value : null;
+
+        if (!moods && !charts) {
+          exploreResults.innerHTML =
+            '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
+          exploreLoaded = false;
+          return;
+        }
+
+        renderExploreHome(moods, charts, skipUrlUpdate);
+      }
+
+      // Extract search logic into reusable function
+      async function performSearch(query) {
+        showStatus("Searching...");
+        if (currentTab === "songs") {
+          songsResults.innerHTML = "";
+          await performSongSearch(query);
+        } else if (currentTab === "albums") {
+          albumsResults.innerHTML = "";
+          await performAlbumSearch(query);
+        }
+        // Explore tab doesn't use search
+      }
+
+      async function performSongSearch(query) {
+        try {
+          const response = await fetch(
+            `/api/search?q=${encodeURIComponent(query)}`,
+          );
+
+          if (!response.ok) {
+            const errorData = await response
+              .json()
+              .catch(() => ({ detail: "Unknown error" }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (data.results.length === 0) {
+            showStatus("No results found.");
+            return;
+          }
+
+          showStatus("");
+          renderResults(data.results);
+        } catch (error) {
+          showStatus("Search failed: " + error.message, true);
+        }
+      }
+
+      async function performAlbumSearch(query) {
+        try {
+          const response = await fetch(
+            `/api/search/albums?q=${encodeURIComponent(query)}`,
+          );
+
+          if (!response.ok) {
+            const errorData = await response
+              .json()
+              .catch(() => ({ detail: "Unknown error" }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          if (data.results.length === 0) {
+            showStatus("No albums found.");
+            return;
+          }
+          showStatus("");
+          renderAlbums(data.results);
+        } catch (error) {
+          showStatus("Album search failed: " + error.message, true);
+        }
+      }
+
+      searchForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const query = searchInput.value.trim();
+        if (!query) return;
+
+        updateUrlParams(query, currentTab);
+        performSearch(query);
+      });
+
+      // Handle browser back/forward
+      window.addEventListener("popstate", () => {
+        const query = getQueryParam("q");
+        const tab = getQueryParam("tab") || "songs";
+        const albumId = getQueryParam("album");
+
+        // Handle album view state
+        if (albumId) {
+          // Restore album view mode
+          viewingAlbum = { id: albumId, query: query };
+          loadAlbumTracks(albumId, query);
+          return;
+        } else {
+          exitAlbumViewMode();
+        }
+
+        // Handle explore tab state restoration from URL params
+        if (tab === "explore") {
+          const view = getQueryParam("view");
+          if (view) {
+            // Reset explore state before restoring
+            exploreLoaded = false;
+            exploreBreadcrumb = [];
+            restoreExploreFromUrl();
+            return;
+          }
+          // No view param means explore home - reset and reload
+          exploreLoaded = false;
+          exploreBreadcrumb = [];
+          setActiveTab("explore");
+          return;
+        }
+
+        // Restore tab state
+        if (tab === "songs" || tab === "albums") {
+          setActiveTab(tab);
+        }
+
+        if (query) {
+          searchInput.value = query;
+          performSearch(query);
+        } else {
+          searchInput.value = "";
+          songsResults.innerHTML = "";
+          albumsResults.innerHTML = "";
+          showStatus("");
+        }
+      });
+
+      // Helper function to load album tracks (used by popstate handler)
+      async function loadAlbumTracks(browseId, originalQuery) {
+        try {
+          showStatus("Loading album tracks...");
+          const response = await fetch(`/api/album/${browseId}/tracks`);
+
+          if (!response.ok) {
+            const errorData = await response
+              .json()
+              .catch(() => ({ detail: "Unknown error" }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          showStatus("");
+          viewingAlbum = {
+            id: browseId,
+            title: data.album_title,
+            query: originalQuery,
+          };
+
+          setActiveTab("songs");
+          showBackToAlbumsButton(data.album_title);
+          if (originalQuery) {
+            searchInput.value = originalQuery;
+          }
+
+          renderResults(data.tracks);
+          showStatus(
+            `Showing ${data.tracks.length} tracks from "${data.album_title}"`,
+          );
+        } catch (error) {
+          showStatus("Failed to load album: " + error.message, true);
+          exitAlbumViewMode();
+        }
+      }
+
+      initAutoSearch();
+
+      function renderAlbums(albums) {
+        albumsResults.innerHTML = albums
+          .map(
+            (album) => `
                 <div class="album-card">
-                    <img class="album-cover" src="${album.thumbnail_url || ''}" alt="${escapeHtml(album.title)}" onerror="this.style.display='none'">
+                    <img class="album-cover" src="${album.thumbnail_url || ""}" alt="${escapeHtml(album.title)}" onerror="this.style.display='none'">
                     <div class="album-info">
                         <div class="album-title">${escapeHtml(album.title)}</div>
                         <div class="album-artist">${escapeHtml(album.artist)}</div>
                         <div class="album-meta">
-                            ${album.year ? `<span>${album.year}</span>` : ''}
-                            ${album.track_count ? `<span>${album.track_count} tracks</span>` : ''}
+                            ${album.year ? `<span>${album.year}</span>` : ""}
+                            ${album.track_count ? `<span>${album.track_count} tracks</span>` : ""}
                         </div>
                     </div>
                     <div class="album-actions">
@@ -671,112 +742,120 @@
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `,
+          )
+          .join("");
 
-            document.querySelectorAll('.view-album-btn').forEach(btn => {
-                btn.addEventListener('click', handleViewAlbum);
-            });
-            document.querySelectorAll('.download-album-btn').forEach(btn => {
-                btn.addEventListener('click', handleDownloadAlbum);
-            });
+        document.querySelectorAll(".view-album-btn").forEach((btn) => {
+          btn.addEventListener("click", handleViewAlbum);
+        });
+        document.querySelectorAll(".download-album-btn").forEach((btn) => {
+          btn.addEventListener("click", handleDownloadAlbum);
+        });
+      }
+
+      async function handleViewAlbum(e) {
+        const browseId = e.target.dataset.browseId;
+        try {
+          showStatus("Loading album tracks...");
+          const response = await fetch(`/api/album/${browseId}/tracks`);
+
+          if (!response.ok) {
+            const errorData = await response
+              .json()
+              .catch(() => ({ detail: "Unknown error" }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          showStatus("");
+
+          // Store album view state
+          viewingAlbum = {
+            id: browseId,
+            title: data.album_title,
+            query: searchInput.value.trim(),
+          };
+
+          // Update URL to reflect we're viewing an album's tracks
+          updateUrlParams(searchInput.value.trim(), "songs", browseId);
+
+          setActiveTab("songs");
+          showBackToAlbumsButton(data.album_title);
+
+          renderResults(data.tracks);
+          showStatus(
+            `Showing ${data.tracks.length} tracks from "${data.album_title}"`,
+          );
+        } catch (error) {
+          showStatus("Failed to load album: " + error.message, true);
         }
+      }
 
-        async function handleViewAlbum(e) {
-            const browseId = e.target.dataset.browseId;
-            try {
-                showStatus('Loading album tracks...');
-                const response = await fetch(`/api/album/${browseId}/tracks`);
+      async function handleDownloadAlbum(e) {
+        const btn = e.target;
+        const browseId = btn.dataset.browseId;
+        const title = btn.dataset.title;
+        const artist = btn.dataset.artist;
+        const format = formatSelector.value;
 
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                    throw new Error(errorData.detail || `HTTP ${response.status}`);
-                }
+        btn.disabled = true;
+        btn.textContent = "Queuing...";
 
-                const data = await response.json();
-                showStatus('');
+        try {
+          const response = await fetch("/api/queue/add-album", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              browse_id: browseId,
+              album_title: title,
+              artist: artist,
+              audio_format: format,
+            }),
+          });
+          const data = await response.json();
 
-                // Store album view state
-                viewingAlbum = {
-                    id: browseId,
-                    title: data.album_title,
-                    query: searchInput.value.trim()
-                };
-
-                // Update URL to reflect we're viewing an album's tracks
-                updateUrlParams(searchInput.value.trim(), 'songs', browseId);
-
-                setActiveTab('songs');
-                showBackToAlbumsButton(data.album_title);
-
-                renderResults(data.tracks);
-                showStatus(`Showing ${data.tracks.length} tracks from "${data.album_title}"`);
-            } catch (error) {
-                showStatus('Failed to load album: ' + error.message, true);
-            }
+          if (response.ok) {
+            btn.textContent = `Queued (${data.track_count})`;
+            showStatus(`Added ${data.track_count} tracks to queue`);
+            setTimeout(() => {
+              btn.textContent = "Download Album";
+              btn.disabled = false;
+            }, 3000);
+          } else {
+            throw new Error(data.detail || "Unknown error");
+          }
+        } catch (error) {
+          btn.textContent = "Failed";
+          showStatus("Failed: " + error.message, true);
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = "Download Album";
+          }, 3000);
         }
+      }
 
-        async function handleDownloadAlbum(e) {
-            const btn = e.target;
-            const browseId = btn.dataset.browseId;
-            const title = btn.dataset.title;
-            const artist = btn.dataset.artist;
-            const format = formatSelector.value;
+      function renderResults(tracks) {
+        // Stop any playing audio when re-rendering results
+        stopCurrentAudio();
 
-            btn.disabled = true;
-            btn.textContent = 'Queuing...';
-
-            try {
-                const response = await fetch('/api/queue/add-album', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        browse_id: browseId,
-                        album_title: title,
-                        artist: artist,
-                        audio_format: format
-                    })
-                });
-                const data = await response.json();
-
-                if (response.ok) {
-                    btn.textContent = `Queued (${data.track_count})`;
-                    showStatus(`Added ${data.track_count} tracks to queue`);
-                    setTimeout(() => {
-                        btn.textContent = 'Download Album';
-                        btn.disabled = false;
-                    }, 3000);
-                } else {
-                    throw new Error(data.detail || 'Unknown error');
-                }
-            } catch (error) {
-                btn.textContent = 'Failed';
-                showStatus('Failed: ' + error.message, true);
-                setTimeout(() => {
-                    btn.disabled = false;
-                    btn.textContent = 'Download Album';
-                }, 3000);
-            }
-        }
-
-        function renderResults(tracks) {
-            // Stop any playing audio when re-rendering results
-            stopCurrentAudio();
-
-            songsResults.innerHTML = tracks.map(track => `
+        songsResults.innerHTML = tracks
+          .map(
+            (track) => `
                 <div class="track">
                     <div class="track-main">
                         <img
                             class="track-cover"
-                            src="${track.thumbnail_url || ''}"
+                            src="${track.thumbnail_url || ""}"
                             alt=""
                             loading="lazy"
                         >
                         <div class="track-info">
                             <div class="track-title">${escapeHtml(track.title)}</div>
-                            <div class="track-artist">${escapeHtml(track.artist)}${track.album ? ' - ' + escapeHtml(track.album) : ''}</div>
+                            <div class="track-artist">${escapeHtml(track.artist)}${track.album ? " - " + escapeHtml(track.album) : ""}</div>
                             <div class="track-meta">
                                 <span class="track-duration">${track.duration}</span>
-                                ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ''}
+                                ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ""}
                             </div>
                         </div>
                     </div>
@@ -801,192 +880,206 @@
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `,
+          )
+          .join("");
 
-            // Add play button handlers
-            document.querySelectorAll('.play-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const videoId = e.target.dataset.videoId;
-                    togglePlay(videoId, e.target);
-                });
-            });
-
-            // Add copy URL button handlers
-            document.querySelectorAll('.copy-url-btn').forEach(btn => {
-                btn.addEventListener('click', handleCopyUrl);
-            });
-
-            // Add download button handlers
-            document.querySelectorAll('.download-btn').forEach(btn => {
-                btn.addEventListener('click', handleDownload);
-            });
-        }
-
-        async function handleCopyUrl(e) {
+        // Add play button handlers
+        document.querySelectorAll(".play-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
             e.stopPropagation();
-            const btn = e.target;
-            const videoId = btn.dataset.videoId;
-            const url = `https://music.youtube.com/watch?v=${videoId}`;
-            const originalText = btn.textContent;
+            const videoId = e.target.dataset.videoId;
+            togglePlay(videoId, e.target);
+          });
+        });
 
-            try {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    await navigator.clipboard.writeText(url);
-                    btn.textContent = '✓';
-                    showStatus('URL copied to clipboard');
-                } else {
-                    // Fallback for older browsers
-                    const textarea = document.createElement('textarea');
-                    textarea.value = url;
-                    textarea.style.position = 'fixed';
-                    textarea.style.opacity = '0';
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    const success = document.execCommand('copy');
-                    document.body.removeChild(textarea);
+        // Add copy URL button handlers
+        document.querySelectorAll(".copy-url-btn").forEach((btn) => {
+          btn.addEventListener("click", handleCopyUrl);
+        });
 
-                    if (success) {
-                        btn.textContent = '✓';
-                        showStatus('URL copied to clipboard');
-                    } else {
-                        throw new Error('Copy command failed');
-                    }
-                }
+        // Add download button handlers
+        document.querySelectorAll(".download-btn").forEach((btn) => {
+          btn.addEventListener("click", handleDownload);
+        });
+      }
 
-                setTimeout(() => { btn.textContent = originalText; }, 2000);
-            } catch (error) {
-                console.error('Failed to copy URL:', error);
-                btn.textContent = '✗';
-                showStatus('Failed to copy URL: ' + error.message, true);
-                setTimeout(() => { btn.textContent = originalText; }, 2000);
+      async function handleCopyUrl(e) {
+        e.stopPropagation();
+        const btn = e.target;
+        const videoId = btn.dataset.videoId;
+        const url = `https://music.youtube.com/watch?v=${videoId}`;
+        const originalText = btn.textContent;
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+            btn.textContent = "✓";
+            showStatus("URL copied to clipboard");
+          } else {
+            // Fallback for older browsers
+            const textarea = document.createElement("textarea");
+            textarea.value = url;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            const success = document.execCommand("copy");
+            document.body.removeChild(textarea);
+
+            if (success) {
+              btn.textContent = "✓";
+              showStatus("URL copied to clipboard");
+            } else {
+              throw new Error("Copy command failed");
             }
+          }
+
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
+        } catch (error) {
+          console.error("Failed to copy URL:", error);
+          btn.textContent = "✗";
+          showStatus("Failed to copy URL: " + error.message, true);
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
+        }
+      }
+
+      async function handleDownload(e) {
+        e.stopPropagation();
+        const btn = e.target;
+        const videoId = btn.dataset.videoId;
+        const title = btn.dataset.title;
+        const artist = btn.dataset.artist;
+        const format = formatSelector.value;
+
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = "Adding...";
+
+        try {
+          const response = await fetch("/api/queue/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              video_id: videoId,
+              title,
+              artist,
+              audio_format: format,
+            }),
+          });
+          const data = await response.json();
+
+          if (response.ok) {
+            btn.textContent = "Queued";
+            showStatus(`Added to queue: ${title}`);
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.disabled = false;
+            }, 2000);
+          } else {
+            btn.textContent = "Failed";
+            showStatus("Failed to add to queue", true);
+            setTimeout(() => {
+              btn.disabled = false;
+              btn.textContent = originalText;
+            }, 3000);
+          }
+        } catch (error) {
+          btn.textContent = "Error";
+          showStatus("Failed to add to queue: " + error.message, true);
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = originalText;
+          }, 3000);
+        }
+      }
+
+      // Queue Management
+      let eventSource = null;
+
+      function initQueue() {
+        // Connect to SSE endpoint for real-time updates
+        eventSource = new EventSource("/api/queue/stream");
+
+        eventSource.onmessage = (event) => {
+          const jobs = JSON.parse(event.data);
+          updateQueueUI(jobs);
+        };
+
+        eventSource.onerror = (error) => {
+          console.error("SSE error:", error);
+          // Reconnect after 5 seconds
+          setTimeout(() => {
+            if (eventSource) {
+              eventSource.close();
+            }
+            initQueue();
+          }, 5000);
+        };
+
+        // Load initial queue
+        fetchQueue();
+      }
+
+      async function fetchQueue() {
+        try {
+          const response = await fetch("/api/queue/jobs");
+          const data = await response.json();
+          updateQueueUI(data.jobs);
+        } catch (error) {
+          console.error("Failed to fetch queue:", error);
+        }
+      }
+
+      function updateQueueUI(jobs) {
+        const queueList = document.getElementById("queue-list");
+        const queueSection = document.getElementById("queue-section");
+
+        if (jobs.length === 0) {
+          queueSection.style.display = "none";
+          return;
         }
 
-        async function handleDownload(e) {
-            e.stopPropagation();
-            const btn = e.target;
-            const videoId = btn.dataset.videoId;
-            const title = btn.dataset.title;
-            const artist = btn.dataset.artist;
-            const format = formatSelector.value;
+        queueSection.style.display = "block";
 
-            btn.disabled = true;
-            const originalText = btn.textContent;
-            btn.textContent = 'Adding...';
+        queueList.innerHTML = jobs
+          .map((job) => {
+            const statusClass = job.status.toLowerCase();
+            let progressHtml = "";
+            let actionsHtml = "";
 
-            try {
-                const response = await fetch('/api/queue/add', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ video_id: videoId, title, artist, audio_format: format })
-                });
-                const data = await response.json();
-
-                if (response.ok) {
-                    btn.textContent = 'Queued';
-                    showStatus(`Added to queue: ${title}`);
-                    setTimeout(() => {
-                        btn.textContent = originalText;
-                        btn.disabled = false;
-                    }, 2000);
-                } else {
-                    btn.textContent = 'Failed';
-                    showStatus('Failed to add to queue', true);
-                    setTimeout(() => {
-                        btn.disabled = false;
-                        btn.textContent = originalText;
-                    }, 3000);
-                }
-            } catch (error) {
-                btn.textContent = 'Error';
-                showStatus('Failed to add to queue: ' + error.message, true);
-                setTimeout(() => {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
-                }, 3000);
-            }
-        }
-
-        // Queue Management
-        let eventSource = null;
-
-        function initQueue() {
-            // Connect to SSE endpoint for real-time updates
-            eventSource = new EventSource('/api/queue/stream');
-
-            eventSource.onmessage = (event) => {
-                const jobs = JSON.parse(event.data);
-                updateQueueUI(jobs);
-            };
-
-            eventSource.onerror = (error) => {
-                console.error('SSE error:', error);
-                // Reconnect after 5 seconds
-                setTimeout(() => {
-                    if (eventSource) {
-                        eventSource.close();
-                    }
-                    initQueue();
-                }, 5000);
-            };
-
-            // Load initial queue
-            fetchQueue();
-        }
-
-        async function fetchQueue() {
-            try {
-                const response = await fetch('/api/queue/jobs');
-                const data = await response.json();
-                updateQueueUI(data.jobs);
-            } catch (error) {
-                console.error('Failed to fetch queue:', error);
-            }
-        }
-
-        function updateQueueUI(jobs) {
-            const queueList = document.getElementById('queue-list');
-            const queueSection = document.getElementById('queue-section');
-
-            if (jobs.length === 0) {
-                queueSection.style.display = 'none';
-                return;
-            }
-
-            queueSection.style.display = 'block';
-
-            queueList.innerHTML = jobs.map(job => {
-                const statusClass = job.status.toLowerCase();
-                let progressHtml = '';
-                let actionsHtml = '';
-
-                if (job.status === 'downloading') {
-                    progressHtml = `
+            if (job.status === "downloading") {
+              progressHtml = `
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${job.progress}%"></div>
                             <span class="progress-text">${job.progress.toFixed(1)}% - ${job.speed} - ${job.eta}</span>
                         </div>
                     `;
-                }
+            }
 
-                if (job.status === 'completed' && job.file_path) {
-                    actionsHtml = `
+            if (job.status === "completed" && job.file_path) {
+              actionsHtml = `
                         <a href="/api/download-file/${encodeURIComponent(job.file_path)}" class="download-file-btn" download>
                             💾 Save to Computer
                         </a>
                     `;
-                }
+            }
 
-                if (job.status === 'completed' || job.status === 'failed') {
-                    actionsHtml += `
+            if (job.status === "completed" || job.status === "failed") {
+              actionsHtml += `
                         <button class="clear-job-btn" data-job-id="${job.id}">Clear</button>
                     `;
-                }
+            }
 
-                const errorHtml = job.error ? `<div class="job-error">${escapeHtml(job.error)}</div>` : '';
+            const errorHtml = job.error
+              ? `<div class="job-error">${escapeHtml(job.error)}</div>`
+              : "";
 
-                return `
+            return `
                     <div class="job-card ${statusClass}">
                         <div class="job-header">
                             <div class="job-info">
@@ -1000,486 +1093,532 @@
                         ${actionsHtml}
                     </div>
                 `;
-            }).join('');
+          })
+          .join("");
 
-            // Add clear button handlers
-            document.querySelectorAll('.clear-job-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const jobId = e.target.dataset.jobId;
-                    await removeJob(jobId);
-                });
-            });
+        // Add clear button handlers
+        document.querySelectorAll(".clear-job-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            const jobId = e.target.dataset.jobId;
+            await removeJob(jobId);
+          });
+        });
+      }
+
+      async function removeJob(jobId) {
+        try {
+          await fetch(`/api/queue/${jobId}`, { method: "DELETE" });
+        } catch (error) {
+          console.error("Failed to remove job:", error);
+          showStatus("Failed to remove job", true);
         }
+      }
 
-        async function removeJob(jobId) {
-            try {
-                await fetch(`/api/queue/${jobId}`, { method: 'DELETE' });
-            } catch (error) {
-                console.error('Failed to remove job:', error);
-                showStatus('Failed to remove job', true);
+      async function clearCompleted() {
+        try {
+          const response = await fetch("/api/queue/jobs");
+          const data = await response.json();
+          for (const job of data.jobs) {
+            if (job.status === "completed" || job.status === "failed") {
+              await removeJob(job.id);
             }
+          }
+        } catch (error) {
+          console.error("Failed to clear completed:", error);
+          showStatus("Failed to clear completed jobs", true);
         }
+      }
 
-        async function clearCompleted() {
-            try {
-                const response = await fetch('/api/queue/jobs');
-                const data = await response.json();
-                for (const job of data.jobs) {
-                    if (job.status === 'completed' || job.status === 'failed') {
-                        await removeJob(job.id);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to clear completed:', error);
-                showStatus('Failed to clear completed jobs', true);
-            }
+      document
+        .getElementById("clear-completed-btn")
+        .addEventListener("click", clearCompleted);
+
+      // Initialize queue on page load
+      initQueue();
+
+      // Settings modal management
+      const settingsBtn = document.getElementById("settings-btn");
+      const settingsModal = document.getElementById("settings-modal");
+      const modalClose = settingsModal.querySelector(".modal-close");
+      const cookieFileInput = document.getElementById("cookie-file-input");
+      const uploadCookieBtn = document.getElementById("upload-cookie-btn");
+      const deleteCookieBtn = document.getElementById("delete-cookie-btn");
+      const cookieStatus = document.getElementById("cookie-status");
+
+      // Open settings
+      settingsBtn.addEventListener("click", async () => {
+        settingsModal.classList.add("active");
+        await refreshCookieStatus();
+      });
+
+      // Close settings
+      modalClose.addEventListener("click", () => {
+        settingsModal.classList.remove("active");
+      });
+      settingsModal.addEventListener("click", (e) => {
+        if (e.target === settingsModal) {
+          settingsModal.classList.remove("active");
         }
+      });
 
-        document.getElementById('clear-completed-btn').addEventListener('click', clearCompleted);
+      // Refresh cookie status
+      async function refreshCookieStatus() {
+        try {
+          const response = await fetch("/api/settings/cookies/status");
+          const data = await response.json();
 
-        // Initialize queue on page load
-        initQueue();
+          const indicator = cookieStatus.querySelector(".status-indicator");
+          const text = cookieStatus.querySelector(".status-text");
 
-        // Settings modal management
-        const settingsBtn = document.getElementById('settings-btn');
-        const settingsModal = document.getElementById('settings-modal');
-        const modalClose = settingsModal.querySelector('.modal-close');
-        const cookieFileInput = document.getElementById('cookie-file-input');
-        const uploadCookieBtn = document.getElementById('upload-cookie-btn');
-        const deleteCookieBtn = document.getElementById('delete-cookie-btn');
-        const cookieStatus = document.getElementById('cookie-status');
+          if (data.configured && data.exists) {
+            indicator.className = "status-indicator status-success";
+            text.textContent = `Cookie file configured (${data.source})`;
+            deleteCookieBtn.style.display =
+              data.source === "uploaded" ? "inline-block" : "none";
+          } else if (data.configured && !data.exists) {
+            indicator.className = "status-indicator status-warning";
+            text.textContent = `Cookie file configured but not found`;
+            deleteCookieBtn.style.display = "none";
+          } else {
+            indicator.className = "status-indicator status-none";
+            text.textContent = "No cookie file configured";
+            deleteCookieBtn.style.display = "none";
+          }
+        } catch (error) {
+          console.error("Failed to get cookie status:", error);
+          const indicator = cookieStatus.querySelector(".status-indicator");
+          const text = cookieStatus.querySelector(".status-text");
+          indicator.className = "status-indicator status-error";
+          text.textContent = "Error checking cookie status";
+        }
+      }
 
-        // Open settings
-        settingsBtn.addEventListener('click', async () => {
-            settingsModal.classList.add('active');
+      // Upload cookie file
+      uploadCookieBtn.addEventListener("click", () => {
+        cookieFileInput.click();
+      });
+
+      cookieFileInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        uploadCookieBtn.disabled = true;
+        uploadCookieBtn.textContent = "Uploading...";
+
+        try {
+          const response = await fetch("/api/settings/cookies/upload", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await response.json();
+
+          if (response.ok) {
+            showStatus("Cookie file uploaded successfully");
             await refreshCookieStatus();
-        });
+          } else {
+            throw new Error(data.detail || "Upload failed");
+          }
+        } catch (error) {
+          showStatus("Failed to upload cookie file: " + error.message, true);
+        } finally {
+          uploadCookieBtn.disabled = false;
+          uploadCookieBtn.textContent = "Upload cookies.txt";
+          cookieFileInput.value = "";
+        }
+      });
 
-        // Close settings
-        modalClose.addEventListener('click', () => {
-            settingsModal.classList.remove('active');
-        });
-        settingsModal.addEventListener('click', (e) => {
-            if (e.target === settingsModal) {
-                settingsModal.classList.remove('active');
-            }
-        });
-
-        // Refresh cookie status
-        async function refreshCookieStatus() {
-            try {
-                const response = await fetch('/api/settings/cookies/status');
-                const data = await response.json();
-
-                const indicator = cookieStatus.querySelector('.status-indicator');
-                const text = cookieStatus.querySelector('.status-text');
-
-                if (data.configured && data.exists) {
-                    indicator.className = 'status-indicator status-success';
-                    text.textContent = `Cookie file configured (${data.source})`;
-                    deleteCookieBtn.style.display = data.source === 'uploaded' ? 'inline-block' : 'none';
-                } else if (data.configured && !data.exists) {
-                    indicator.className = 'status-indicator status-warning';
-                    text.textContent = `Cookie file configured but not found`;
-                    deleteCookieBtn.style.display = 'none';
-                } else {
-                    indicator.className = 'status-indicator status-none';
-                    text.textContent = 'No cookie file configured';
-                    deleteCookieBtn.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Failed to get cookie status:', error);
-                const indicator = cookieStatus.querySelector('.status-indicator');
-                const text = cookieStatus.querySelector('.status-text');
-                indicator.className = 'status-indicator status-error';
-                text.textContent = 'Error checking cookie status';
-            }
+      // Delete cookie file
+      deleteCookieBtn.addEventListener("click", async () => {
+        if (
+          !confirm("Are you sure you want to delete the uploaded cookie file?")
+        ) {
+          return;
         }
 
-        // Upload cookie file
-        uploadCookieBtn.addEventListener('click', () => {
-            cookieFileInput.click();
-        });
+        deleteCookieBtn.disabled = true;
+        deleteCookieBtn.textContent = "Deleting...";
 
-        cookieFileInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
+        try {
+          const response = await fetch("/api/settings/cookies", {
+            method: "DELETE",
+          });
+          const data = await response.json();
 
-            const formData = new FormData();
-            formData.append('file', file);
+          if (response.ok) {
+            showStatus("Cookie file deleted successfully");
+            await refreshCookieStatus();
+          } else {
+            throw new Error(data.detail || "Delete failed");
+          }
+        } catch (error) {
+          showStatus("Failed to delete cookie file: " + error.message, true);
+        } finally {
+          deleteCookieBtn.disabled = false;
+          deleteCookieBtn.textContent = "Delete Cookie File";
+        }
+      });
 
-            uploadCookieBtn.disabled = true;
-            uploadCookieBtn.textContent = 'Uploading...';
+      // --- Cron config generation ---
 
-            try {
-                const response = await fetch('/api/settings/cookies/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
+      // Country code to human-readable name mapping for cron config key generation
+      const COUNTRY_NAMES = {
+        ZZ: "global",
+        US: "united-states",
+        GB: "united-kingdom",
+        DE: "germany",
+        FR: "france",
+        JP: "japan",
+        KR: "south-korea",
+        BR: "brazil",
+        IN: "india",
+        AU: "australia",
+        CA: "canada",
+      };
 
-                if (response.ok) {
-                    showStatus('Cookie file uploaded successfully');
-                    await refreshCookieStatus();
-                } else {
-                    throw new Error(data.detail || 'Upload failed');
-                }
-            } catch (error) {
-                showStatus('Failed to upload cookie file: ' + error.message, true);
-            } finally {
-                uploadCookieBtn.disabled = false;
-                uploadCookieBtn.textContent = 'Upload cookies.txt';
-                cookieFileInput.value = '';
-            }
-        });
+      function generateCronYaml(type, options) {
+        // Generate a YAML snippet for cron.yaml explore section
+        // type: "charts" or "mood"
+        // options: { country, title, params, playlistId }
+        if (type === "charts") {
+          const country = options.country || "ZZ";
+          const nameBase = COUNTRY_NAMES[country] || country.toLowerCase();
+          const key = nameBase + "-charts";
+          let yaml = `${key}:\n`;
+          yaml += `  type: charts\n`;
+          if (country !== "ZZ") {
+            yaml += `  country: ${country}\n`;
+          }
+          yaml += `  sync: true\n`;
+          yaml += `  schedule: "0 6 * * *"\n`;
+          yaml += `  limit: 10`;
+          return yaml;
+        } else if (type === "mood") {
+          const title = options.title || "mood";
+          const params = options.params || "";
+          const playlistId = options.playlistId || "";
+          // Sanitize title into a valid cron key: lowercase, replace spaces/special chars with dashes
+          const key =
+            title
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "") || "mood";
+          let yaml = `${key}:\n`;
+          yaml += `  type: mood\n`;
+          yaml += `  params: "${params}"\n`;
+          if (playlistId) {
+            yaml += `  playlist_id: "${playlistId}"\n`;
+          }
+          yaml += `  sync: true\n`;
+          yaml += `  schedule: "0 6 * * *"`;
+          return yaml;
+        }
+        return "";
+      }
 
-        // Delete cookie file
-        deleteCookieBtn.addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to delete the uploaded cookie file?')) {
-                return;
-            }
+      async function copyCronConfig(yamlSnippet, btn) {
+        const originalText = btn.textContent;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(yamlSnippet);
+          } else {
+            // Fallback for older browsers
+            const textarea = document.createElement("textarea");
+            textarea.value = yamlSnippet;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            const success = document.execCommand("copy");
+            document.body.removeChild(textarea);
+            if (!success) throw new Error("Copy command failed");
+          }
 
-            deleteCookieBtn.disabled = true;
-            deleteCookieBtn.textContent = 'Deleting...';
+          btn.textContent = "Copied!";
+          btn.classList.add("cron-copied");
+          showStatus("Cron config copied to clipboard");
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.classList.remove("cron-copied");
+          }, 2000);
+        } catch (error) {
+          console.error("Failed to copy cron config:", error);
+          btn.textContent = "Failed";
+          showStatus("Failed to copy cron config: " + error.message, true);
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 2000);
+        }
+      }
 
-            try {
-                const response = await fetch('/api/settings/cookies', {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
+      // --- Explore functionality ---
+      let exploreLoaded = false;
+      let exploreBreadcrumb = []; // tracks navigation: [{type, title, params?}]
 
-                if (response.ok) {
-                    showStatus('Cookie file deleted successfully');
-                    await refreshCookieStatus();
-                } else {
-                    throw new Error(data.detail || 'Delete failed');
-                }
-            } catch (error) {
-                showStatus('Failed to delete cookie file: ' + error.message, true);
-            } finally {
-                deleteCookieBtn.disabled = false;
-                deleteCookieBtn.textContent = 'Delete Cookie File';
-            }
-        });
+      async function loadExploreContent() {
+        if (exploreLoaded && exploreBreadcrumb.length === 0) return;
+        if (exploreBreadcrumb.length > 0) return; // Don't reload if navigating
 
-        // --- Cron config generation ---
+        exploreLoaded = true;
+        exploreResults.innerHTML =
+          '<div class="explore-loading">Loading explore content...</div>';
 
-        // Country code to human-readable name mapping for cron config key generation
-        const COUNTRY_NAMES = {
-            'ZZ': 'global', 'US': 'united-states', 'GB': 'united-kingdom',
-            'DE': 'germany', 'FR': 'france', 'JP': 'japan', 'KR': 'south-korea',
-            'BR': 'brazil', 'IN': 'india', 'AU': 'australia', 'CA': 'canada'
-        };
+        // Fetch moods and charts independently so one failure does not block the other
+        let moods = null;
+        let charts = null;
 
-        function generateCronYaml(type, options) {
-            // Generate a YAML snippet for cron.yaml explore section
-            // type: "charts" or "mood"
-            // options: { country, title, params, playlistId }
-            if (type === 'charts') {
-                const country = options.country || 'ZZ';
-                const nameBase = COUNTRY_NAMES[country] || country.toLowerCase();
-                const key = nameBase + '-charts';
-                let yaml = `${key}:\n`;
-                yaml += `  type: charts\n`;
-                if (country !== 'ZZ') {
-                    yaml += `  country: ${country}\n`;
-                }
-                yaml += `  sync: true\n`;
-                yaml += `  schedule: "0 6 * * *"\n`;
-                yaml += `  limit: 10`;
-                return yaml;
-            } else if (type === 'mood') {
-                const title = options.title || 'mood';
-                const params = options.params || '';
-                const playlistId = options.playlistId || '';
-                // Sanitize title into a valid cron key: lowercase, replace spaces/special chars with dashes
-                const key = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mood';
-                let yaml = `${key}:\n`;
-                yaml += `  type: mood\n`;
-                yaml += `  params: "${params}"\n`;
-                if (playlistId) {
-                    yaml += `  playlist_id: "${playlistId}"\n`;
-                }
-                yaml += `  sync: true\n`;
-                yaml += `  schedule: "0 6 * * *"`;
-                return yaml;
-            }
-            return '';
+        const [moodsResult, chartsResult] = await Promise.allSettled([
+          fetch("/api/explore/moods").then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          }),
+          fetch("/api/explore/charts?country=ZZ").then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          }),
+        ]);
+
+        if (moodsResult.status === "fulfilled") {
+          moods = moodsResult.value;
+        } else {
+          console.error("Failed to load moods:", moodsResult.reason);
         }
 
-        async function copyCronConfig(yamlSnippet, btn) {
-            const originalText = btn.textContent;
-            try {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    await navigator.clipboard.writeText(yamlSnippet);
-                } else {
-                    // Fallback for older browsers
-                    const textarea = document.createElement('textarea');
-                    textarea.value = yamlSnippet;
-                    textarea.style.position = 'fixed';
-                    textarea.style.opacity = '0';
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    const success = document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                    if (!success) throw new Error('Copy command failed');
-                }
-
-                btn.textContent = 'Copied!';
-                btn.classList.add('cron-copied');
-                showStatus('Cron config copied to clipboard');
-                setTimeout(() => {
-                    btn.textContent = originalText;
-                    btn.classList.remove('cron-copied');
-                }, 2000);
-            } catch (error) {
-                console.error('Failed to copy cron config:', error);
-                btn.textContent = 'Failed';
-                showStatus('Failed to copy cron config: ' + error.message, true);
-                setTimeout(() => { btn.textContent = originalText; }, 2000);
-            }
+        if (chartsResult.status === "fulfilled") {
+          charts = chartsResult.value;
+        } else {
+          console.error("Failed to load charts:", chartsResult.reason);
         }
 
-        // --- Explore functionality ---
-        let exploreLoaded = false;
-        let exploreBreadcrumb = []; // tracks navigation: [{type, title, params?}]
-
-        async function loadExploreContent() {
-            if (exploreLoaded && exploreBreadcrumb.length === 0) return;
-            if (exploreBreadcrumb.length > 0) return; // Don't reload if navigating
-
-            exploreLoaded = true;
-            exploreResults.innerHTML = '<div class="explore-loading">Loading explore content...</div>';
-
-            // Fetch moods and charts independently so one failure does not block the other
-            let moods = null;
-            let charts = null;
-
-            const [moodsResult, chartsResult] = await Promise.allSettled([
-                fetch('/api/explore/moods').then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
-                }),
-                fetch('/api/explore/charts?country=ZZ').then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
-                }),
-            ]);
-
-            if (moodsResult.status === 'fulfilled') {
-                moods = moodsResult.value;
-            } else {
-                console.error('Failed to load moods:', moodsResult.reason);
-            }
-
-            if (chartsResult.status === 'fulfilled') {
-                charts = chartsResult.value;
-            } else {
-                console.error('Failed to load charts:', chartsResult.reason);
-            }
-
-            if (!moods && !charts) {
-                exploreResults.innerHTML = '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
-                exploreLoaded = false;
-                return;
-            }
-
-            renderExploreHome(moods, charts);
+        if (!moods && !charts) {
+          exploreResults.innerHTML =
+            '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
+          exploreLoaded = false;
+          return;
         }
 
-        function renderExploreHome(moods, charts, skipUrlUpdate = false) {
-            exploreBreadcrumb = [];
-            // Cache moods so country selector changes skip re-fetching them
-            if (moods) {
-                cachedMoods = moods;
-            }
-            // Update URL to reflect charts country if not ZZ
-            if (!skipUrlUpdate) {
-                const chartsCountryCode = (charts && charts.country) ? charts.country : 'ZZ';
-                if (chartsCountryCode !== 'ZZ') {
-                    updateExploreUrlParams('charts', { country: chartsCountryCode });
-                } else {
-                    updateExploreUrlParams('home');
-                }
-            }
-            let html = '<div class="explore-home">';
+        renderExploreHome(moods, charts);
+      }
 
-            // Charts section -- always render the header with country selector
-            const chartsCountry = (charts && charts.country) ? charts.country : 'ZZ';
-            const chartTracks = (charts && charts.tracks) ? charts.tracks : [];
+      function renderExploreHome(moods, charts, skipUrlUpdate = false) {
+        exploreBreadcrumb = [];
+        // Cache moods so country selector changes skip re-fetching them
+        if (moods) {
+          cachedMoods = moods;
+        }
+        // Update URL to reflect charts country if not ZZ
+        if (!skipUrlUpdate) {
+          const chartsCountryCode =
+            charts && charts.country ? charts.country : "ZZ";
+          if (chartsCountryCode !== "ZZ") {
+            updateExploreUrlParams("charts", { country: chartsCountryCode });
+          } else {
+            updateExploreUrlParams("home");
+          }
+        }
+        let html = '<div class="explore-home">';
 
-            html += `
+        // Charts section -- always render the header with country selector
+        const chartsCountry = charts && charts.country ? charts.country : "ZZ";
+        const chartTracks = charts && charts.tracks ? charts.tracks : [];
+
+        html += `
                 <div class="explore-charts-section">
                     <div class="explore-section-header">
-                        <h2>Top Charts (${escapeHtml(chartsCountry === 'ZZ' ? 'Global' : chartsCountry)})</h2>
+                        <h2>Top Charts (${escapeHtml(chartsCountry === "ZZ" ? "Global" : chartsCountry)})</h2>
                         <div class="explore-section-actions">
                             <select id="charts-country-selector" class="country-selector">
-                                <option value="ZZ" ${chartsCountry === 'ZZ' ? 'selected' : ''}>Global</option>
-                                <option value="US" ${chartsCountry === 'US' ? 'selected' : ''}>United States</option>
-                                <option value="GB" ${chartsCountry === 'GB' ? 'selected' : ''}>United Kingdom</option>
-                                <option value="DE" ${chartsCountry === 'DE' ? 'selected' : ''}>Germany</option>
-                                <option value="FR" ${chartsCountry === 'FR' ? 'selected' : ''}>France</option>
-                                <option value="JP" ${chartsCountry === 'JP' ? 'selected' : ''}>Japan</option>
-                                <option value="KR" ${chartsCountry === 'KR' ? 'selected' : ''}>South Korea</option>
-                                <option value="BR" ${chartsCountry === 'BR' ? 'selected' : ''}>Brazil</option>
-                                <option value="IN" ${chartsCountry === 'IN' ? 'selected' : ''}>India</option>
-                                <option value="AU" ${chartsCountry === 'AU' ? 'selected' : ''}>Australia</option>
-                                <option value="CA" ${chartsCountry === 'CA' ? 'selected' : ''}>Canada</option>
+                                <option value="ZZ" ${chartsCountry === "ZZ" ? "selected" : ""}>Global</option>
+                                <option value="US" ${chartsCountry === "US" ? "selected" : ""}>United States</option>
+                                <option value="GB" ${chartsCountry === "GB" ? "selected" : ""}>United Kingdom</option>
+                                <option value="DE" ${chartsCountry === "DE" ? "selected" : ""}>Germany</option>
+                                <option value="FR" ${chartsCountry === "FR" ? "selected" : ""}>France</option>
+                                <option value="JP" ${chartsCountry === "JP" ? "selected" : ""}>Japan</option>
+                                <option value="KR" ${chartsCountry === "KR" ? "selected" : ""}>South Korea</option>
+                                <option value="BR" ${chartsCountry === "BR" ? "selected" : ""}>Brazil</option>
+                                <option value="IN" ${chartsCountry === "IN" ? "selected" : ""}>India</option>
+                                <option value="AU" ${chartsCountry === "AU" ? "selected" : ""}>Australia</option>
+                                <option value="CA" ${chartsCountry === "CA" ? "selected" : ""}>Canada</option>
                             </select>
-                            ${chartTracks.length > 0 ? '<button class="download-all-btn" id="download-all-charts">Download All</button>' : ''}
+                            ${chartTracks.length > 0 ? '<button class="download-all-btn" id="download-all-charts">Download All</button>' : ""}
                             <button class="cron-btn" id="cron-charts-btn" data-country="${chartsCountry}" aria-label="Copy cron config" title="Copy cron.yaml config for this chart">+ Cron</button>
                         </div>
                     </div>
             `;
 
-            if (chartTracks.length > 0) {
-                html += `
+        if (chartTracks.length > 0) {
+          html += `
                     <div class="chart-tracks-list">
-                        ${chartTracks.map((track, idx) => `
+                        ${chartTracks
+                          .map(
+                            (track, idx) => `
                             <div class="track chart-track">
-                                <span class="chart-rank">${track.rank || (idx + 1)}</span>
+                                <span class="chart-rank">${track.rank || idx + 1}</span>
                                 <div class="track-main">
-                                    <img class="track-cover" src="${track.thumbnail_url || ''}" alt="" loading="lazy" onerror="this.style.display='none'">
+                                    <img class="track-cover" src="${track.thumbnail_url || ""}" alt="" loading="lazy" onerror="this.style.display='none'">
                                     <div class="track-info">
                                         <div class="track-title">${escapeHtml(track.title)}</div>
                                         <div class="track-artist">${escapeHtml(track.artist)}</div>
                                         <div class="track-meta">
-                                            ${track.duration ? `<span class="track-duration">${track.duration}</span>` : ''}
-                                            ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ''}
+                                            ${track.duration ? `<span class="track-duration">${track.duration}</span>` : ""}
+                                            ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ""}
                                         </div>
                                     </div>
                                 </div>
-                                ${track.trend ? `<span class="chart-trend trend-${track.trend}">${track.trend === 'up' ? '&#9650;' : track.trend === 'down' ? '&#9660;' : '&#8212;'}</span>` : ''}
+                                ${track.trend ? `<span class="chart-trend trend-${track.trend}">${track.trend === "up" ? "&#9650;" : track.trend === "down" ? "&#9660;" : "&#8212;"}</span>` : ""}
                                 <div class="track-actions">
                                     <button class="play-btn" data-video-id="${track.video_id}" aria-label="Play preview">&#9654;</button>
                                     <button class="copy-url-btn" data-video-id="${track.video_id}" aria-label="Copy URL" title="Copy YouTube Music URL">&#128279;</button>
                                     <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>
                                 </div>
                             </div>
-                        `).join('')}
+                        `,
+                          )
+                          .join("")}
                     </div>
                 `;
-            } else {
-                html += '<div class="explore-charts-empty">No chart tracks available. Try selecting a different country.</div>';
-            }
+        } else {
+          html +=
+            '<div class="explore-charts-empty">No chart tracks available. Try selecting a different country.</div>';
+        }
 
-            html += '</div>';
+        html += "</div>";
 
-            // Moods & Genres section
-            if (moods && moods.length > 0) {
-                html += '<div class="explore-moods-section">';
-                for (const section of moods) {
-                    html += `
+        // Moods & Genres section
+        if (moods && moods.length > 0) {
+          html += '<div class="explore-moods-section">';
+          for (const section of moods) {
+            html += `
                         <div class="mood-section">
                             <h2>${escapeHtml(section.title)}</h2>
                             <div class="mood-categories-grid">
-                                ${section.categories.map(cat => `
+                                ${section.categories
+                                  .map(
+                                    (cat) => `
                                     <button class="mood-category-card" data-params="${escapeHtml(cat.params)}" data-title="${escapeHtml(cat.title)}">
                                         ${escapeHtml(cat.title)}
                                     </button>
-                                `).join('')}
+                                `,
+                                  )
+                                  .join("")}
                             </div>
                         </div>
                     `;
-                }
-                html += '</div>';
-            }
-
-            html += '</div>';
-            exploreResults.innerHTML = html;
-            attachExploreHandlers(charts);
+          }
+          html += "</div>";
         }
 
-        // Cache moods data so country selector changes do not re-fetch moods
-        let cachedMoods = null;
+        html += "</div>";
+        exploreResults.innerHTML = html;
+        attachExploreHandlers(charts);
+      }
 
-        function attachExploreHandlers(charts) {
-            // Country selector
-            const countrySelector = document.getElementById('charts-country-selector');
-            if (countrySelector) {
-                countrySelector.addEventListener('change', async (e) => {
-                    const country = e.target.value;
-                    showStatus('Loading charts...');
-                    try {
-                        const res = await fetch(`/api/explore/charts?country=${encodeURIComponent(country)}`);
-                        if (!res.ok) throw new Error('Failed to load charts');
-                        const newCharts = await res.json();
-                        showStatus('');
-                        renderExploreHome(cachedMoods, newCharts);
-                    } catch (error) {
-                        showStatus('Failed to load charts: ' + error.message, true);
-                    }
-                });
-            }
+      // Cache moods data so country selector changes do not re-fetch moods
+      let cachedMoods = null;
 
-            // Cron config button for charts
-            const cronChartsBtn = document.getElementById('cron-charts-btn');
-            if (cronChartsBtn) {
-                cronChartsBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const country = cronChartsBtn.dataset.country;
-                    const yaml = generateCronYaml('charts', { country });
-                    copyCronConfig(yaml, cronChartsBtn);
-                });
-            }
-
-            // Download all charts
-            const chartTracks = (charts && charts.tracks) ? charts.tracks : [];
-            const downloadAllChartsBtn = document.getElementById('download-all-charts');
-            if (downloadAllChartsBtn && chartTracks.length > 0) {
-                downloadAllChartsBtn.addEventListener('click', () => {
-                    queueMultipleTracks(chartTracks, downloadAllChartsBtn);
-                });
-            }
-
-            // Mood category cards
-            document.querySelectorAll('.mood-category-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const params = card.dataset.params;
-                    const title = card.dataset.title;
-                    loadMoodPlaylists(params, title);
-                });
-            });
-
-            // Play buttons in chart tracks
-            exploreResults.querySelectorAll('.play-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const videoId = e.target.dataset.videoId;
-                    togglePlay(videoId, e.target);
-                });
-            });
-
-            // Copy URL buttons in chart tracks
-            exploreResults.querySelectorAll('.copy-url-btn').forEach(btn => {
-                btn.addEventListener('click', handleCopyUrl);
-            });
-
-            // Download buttons in chart tracks
-            exploreResults.querySelectorAll('.download-btn').forEach(btn => {
-                btn.addEventListener('click', handleDownload);
-            });
-        }
-
-        async function loadMoodPlaylists(params, categoryTitle, skipUrlUpdate = false) {
-            showStatus('Loading playlists...');
-            if (!skipUrlUpdate) {
-                updateExploreUrlParams('mood', { params, title: categoryTitle });
-            }
+      function attachExploreHandlers(charts) {
+        // Country selector
+        const countrySelector = document.getElementById(
+          "charts-country-selector",
+        );
+        if (countrySelector) {
+          countrySelector.addEventListener("change", async (e) => {
+            const country = e.target.value;
+            showStatus("Loading charts...");
             try {
-                const res = await fetch(`/api/explore/mood-playlists?params=${encodeURIComponent(params)}`);
-                if (!res.ok) throw new Error('Failed to load playlists');
-                const playlists = await res.json();
-                showStatus('');
-                renderMoodPlaylists(playlists, categoryTitle, params);
+              const res = await fetch(
+                `/api/explore/charts?country=${encodeURIComponent(country)}`,
+              );
+              if (!res.ok) throw new Error("Failed to load charts");
+              const newCharts = await res.json();
+              showStatus("");
+              renderExploreHome(cachedMoods, newCharts);
             } catch (error) {
-                showStatus('Failed to load playlists: ' + error.message, true);
+              showStatus("Failed to load charts: " + error.message, true);
             }
+          });
         }
 
-        function renderMoodPlaylists(playlists, categoryTitle, params) {
-            exploreBreadcrumb = [{type: 'category', title: categoryTitle, params}];
-            let html = `
+        // Cron config button for charts
+        const cronChartsBtn = document.getElementById("cron-charts-btn");
+        if (cronChartsBtn) {
+          cronChartsBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const country = cronChartsBtn.dataset.country;
+            const yaml = generateCronYaml("charts", { country });
+            copyCronConfig(yaml, cronChartsBtn);
+          });
+        }
+
+        // Download all charts
+        const chartTracks = charts && charts.tracks ? charts.tracks : [];
+        const downloadAllChartsBtn = document.getElementById(
+          "download-all-charts",
+        );
+        if (downloadAllChartsBtn && chartTracks.length > 0) {
+          downloadAllChartsBtn.addEventListener("click", () => {
+            queueMultipleTracks(chartTracks, downloadAllChartsBtn);
+          });
+        }
+
+        // Mood category cards
+        document.querySelectorAll(".mood-category-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            const params = card.dataset.params;
+            const title = card.dataset.title;
+            loadMoodPlaylists(params, title);
+          });
+        });
+
+        // Play buttons in chart tracks
+        exploreResults.querySelectorAll(".play-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const videoId = e.target.dataset.videoId;
+            togglePlay(videoId, e.target);
+          });
+        });
+
+        // Copy URL buttons in chart tracks
+        exploreResults.querySelectorAll(".copy-url-btn").forEach((btn) => {
+          btn.addEventListener("click", handleCopyUrl);
+        });
+
+        // Download buttons in chart tracks
+        exploreResults.querySelectorAll(".download-btn").forEach((btn) => {
+          btn.addEventListener("click", handleDownload);
+        });
+      }
+
+      async function loadMoodPlaylists(
+        params,
+        categoryTitle,
+        skipUrlUpdate = false,
+      ) {
+        showStatus("Loading playlists...");
+        if (!skipUrlUpdate) {
+          updateExploreUrlParams("mood", { params, title: categoryTitle });
+        }
+        try {
+          const res = await fetch(
+            `/api/explore/mood-playlists?params=${encodeURIComponent(params)}`,
+          );
+          if (!res.ok) throw new Error("Failed to load playlists");
+          const playlists = await res.json();
+          showStatus("");
+          renderMoodPlaylists(playlists, categoryTitle, params);
+        } catch (error) {
+          showStatus("Failed to load playlists: " + error.message, true);
+        }
+      }
+
+      function renderMoodPlaylists(playlists, categoryTitle, params) {
+        exploreBreadcrumb = [
+          { type: "category", title: categoryTitle, params },
+        ];
+        let html = `
                 <div class="explore-breadcrumb">
                     <button class="breadcrumb-link" id="breadcrumb-home">Explore</button>
                     <span class="breadcrumb-sep">›</span>
@@ -1487,108 +1626,142 @@
                     <button class="cron-btn cron-btn-inline" id="cron-mood-btn" data-params="${escapeHtml(params)}" data-title="${escapeHtml(categoryTitle)}" aria-label="Copy cron config" title="Copy cron.yaml config for this mood/genre">+ Cron</button>
                 </div>
                 <div class="mood-playlists-grid">
-                    ${playlists.map(pl => `
+                    ${playlists
+                      .map(
+                        (pl) => `
                         <div class="mood-playlist-card" data-playlist-id="${escapeHtml(pl.playlist_id)}" data-title="${escapeHtml(pl.title)}">
-                            <img class="mood-playlist-thumb" src="${pl.thumbnail_url || ''}" alt="${escapeHtml(pl.title)}" loading="lazy" onerror="this.style.display='none'">
+                            <img class="mood-playlist-thumb" src="${pl.thumbnail_url || ""}" alt="${escapeHtml(pl.title)}" loading="lazy" onerror="this.style.display='none'">
                             <div class="mood-playlist-info">
                                 <div class="mood-playlist-title">${escapeHtml(pl.title)}</div>
-                                ${pl.author ? `<div class="mood-playlist-author">${escapeHtml(pl.author)}</div>` : ''}
+                                ${pl.author ? `<div class="mood-playlist-author">${escapeHtml(pl.author)}</div>` : ""}
                             </div>
                             <div class="mood-playlist-actions">
                                 <button class="view-playlist-btn" data-playlist-id="${escapeHtml(pl.playlist_id)}" data-title="${escapeHtml(pl.title)}">View Tracks</button>
                                 <button class="download-playlist-btn" data-playlist-id="${escapeHtml(pl.playlist_id)}" data-title="${escapeHtml(pl.title)}">Download All</button>
                             </div>
                         </div>
-                    `).join('')}
+                    `,
+                      )
+                      .join("")}
                 </div>
             `;
-            exploreResults.innerHTML = html;
+        exploreResults.innerHTML = html;
 
-            // Breadcrumb home link
-            document.getElementById('breadcrumb-home').addEventListener('click', () => {
-                exploreBreadcrumb = [];
-                exploreLoaded = false;
-                updateExploreUrlParams('home');
-                loadExploreContent();
+        // Breadcrumb home link
+        document
+          .getElementById("breadcrumb-home")
+          .addEventListener("click", () => {
+            exploreBreadcrumb = [];
+            exploreLoaded = false;
+            updateExploreUrlParams("home");
+            loadExploreContent();
+          });
+
+        // Cron config button for mood/genre category
+        const cronMoodBtn = document.getElementById("cron-mood-btn");
+        if (cronMoodBtn) {
+          cronMoodBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const moodParams = cronMoodBtn.dataset.params;
+            const moodTitle = cronMoodBtn.dataset.title;
+            const yaml = generateCronYaml("mood", {
+              params: moodParams,
+              title: moodTitle,
             });
-
-            // Cron config button for mood/genre category
-            const cronMoodBtn = document.getElementById('cron-mood-btn');
-            if (cronMoodBtn) {
-                cronMoodBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const moodParams = cronMoodBtn.dataset.params;
-                    const moodTitle = cronMoodBtn.dataset.title;
-                    const yaml = generateCronYaml('mood', { params: moodParams, title: moodTitle });
-                    copyCronConfig(yaml, cronMoodBtn);
-                });
-            }
-
-            // View playlist tracks
-            document.querySelectorAll('.view-playlist-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    loadPlaylistTracks(btn.dataset.playlistId, btn.dataset.title);
-                });
-            });
-
-            // Download all tracks from playlist
-            document.querySelectorAll('.download-playlist-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    btn.disabled = true;
-                    btn.textContent = 'Loading...';
-                    try {
-                        const res = await fetch(`/api/explore/playlist/${encodeURIComponent(btn.dataset.playlistId)}/tracks`);
-                        if (!res.ok) throw new Error('Failed to load tracks');
-                        const data = await res.json();
-                        await queueMultipleTracks(data.tracks, btn);
-                    } catch (error) {
-                        btn.textContent = 'Failed';
-                        showStatus('Failed: ' + error.message, true);
-                        setTimeout(() => { btn.disabled = false; btn.textContent = 'Download All'; }, 3000);
-                    }
-                });
-            });
+            copyCronConfig(yaml, cronMoodBtn);
+          });
         }
 
-        async function loadPlaylistTracks(playlistId, playlistTitle, skipUrlUpdate = false) {
-            showStatus('Loading tracks...');
-            if (!skipUrlUpdate) {
-                // Build URL params including parent mood context from breadcrumb
-                const urlOptions = { playlistId, playlistTitle };
-                if (exploreBreadcrumb.length > 0 && exploreBreadcrumb[0].type === 'category') {
-                    urlOptions.moodParams = exploreBreadcrumb[0].params;
-                    urlOptions.moodTitle = exploreBreadcrumb[0].title;
-                }
-                updateExploreUrlParams('playlist', urlOptions);
-            }
+        // View playlist tracks
+        document.querySelectorAll(".view-playlist-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            loadPlaylistTracks(btn.dataset.playlistId, btn.dataset.title);
+          });
+        });
+
+        // Download all tracks from playlist
+        document.querySelectorAll(".download-playlist-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            btn.disabled = true;
+            btn.textContent = "Loading...";
             try {
-                const res = await fetch(`/api/explore/playlist/${encodeURIComponent(playlistId)}/tracks`);
-                if (!res.ok) throw new Error('Failed to load tracks');
-                const data = await res.json();
-                showStatus('');
-                renderPlaylistTracks(data.tracks, playlistTitle, playlistId);
+              const res = await fetch(
+                `/api/explore/playlist/${encodeURIComponent(btn.dataset.playlistId)}/tracks`,
+              );
+              if (!res.ok) throw new Error("Failed to load tracks");
+              const data = await res.json();
+              await queueMultipleTracks(data.tracks, btn);
             } catch (error) {
-                showStatus('Failed to load tracks: ' + error.message, true);
+              btn.textContent = "Failed";
+              showStatus("Failed: " + error.message, true);
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.textContent = "Download All";
+              }, 3000);
             }
+          });
+        });
+      }
+
+      async function loadPlaylistTracks(
+        playlistId,
+        playlistTitle,
+        skipUrlUpdate = false,
+      ) {
+        showStatus("Loading tracks...");
+        if (!skipUrlUpdate) {
+          // Build URL params including parent mood context from breadcrumb
+          const urlOptions = { playlistId, playlistTitle };
+          if (
+            exploreBreadcrumb.length > 0 &&
+            exploreBreadcrumb[0].type === "category"
+          ) {
+            urlOptions.moodParams = exploreBreadcrumb[0].params;
+            urlOptions.moodTitle = exploreBreadcrumb[0].title;
+          }
+          updateExploreUrlParams("playlist", urlOptions);
         }
+        try {
+          const res = await fetch(
+            `/api/explore/playlist/${encodeURIComponent(playlistId)}/tracks`,
+          );
+          if (!res.ok) throw new Error("Failed to load tracks");
+          const data = await res.json();
+          showStatus("");
+          renderPlaylistTracks(data.tracks, playlistTitle, playlistId);
+        } catch (error) {
+          showStatus("Failed to load tracks: " + error.message, true);
+        }
+      }
 
-        function renderPlaylistTracks(tracks, playlistTitle, playlistId) {
-            const prevBreadcrumb = [...exploreBreadcrumb];
-            exploreBreadcrumb.push({type: 'playlist', title: playlistTitle, playlistId});
+      function renderPlaylistTracks(tracks, playlistTitle, playlistId) {
+        const prevBreadcrumb = [...exploreBreadcrumb];
+        exploreBreadcrumb.push({
+          type: "playlist",
+          title: playlistTitle,
+          playlistId,
+        });
 
-            // Extract parent mood params if available for cron config
-            const parentMoodParams = prevBreadcrumb.length > 0 && prevBreadcrumb[0].params ? prevBreadcrumb[0].params : '';
+        // Extract parent mood params if available for cron config
+        const parentMoodParams =
+          prevBreadcrumb.length > 0 && prevBreadcrumb[0].params
+            ? prevBreadcrumb[0].params
+            : "";
 
-            let html = `
+        let html = `
                 <div class="explore-breadcrumb">
                     <button class="breadcrumb-link" id="breadcrumb-home">Explore</button>
                     <span class="breadcrumb-sep">›</span>
-                    ${prevBreadcrumb.length > 0 ? `
+                    ${
+                      prevBreadcrumb.length > 0
+                        ? `
                         <button class="breadcrumb-link" id="breadcrumb-category">${escapeHtml(prevBreadcrumb[0].title)}</button>
                         <span class="breadcrumb-sep">›</span>
-                    ` : ''}
+                    `
+                        : ""
+                    }
                     <span class="breadcrumb-current">${escapeHtml(playlistTitle)}</span>
                 </div>
                 <div class="explore-playlist-header">
@@ -1598,22 +1771,24 @@
                     </div>
                     <div class="explore-section-actions">
                         <button class="download-all-btn" id="download-all-playlist">Download All</button>
-                        ${parentMoodParams ? `<button class="cron-btn" id="cron-playlist-btn" data-params="${escapeHtml(parentMoodParams)}" data-playlist-id="${escapeHtml(playlistId)}" data-title="${escapeHtml(playlistTitle)}" aria-label="Copy cron config" title="Copy cron.yaml config for this playlist">+ Cron</button>` : ''}
+                        ${parentMoodParams ? `<button class="cron-btn" id="cron-playlist-btn" data-params="${escapeHtml(parentMoodParams)}" data-playlist-id="${escapeHtml(playlistId)}" data-title="${escapeHtml(playlistTitle)}" aria-label="Copy cron config" title="Copy cron.yaml config for this playlist">+ Cron</button>` : ""}
                     </div>
                 </div>
                 <div class="explore-tracks-list">
             `;
 
-            html += tracks.map(track => `
+        html += tracks
+          .map(
+            (track) => `
                 <div class="track">
                     <div class="track-main">
-                        <img class="track-cover" src="${track.thumbnail_url || ''}" alt="" loading="lazy">
+                        <img class="track-cover" src="${track.thumbnail_url || ""}" alt="" loading="lazy">
                         <div class="track-info">
                             <div class="track-title">${escapeHtml(track.title)}</div>
-                            <div class="track-artist">${escapeHtml(track.artist)}${track.album ? ' - ' + escapeHtml(track.album) : ''}</div>
+                            <div class="track-artist">${escapeHtml(track.artist)}${track.album ? " - " + escapeHtml(track.album) : ""}</div>
                             <div class="track-meta">
                                 <span class="track-duration">${track.duration}</span>
-                                ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ''}
+                                ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ""}
                             </div>
                         </div>
                     </div>
@@ -1623,114 +1798,126 @@
                         <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>
                     </div>
                 </div>
-            `).join('');
+            `,
+          )
+          .join("");
 
-            html += '</div>';
-            exploreResults.innerHTML = html;
+        html += "</div>";
+        exploreResults.innerHTML = html;
 
-            // Breadcrumb navigation
-            document.getElementById('breadcrumb-home').addEventListener('click', () => {
-                exploreBreadcrumb = [];
-                exploreLoaded = false;
-                updateExploreUrlParams('home');
-                loadExploreContent();
-            });
+        // Breadcrumb navigation
+        document
+          .getElementById("breadcrumb-home")
+          .addEventListener("click", () => {
+            exploreBreadcrumb = [];
+            exploreLoaded = false;
+            updateExploreUrlParams("home");
+            loadExploreContent();
+          });
 
-            const catBtn = document.getElementById('breadcrumb-category');
-            if (catBtn && prevBreadcrumb.length > 0) {
-                catBtn.addEventListener('click', () => {
-                    exploreBreadcrumb = [];
-                    loadMoodPlaylists(prevBreadcrumb[0].params, prevBreadcrumb[0].title);
-                });
-            }
-
-            // Cron config button for playlist
-            const cronPlaylistBtn = document.getElementById('cron-playlist-btn');
-            if (cronPlaylistBtn) {
-                cronPlaylistBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const moodParams = cronPlaylistBtn.dataset.params;
-                    const playlistIdData = cronPlaylistBtn.dataset.playlistId;
-                    const playlistTitleData = cronPlaylistBtn.dataset.title;
-                    const yaml = generateCronYaml('mood', {
-                        params: moodParams,
-                        title: playlistTitleData,
-                        playlistId: playlistIdData
-                    });
-                    copyCronConfig(yaml, cronPlaylistBtn);
-                });
-            }
-
-            // Download all tracks
-            document.getElementById('download-all-playlist').addEventListener('click', () => {
-                queueMultipleTracks(tracks, document.getElementById('download-all-playlist'));
-            });
-
-            // Play buttons in playlist tracks
-            exploreResults.querySelectorAll('.play-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const videoId = e.target.dataset.videoId;
-                    togglePlay(videoId, e.target);
-                });
-            });
-
-            // Copy URL buttons in playlist tracks
-            exploreResults.querySelectorAll('.copy-url-btn').forEach(btn => {
-                btn.addEventListener('click', handleCopyUrl);
-            });
-
-            // Individual download buttons
-            exploreResults.querySelectorAll('.download-btn').forEach(btn => {
-                btn.addEventListener('click', handleDownload);
-            });
+        const catBtn = document.getElementById("breadcrumb-category");
+        if (catBtn && prevBreadcrumb.length > 0) {
+          catBtn.addEventListener("click", () => {
+            exploreBreadcrumb = [];
+            loadMoodPlaylists(
+              prevBreadcrumb[0].params,
+              prevBreadcrumb[0].title,
+            );
+          });
         }
 
-        async function queueMultipleTracks(tracks, btn) {
-            if (!tracks || tracks.length === 0) {
-                showStatus('No tracks to download');
-                return;
-            }
-
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            const format = formatSelector.value;
-            let queued = 0;
-
-            for (let i = 0; i < tracks.length; i++) {
-                btn.textContent = `Queueing ${i + 1}/${tracks.length}...`;
-                const track = tracks[i];
-                try {
-                    const response = await fetch('/api/queue/add', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            video_id: track.video_id,
-                            title: track.title,
-                            artist: track.artist,
-                            artists: track.artists || [],
-                            audio_format: format,
-                        })
-                    });
-                    if (response.ok) queued++;
-                } catch (error) {
-                    console.error(`Failed to queue ${track.title}:`, error);
-                }
-            }
-
-            btn.textContent = `Queued ${queued}/${tracks.length}`;
-            showStatus(`Added ${queued} tracks to queue`);
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            }, 3000);
+        // Cron config button for playlist
+        const cronPlaylistBtn = document.getElementById("cron-playlist-btn");
+        if (cronPlaylistBtn) {
+          cronPlaylistBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const moodParams = cronPlaylistBtn.dataset.params;
+            const playlistIdData = cronPlaylistBtn.dataset.playlistId;
+            const playlistTitleData = cronPlaylistBtn.dataset.title;
+            const yaml = generateCronYaml("mood", {
+              params: moodParams,
+              title: playlistTitleData,
+              playlistId: playlistIdData,
+            });
+            copyCronConfig(yaml, cronPlaylistBtn);
+          });
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        // Download all tracks
+        document
+          .getElementById("download-all-playlist")
+          .addEventListener("click", () => {
+            queueMultipleTracks(
+              tracks,
+              document.getElementById("download-all-playlist"),
+            );
+          });
+
+        // Play buttons in playlist tracks
+        exploreResults.querySelectorAll(".play-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const videoId = e.target.dataset.videoId;
+            togglePlay(videoId, e.target);
+          });
+        });
+
+        // Copy URL buttons in playlist tracks
+        exploreResults.querySelectorAll(".copy-url-btn").forEach((btn) => {
+          btn.addEventListener("click", handleCopyUrl);
+        });
+
+        // Individual download buttons
+        exploreResults.querySelectorAll(".download-btn").forEach((btn) => {
+          btn.addEventListener("click", handleDownload);
+        });
+      }
+
+      async function queueMultipleTracks(tracks, btn) {
+        if (!tracks || tracks.length === 0) {
+          showStatus("No tracks to download");
+          return;
         }
+
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        const format = formatSelector.value;
+        let queued = 0;
+
+        for (let i = 0; i < tracks.length; i++) {
+          btn.textContent = `Queueing ${i + 1}/${tracks.length}...`;
+          const track = tracks[i];
+          try {
+            const response = await fetch("/api/queue/add", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                video_id: track.video_id,
+                title: track.title,
+                artist: track.artist,
+                artists: track.artists || [],
+                audio_format: format,
+              }),
+            });
+            if (response.ok) queued++;
+          } catch (error) {
+            console.error(`Failed to queue ${track.title}:`, error);
+          }
+        }
+
+        btn.textContent = `Queued ${queued}/${tracks.length}`;
+        showStatus(`Added ${queued} tracks to queue`);
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }, 3000);
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
     </script>
-</body>
+  </body>
 </html>
