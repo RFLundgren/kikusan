@@ -1332,19 +1332,21 @@
                 html += `
                     <div class="chart-tracks-list">
                         ${chartTracks.map((track, idx) => `
-                            <div class="chart-track">
+                            <div class="track chart-track">
                                 <span class="chart-rank">${track.rank || (idx + 1)}</span>
-                                <img class="chart-thumb" src="${track.thumbnail_url || ''}" alt="" loading="lazy" onerror="this.style.display='none'">
-                                <div class="chart-track-info">
-                                    <div class="chart-track-title">${escapeHtml(track.title)}</div>
-                                    <div class="chart-track-artist">${escapeHtml(track.artist)}</div>
-                                    <div class="chart-track-meta">
-                                        ${track.duration ? `<span class="track-duration">${track.duration}</span>` : ''}
-                                        ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ''}
+                                <div class="track-main">
+                                    <img class="track-cover" src="${track.thumbnail_url || ''}" alt="" loading="lazy" onerror="this.style.display='none'">
+                                    <div class="track-info">
+                                        <div class="track-title">${escapeHtml(track.title)}</div>
+                                        <div class="track-artist">${escapeHtml(track.artist)}</div>
+                                        <div class="track-meta">
+                                            ${track.duration ? `<span class="track-duration">${track.duration}</span>` : ''}
+                                            ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ''}
+                                        </div>
                                     </div>
                                 </div>
                                 ${track.trend ? `<span class="chart-trend trend-${track.trend}">${track.trend === 'up' ? '&#9650;' : track.trend === 'down' ? '&#9660;' : '&#8212;'}</span>` : ''}
-                                <div class="chart-track-actions">
+                                <div class="track-actions">
                                     <button class="play-btn" data-video-id="${track.video_id}" aria-label="Play preview">&#9654;</button>
                                     <button class="copy-url-btn" data-video-id="${track.video_id}" aria-label="Copy URL" title="Copy YouTube Music URL">&#128279;</button>
                                     <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>

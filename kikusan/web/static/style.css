@@ -614,6 +614,21 @@ header p {
         flex: 1;
         min-width: unset;
     }
+
+    /* Chart tracks: override column layout to keep rank on same row as track-main */
+    .chart-track.track {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .chart-track .track-main {
+        flex: 1 1 0;
+        min-width: 0;
+        margin-bottom: 0;
+    }
+    .chart-track .track-actions {
+        flex-basis: 100%;
+    }
 }
 
 /* Tablet (640px - 1024px) */
@@ -1205,89 +1220,27 @@ header p {
 .chart-tracks-list {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-}
-.chart-track {
-    display: flex;
-    align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    background: var(--bg-secondary);
 }
-.chart-track:hover {
-    background: var(--bg-hover, var(--bg-secondary));
-}
-.chart-rank {
+
+/* Chart track: extends .track with rank number and trend indicator */
+.chart-track .chart-rank {
     font-size: 1rem;
     font-weight: 700;
     min-width: 2rem;
     text-align: center;
     color: var(--text-secondary);
-}
-.chart-thumb {
-    width: 40px;
-    height: 40px;
-    border-radius: 4px;
-    object-fit: cover;
     flex-shrink: 0;
-}
-.chart-track-info {
-    flex: 1;
-    min-width: 0;
-}
-.chart-track-title {
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.chart-track-artist {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.chart-track-meta {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
-    margin-top: 0.1rem;
 }
 .chart-trend {
     font-size: 0.85rem;
     min-width: 1.5rem;
     text-align: center;
+    flex-shrink: 0;
 }
 .chart-trend.trend-up { color: #22c55e; }
 .chart-trend.trend-down { color: #ef4444; }
 .chart-trend.trend-neutral { color: var(--text-secondary); }
-.chart-track-actions {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    gap: 0.4rem;
-    align-items: center;
-    flex-shrink: 0;
-}
-.chart-track-actions .play-btn,
-.chart-track-actions .copy-url-btn {
-    min-height: 32px;
-    min-width: 32px;
-    max-height: 32px;
-    max-width: 32px;
-    font-size: 0.9rem;
-    padding: 0;
-}
-.chart-track-actions .download-btn {
-    padding: 0.3rem 0.75rem;
-    font-size: 0.8rem;
-    min-height: 32px;
-    min-width: unset;
-}
 
 /* Cron config button */
 .cron-btn {
@@ -1497,45 +1450,14 @@ header p {
         min-width: 0;
     }
 
-    /* Chart track rows: stack into a compact card layout */
-    .chart-track {
-        flex-wrap: wrap;
-        padding: 0.5rem;
-        gap: 0.5rem;
-    }
-    .chart-rank {
+    /* Chart track rank/trend adjustments for very small screens */
+    .chart-track .chart-rank {
         min-width: 1.5rem;
         font-size: 0.9rem;
     }
-    .chart-thumb {
-        width: 36px;
-        height: 36px;
-    }
-    .chart-track-info {
-        /* Let info section shrink so actions can fit, but allow wrapping if needed */
-        min-width: 0;
-        flex: 1 1 0;
-    }
-    .chart-trend {
+    .chart-track .chart-trend {
         min-width: 1rem;
         font-size: 0.75rem;
-    }
-    .chart-track-actions {
-        flex-wrap: wrap;
-        gap: 0.25rem;
-    }
-    .chart-track-actions .download-btn {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        min-height: 28px;
-    }
-    .chart-track-actions .play-btn,
-    .chart-track-actions .copy-url-btn {
-        min-height: 28px;
-        min-width: 28px;
-        max-height: 28px;
-        max-width: 28px;
-        font-size: 0.8rem;
     }
 
     /* Breadcrumb: allow wrapping so cron button stays visible */
