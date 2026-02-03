@@ -72,9 +72,23 @@ See [`examples/third-party-plugin/`](examples/third-party-plugin/) for a complet
 
 ## Installation
 
+Run from git:
+
 ```bash
+git clone https://github.com/dadav/kikusan
+cd kikusan
 uv sync
+uv run kikusan --help
 ```
+
+Install as uv tool:
+
+```bash
+uv tool install kikusan
+kikusan --help
+```
+
+Or via [docker-compose](./docker-compose.yml).
 
 ## Usage
 
@@ -151,14 +165,14 @@ explore:
   # Sync US music charts daily
   us-charts:
     type: charts
-    country: US          # ISO 3166-1 Alpha-2 code (ZZ = global)
-    sync: true           # Remove tracks that fall off the charts
+    country: US # ISO 3166-1 Alpha-2 code (ZZ = global)
+    sync: true # Remove tracks that fall off the charts
     schedule: "0 6 * * *"
 
   # Sync a mood/genre category weekly
   chill-vibes:
     type: mood
-    params: "ggMPOg1uX1J"  # Get params from: kikusan explore moods
+    params: "ggMPOg1uX1J" # Get params from: kikusan explore moods
     sync: false
     schedule: "0 12 * * 0"
 ```
