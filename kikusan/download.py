@@ -168,7 +168,7 @@ def _get_ydl_opts(
     output_path = _get_output_path(output_dir, info, filename_template, organization_mode, use_primary_artist)
 
     opts = {
-        "format": "bestaudio/best",
+        "format": f"bestaudio[ext={audio_format}]/bestaudio[acodec*={audio_format}]/bestaudio/best",
         "outtmpl": output_path,
         "trim_file_name": MAX_FILENAME_BYTES,
         "postprocessors": [

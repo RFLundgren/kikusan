@@ -132,6 +132,7 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - `UnavailableCooldownError`: Raised when video is on cooldown (avoids hitting YouTube)
   - `_extract_video_id_from_url()`: Extracts video ID from YouTube URLs for error recording
   - All download paths (`download()`, `_download_single()`, `download_url()`, `_download_playlist()`) record unavailable errors
+  - **Format Selection Optimization**: `_get_ydl_opts()` uses intelligent format selector `bestaudio[ext={format}]/bestaudio[acodec*={format}]/bestaudio/best` to prefer audio streams that already match the desired codec (e.g., native opus from YouTube Music), avoiding unnecessary transcoding and preserving quality (inspired by guillevc/yubal@f5d7ee9)
 - `kikusan/unavailable.py`: Unavailable video cooldown management
   - Tracks video IDs that returned "Video unavailable" errors
   - JSON persistence in `.kikusan/unavailable.json` with atomic writes
