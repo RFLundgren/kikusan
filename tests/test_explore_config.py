@@ -64,6 +64,28 @@ class TestExploreConfigParsing:
         assert entry.sync is False
         assert entry.schedule == "0 12 * * 0"
         assert entry.country == "ZZ"  # default
+        assert entry.playlist_id == ""  # default
+
+    def test_mood_config_with_playlist_id(self, tmp_path):
+        """Test parsing a mood explore entry with playlist_id."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              chill-playlist:
+                type: mood
+                params: "ggMPOg1uX1J"
+                playlist_id: "RDCLAK5uy_test123"
+                sync: false
+                schedule: "0 12 * * 0"
+        """)
+
+        config = load_config(config_path)
+        assert "chill-playlist" in config.explore
+        entry = config.explore["chill-playlist"]
+        assert entry.type == "mood"
+        assert entry.params == "ggMPOg1uX1J"
+        assert entry.playlist_id == "RDCLAK5uy_test123"
+        assert entry.sync is False
+        assert entry.schedule == "0 12 * * 0"
 
     def test_charts_default_country(self, tmp_path):
         """Test charts entry defaults to ZZ for country."""
@@ -224,6 +246,21 @@ class TestExploreConfigValidation:
         """)
 
         with pytest.raises(ValueError, match="params must be a non-empty string"):
+            load_config(config_path)
+
+    def test_mood_invalid_playlist_id_type(self, tmp_path):
+        """Test that mood type with non-string playlist_id raises ValueError."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              bad-mood:
+                type: mood
+                params: "ggMPOg1uX1J"
+                playlist_id: 12345
+                sync: true
+                schedule: "0 6 * * *"
+        """)
+
+        with pytest.raises(ValueError, match="playlist_id must be a string"):
             load_config(config_path)
 
     def test_invalid_country_code_lowercase(self, tmp_path):

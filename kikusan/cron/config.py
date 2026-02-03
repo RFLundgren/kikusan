@@ -41,6 +41,7 @@ class ExploreConfig:
     type: "charts" or "mood"
     country: ISO 3166-1 Alpha-2 code (only for type="charts", default "ZZ")
     params: Mood/genre params string (only for type="mood")
+    playlist_id: Specific playlist ID to sync (only for type="mood", optional)
     sync: If True, delete tracks removed from the source
     schedule: Cron expression
     name: Internal name for state/playlist files
@@ -53,6 +54,7 @@ class ExploreConfig:
     schedule: str
     country: str = "ZZ"
     params: str = ""
+    playlist_id: str = ""
     limit: int = 0
 
 
@@ -234,6 +236,7 @@ def load_config(path: Path) -> CronConfig:
             # Type-specific validation
             country = "ZZ"
             params = ""
+            playlist_id = ""
 
             if explore_type == "charts":
                 country = config.get("country", "ZZ")
@@ -247,6 +250,11 @@ def load_config(path: Path) -> CronConfig:
                 params = config["params"]
                 if not isinstance(params, str) or not params.strip():
                     raise ValueError(f"Explore '{name}' params must be a non-empty string")
+
+                # Optional playlist_id for targeting a specific playlist
+                playlist_id = config.get("playlist_id", "")
+                if playlist_id and not isinstance(playlist_id, str):
+                    raise ValueError(f"Explore '{name}' playlist_id must be a string")
 
             validate_cron_schedule(config["schedule"], name)
 
@@ -264,6 +272,7 @@ def load_config(path: Path) -> CronConfig:
                 schedule=config["schedule"],
                 country=country,
                 params=params,
+                playlist_id=playlist_id,
                 limit=limit,
             )
 

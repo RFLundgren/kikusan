@@ -219,7 +219,21 @@ class TestFetchExploreTracks:
 
         tracks = fetch_explore_tracks(config)
         assert tracks == [("vid1", "Song", "Artist")]
-        mock_fetch_mood.assert_called_once_with("ggMPOg1uX1J")
+        mock_fetch_mood.assert_called_once_with("ggMPOg1uX1J", "")
+
+    @patch("kikusan.cron.explore_sync._fetch_mood_tracks")
+    def test_routes_to_mood_with_playlist_id(self, mock_fetch_mood):
+        mock_fetch_mood.return_value = [("vid1", "Song", "Artist")]
+
+        config = ExploreConfig(
+            name="pop-moods", type="mood", sync=True,
+            schedule="0 12 * * 0", params="ggMPOg1uX1J",
+            playlist_id="RDCLAK5uy_test123",
+        )
+
+        tracks = fetch_explore_tracks(config)
+        assert tracks == [("vid1", "Song", "Artist")]
+        mock_fetch_mood.assert_called_once_with("ggMPOg1uX1J", "RDCLAK5uy_test123")
 
     def test_unknown_type_returns_empty(self):
         config = ExploreConfig(
@@ -247,6 +261,14 @@ class TestBuildExploreUrl:
             schedule="0 12 * * 0", params="ggMPOg1uX1J",
         )
         assert _build_explore_url(config) == "explore:mood:ggMPOg1uX1J"
+
+    def test_mood_url_with_playlist_id(self):
+        config = ExploreConfig(
+            name="pop-playlist", type="mood", sync=True,
+            schedule="0 12 * * 0", params="ggMPOg1uX1J",
+            playlist_id="RDCLAK5uy_test123",
+        )
+        assert _build_explore_url(config) == "explore:mood:ggMPOg1uX1J:playlist:RDCLAK5uy_test123"
 
 
 class TestSyncExplore:

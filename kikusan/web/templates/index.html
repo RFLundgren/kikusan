@@ -1174,7 +1174,7 @@
         function generateCronYaml(type, options) {
             // Generate a YAML snippet for cron.yaml explore section
             // type: "charts" or "mood"
-            // options: { country, title, params }
+            // options: { country, title, params, playlistId }
             if (type === 'charts') {
                 const country = options.country || 'ZZ';
                 const nameBase = COUNTRY_NAMES[country] || country.toLowerCase();
@@ -1191,11 +1191,15 @@
             } else if (type === 'mood') {
                 const title = options.title || 'mood';
                 const params = options.params || '';
+                const playlistId = options.playlistId || '';
                 // Sanitize title into a valid cron key: lowercase, replace spaces/special chars with dashes
                 const key = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'mood';
                 let yaml = `${key}:\n`;
                 yaml += `  type: mood\n`;
                 yaml += `  params: "${params}"\n`;
+                if (playlistId) {
+                    yaml += `  playlist_id: "${playlistId}"\n`;
+                }
                 yaml += `  sync: true\n`;
                 yaml += `  schedule: "0 6 * * *"`;
                 return yaml;
@@ -1574,6 +1578,9 @@
             const prevBreadcrumb = [...exploreBreadcrumb];
             exploreBreadcrumb.push({type: 'playlist', title: playlistTitle, playlistId});
 
+            // Extract parent mood params if available for cron config
+            const parentMoodParams = prevBreadcrumb.length > 0 && prevBreadcrumb[0].params ? prevBreadcrumb[0].params : '';
+
             let html = `
                 <div class="explore-breadcrumb">
                     <button class="breadcrumb-link" id="breadcrumb-home">Explore</button>
@@ -1585,9 +1592,14 @@
                     <span class="breadcrumb-current">${escapeHtml(playlistTitle)}</span>
                 </div>
                 <div class="explore-playlist-header">
-                    <h2>${escapeHtml(playlistTitle)}</h2>
-                    <span class="explore-track-count">${tracks.length} tracks</span>
-                    <button class="download-all-btn" id="download-all-playlist">Download All</button>
+                    <div>
+                        <h2>${escapeHtml(playlistTitle)}</h2>
+                        <span class="explore-track-count">${tracks.length} tracks</span>
+                    </div>
+                    <div class="explore-section-actions">
+                        <button class="download-all-btn" id="download-all-playlist">Download All</button>
+                        ${parentMoodParams ? `<button class="cron-btn" id="cron-playlist-btn" data-params="${escapeHtml(parentMoodParams)}" data-playlist-id="${escapeHtml(playlistId)}" data-title="${escapeHtml(playlistTitle)}" aria-label="Copy cron config" title="Copy cron.yaml config for this playlist">+ Cron</button>` : ''}
+                    </div>
                 </div>
                 <div class="explore-tracks-list">
             `;
@@ -1629,6 +1641,23 @@
                 catBtn.addEventListener('click', () => {
                     exploreBreadcrumb = [];
                     loadMoodPlaylists(prevBreadcrumb[0].params, prevBreadcrumb[0].title);
+                });
+            }
+
+            // Cron config button for playlist
+            const cronPlaylistBtn = document.getElementById('cron-playlist-btn');
+            if (cronPlaylistBtn) {
+                cronPlaylistBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const moodParams = cronPlaylistBtn.dataset.params;
+                    const playlistIdData = cronPlaylistBtn.dataset.playlistId;
+                    const playlistTitleData = cronPlaylistBtn.dataset.title;
+                    const yaml = generateCronYaml('mood', {
+                        params: moodParams,
+                        title: playlistTitleData,
+                        playlistId: playlistIdData
+                    });
+                    copyCronConfig(yaml, cronPlaylistBtn);
                 });
             }
 

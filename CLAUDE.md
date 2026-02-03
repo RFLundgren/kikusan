@@ -102,11 +102,12 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - `sync_explore()`: Main entry point, reuses `download_new_tracks`, `remove_old_tracks`, `update_m3u_playlist` from `sync.py`. Applies `limit` truncation after fetching tracks (before compare/download).
   - `fetch_explore_tracks()`: Routes to `_fetch_chart_tracks()` or `_fetch_mood_tracks()` based on type
   - `_fetch_chart_tracks()`: Fetches tracks from YouTube Music charts via `get_charts()`
-  - `_fetch_mood_tracks()`: Fetches playlists for a mood/genre category, then fetches tracks from each playlist, deduplicating by video_id
+  - `_fetch_mood_tracks()`: Fetches tracks from a specific playlist (if `playlist_id` is set) or from all playlists in the category (if `playlist_id` is not set, legacy behavior). Accepts optional `playlist_id` parameter to target a single playlist instead of fetching all playlists in the mood/genre category.
   - State is stored using the same `PlaylistState` model in `.kikusan/state/`
   - All safety features apply: cross-reference protection, Navidrome protection, unavailable cooldown
 - `kikusan/cron/config.py`: Cron configuration loading with support for `playlists`, `plugins`, `explore`, and `hooks` sections
-  - `ExploreConfig`: Dataclass for explore entries (type, country, params, sync, schedule, limit)
+  - `ExploreConfig`: Dataclass for explore entries (type, country, params, playlist_id, sync, schedule, limit)
+  - `playlist_id` field: Optional for mood type entries - when set, only tracks from that specific playlist are synced instead of all playlists in the category
   - `validate_country_code()`: Validates ISO 3166-1 Alpha-2 country codes
 - `kikusan/plugins/sync.py`: Plugin synchronization with reference-aware deletion and Navidrome protection
 - `kikusan/hooks.py`: Generic hook system for running commands on events
@@ -175,6 +176,7 @@ All major configuration variables have corresponding CLI flags:
 - Supports `explore` section in `cron.yaml` for syncing charts and moods/genres:
   - `type: charts` with optional `country` (ISO 3166-1 Alpha-2, default ZZ)
   - `type: mood` with required `params` (from `explore moods` command)
+    - Optional `playlist_id` (str): Target a specific playlist instead of all playlists in the category. Get playlist IDs from `kikusan explore mood-playlists <PARAMS>` command.
   - Each entry has `sync` (bool) and `schedule` (cron expression)
   - Optional `limit` (int, default 0 = no limit): Maximum number of tracks to sync. Tracks are truncated from the end, preserving the top-ranked entries (e.g., `limit: 10` keeps the top 10 chart tracks).
   - State stored in `.kikusan/state/` using same format as playlist state

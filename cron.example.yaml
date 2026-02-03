@@ -113,13 +113,17 @@ explore:
   #   sync: true
   #   schedule: "0 6 * * 1"  # Every Monday at 06:00
 
-  # Sync a mood/genre category
+  # Sync a specific playlist from a mood/genre category
   # Use 'kikusan explore moods' to discover available categories and their params
+  # Use 'kikusan explore mood-playlists <PARAMS>' to see available playlists
   # chill-vibes:
   #   type: mood
-  #   params: "ggMPOg1uX1J"  # Params string from 'kikusan explore moods'
-  #   sync: false             # Keep tracks even if removed from the category
-  #   schedule: "0 12 * * 0"  # Weekly on Sunday at noon
+  #   params: "ggMPOg1uX1J"           # Params string from 'kikusan explore moods'
+  #   playlist_id: "RDCLAK5uy_..."   # Optional: target specific playlist (get from explore mood-playlists)
+  #   sync: false                     # Keep tracks even if removed from the playlist
+  #   schedule: "0 12 * * 0"          # Weekly on Sunday at noon
+  #
+  # Note: If playlist_id is not specified, all playlists in the category will be fetched (legacy behavior)
 
 # Hooks - run commands when events occur
 # Useful for integrating with external systems like Navidrome

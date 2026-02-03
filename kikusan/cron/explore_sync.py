@@ -142,8 +142,8 @@ def fetch_explore_tracks(explore_config: ExploreConfig) -> list[tuple[str, str, 
     """Fetch current tracks from an explore source.
 
     For charts: fetches chart tracks via get_charts().
-    For mood: fetches all playlists for the mood/genre params,
-    then fetches tracks from each playlist.
+    For mood: fetches tracks from a specific playlist (if playlist_id is set)
+    or from all playlists in the category (if playlist_id is not set).
 
     Args:
         explore_config: Explore entry configuration
@@ -154,7 +154,7 @@ def fetch_explore_tracks(explore_config: ExploreConfig) -> list[tuple[str, str, 
     if explore_config.type == "charts":
         return _fetch_chart_tracks(explore_config.country)
     elif explore_config.type == "mood":
-        return _fetch_mood_tracks(explore_config.params)
+        return _fetch_mood_tracks(explore_config.params, explore_config.playlist_id)
     else:
         logger.error("Unknown explore type: %s", explore_config.type)
         return []
@@ -182,20 +182,37 @@ def _fetch_chart_tracks(country: str) -> list[tuple[str, str, str]]:
         return []
 
 
-def _fetch_mood_tracks(params: str) -> list[tuple[str, str, str]]:
-    """Fetch tracks from all playlists in a mood/genre category.
+def _fetch_mood_tracks(params: str, playlist_id: str = "") -> list[tuple[str, str, str]]:
+    """Fetch tracks from a mood/genre category.
 
-    First fetches the list of playlists for the category, then fetches
-    tracks from each playlist. Deduplicates by video_id to avoid
-    downloading the same track twice.
+    If playlist_id is provided, fetches tracks only from that specific playlist.
+    Otherwise, fetches tracks from all playlists in the category (legacy behavior).
 
     Args:
         params: Mood/genre category params string
+        playlist_id: Optional specific playlist ID to fetch from
 
     Returns:
         List of tuples: (video_id, title, artist)
     """
     try:
+        # If playlist_id is specified, fetch only from that playlist
+        if playlist_id:
+            logger.info("Fetching tracks from specific playlist: %s", playlist_id)
+            try:
+                playlist_tracks = get_playlist_tracks(playlist_id)
+                tracks = [
+                    (track.video_id, track.title, track.artist)
+                    for track in playlist_tracks
+                    if track.video_id
+                ]
+                logger.info("Fetched %d tracks from playlist %s", len(tracks), playlist_id)
+                return tracks
+            except Exception as e:
+                logger.error("Failed to fetch tracks from playlist %s: %s", playlist_id, e)
+                return []
+
+        # Legacy behavior: fetch from all playlists in the category
         playlists = get_mood_playlists(params)
         if not playlists:
             logger.warning("No playlists found for mood params: %s", params)
@@ -244,5 +261,7 @@ def _build_explore_url(explore_config: ExploreConfig) -> str:
     if explore_config.type == "charts":
         return f"explore:charts:{explore_config.country}"
     elif explore_config.type == "mood":
+        if explore_config.playlist_id:
+            return f"explore:mood:{explore_config.params}:playlist:{explore_config.playlist_id}"
         return f"explore:mood:{explore_config.params}"
     return f"explore:{explore_config.type}"

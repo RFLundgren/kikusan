@@ -1399,6 +1399,7 @@ header p {
 .explore-playlist-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1rem;
     flex-wrap: wrap;
@@ -1475,8 +1476,13 @@ header p {
         align-items: stretch;
         gap: 0.5rem;
     }
-    .explore-playlist-header .download-all-btn {
+    .explore-playlist-header .explore-section-actions {
+        flex-wrap: wrap;
         width: 100%;
+    }
+    .explore-playlist-header .explore-section-actions .download-all-btn,
+    .explore-playlist-header .explore-section-actions .cron-btn {
+        flex: 1 1 auto;
         min-width: 0;
     }
 }
