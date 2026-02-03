@@ -46,10 +46,10 @@ plugins:
   listenbrainz-discoveries:
     type: listenbrainz
     sync: false
-    schedule: "0 8 * * 1"  # Every Monday at 8am
+    schedule: "0 8 * * 1" # Every Monday at 8am
     config:
       user: your_listenbrainz_username
-      recommendation_type: weekly-exploration  # or 'weekly-jams'
+      recommendation_type: weekly-exploration # or 'weekly-jams'
 
   # RSS feed example (music podcast, blog, etc.)
   # music-podcast:
@@ -65,13 +65,13 @@ plugins:
   reddit-listentothis:
     type: reddit
     sync: false
-    schedule: "0 9 * * *"  # Daily at 9am
+    schedule: "0 9 * * *" # Daily at 9am
     config:
       subreddit: listentothis
       sort: top
       time_filter: day
       limit: 25
-      min_score: 100  # Only highly upvoted tracks
+      min_score: 100 # Only highly upvoted tracks
 
   # Reddit r/Music - weekly top posts
   # reddit-music-weekly:
@@ -101,9 +101,10 @@ explore:
   # Sync global music charts daily
   global-charts:
     type: charts
-    country: ZZ           # ISO 3166-1 Alpha-2 code (ZZ = global)
-    sync: true            # Remove tracks that fall off the charts
+    country: ZZ # ISO 3166-1 Alpha-2 code (ZZ = global)
+    sync: true # Remove tracks that fall off the charts
     schedule: "0 6 * * *" # Daily at 06:00
+    limit: 10 # Fetch top 10 songs
 
   # Sync US charts weekly
   # us-charts:
@@ -132,18 +133,17 @@ hooks:
         -H "X-ND-Authorization: Bearer ${NAVIDROME_TOKEN}" \
         --data-binary @"${KIKUSAN_PLAYLIST_PATH}" \
         "${NAVIDROME_URL}/api/playlist"
-    timeout: 30  # seconds (default: 60)
+    timeout: 30 # seconds (default: 60)
 
   # Log sync results
   - event: sync_completed
     command: |
       echo "[$(date)] Sync completed: ${KIKUSAN_PLAYLIST_NAME} - Downloaded: ${KIKUSAN_DOWNLOADED}, Skipped: ${KIKUSAN_SKIPPED}, Failed: ${KIKUSAN_FAILED}" >> /var/log/kikusan-sync.log
-    run_on_error: true  # Run even if sync failed (default: false)
+    run_on_error: true # Run even if sync failed (default: false)
 
   # Custom script example - backup playlist on update
   # - event: playlist_updated
   #   command: cp "${KIKUSAN_PLAYLIST_PATH}" "/backup/playlists/${KIKUSAN_PLAYLIST_NAME}_$(date +%Y%m%d).m3u"
-
 # Hook events:
 #   - playlist_updated: Triggered when an M3U playlist is created/updated
 #   - sync_completed: Triggered after every sync operation (success or failure)
