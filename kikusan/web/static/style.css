@@ -49,6 +49,7 @@ body {
     max-width: 800px;
     margin: 0 auto;
     padding: 0 0.5rem;
+    overflow-x: hidden;
 }
 
 header {
@@ -1122,6 +1123,8 @@ header p {
 
 .explore-section {
     display: none;
+    overflow-x: hidden;
+    max-width: 100%;
 }
 .explore-section.active {
     display: block;
@@ -1348,6 +1351,8 @@ header p {
     text-align: center;
     font-size: 0.9rem;
     transition: background 0.15s, border-color 0.15s;
+    overflow-wrap: anywhere;
+    min-width: 0;
 }
 .mood-category-card:hover {
     background: var(--bg-tertiary);
@@ -1433,6 +1438,8 @@ header p {
 .breadcrumb-current {
     color: var(--text-primary);
     font-weight: 500;
+    overflow-wrap: anywhere;
+    min-width: 0;
 }
 
 /* Playlist tracks header */
@@ -1457,7 +1464,7 @@ header p {
     gap: 0;
 }
 
-/* Responsive */
+/* Responsive - Explore tab mobile fixes */
 @media (max-width: 600px) {
     .mood-categories-grid {
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -1465,11 +1472,89 @@ header p {
     .mood-playlists-grid {
         grid-template-columns: 1fr;
     }
+
+    /* Stack the section header vertically */
     .explore-section-header {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
     }
+
+    /* Allow section actions to wrap and fill width */
+    .explore-section-actions {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    .explore-section-actions .country-selector {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .explore-section-actions .download-all-btn {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    .explore-section-actions .cron-btn {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    /* Chart track rows: stack into a compact card layout */
     .chart-track {
-        padding: 0.4rem 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.5rem;
+        gap: 0.5rem;
+    }
+    .chart-rank {
+        min-width: 1.5rem;
+        font-size: 0.9rem;
+    }
+    .chart-thumb {
+        width: 36px;
+        height: 36px;
+    }
+    .chart-track-info {
+        /* Let info section shrink so actions can fit, but allow wrapping if needed */
+        min-width: 0;
+        flex: 1 1 0;
+    }
+    .chart-trend {
+        min-width: 1rem;
+        font-size: 0.75rem;
+    }
+    .chart-track-actions {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    .chart-track-actions .download-btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        min-height: 28px;
+    }
+    .chart-track-actions .play-btn,
+    .chart-track-actions .copy-url-btn {
+        min-height: 28px;
+        min-width: 28px;
+        max-height: 28px;
+        max-width: 28px;
+        font-size: 0.8rem;
+    }
+
+    /* Breadcrumb: allow wrapping so cron button stays visible */
+    .explore-breadcrumb {
+        flex-wrap: wrap;
+    }
+    .cron-btn-inline {
+        margin-left: 0;
+        flex: 0 0 auto;
+    }
+
+    /* Playlist header: wrap on mobile */
+    .explore-playlist-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    .explore-playlist-header .download-all-btn {
+        width: 100%;
+        min-width: 0;
     }
 }
