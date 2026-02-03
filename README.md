@@ -630,3 +630,11 @@ If the header is absent (e.g. direct access without the proxy), the shared playl
 
 - Python 3.12+
 - ffmpeg (for audio processing)
+
+## Disclaimer
+
+Kikusan is intended for **private, personal use only**.
+It must not be used for commercial purposes or in any way that violates copyright laws.
+
+Users are responsible for ensuring their usage complies with applicable laws and YouTubes terms of service.  
+The developer does not condone copyright infringement and is not liable for misuse of this tool.
