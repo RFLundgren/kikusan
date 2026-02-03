@@ -638,3 +638,7 @@ It must not be used for commercial purposes or in any way that violates copyrigh
 
 Users are responsible for ensuring their usage complies with applicable laws and YouTubes terms of service.  
 The developer does not condone copyright infringement and is not liable for misuse of this tool.
+
+## LICENSE
+
+[MIT](./LICENSE)
