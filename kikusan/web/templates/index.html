@@ -226,11 +226,19 @@
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
                 exitAlbumViewMode(); // Clear album view mode when switching tabs
-                setActiveTab(tab);
 
-                const query = searchInput.value.trim();
-                updateUrlParams(query, tab);
-                if (query) performSearch(query);
+                if (tab === 'explore') {
+                    // Explore tab manages its own URL params via updateExploreUrlParams
+                    // Reset explore state so it reloads fresh
+                    exploreLoaded = false;
+                    exploreBreadcrumb = [];
+                    setActiveTab(tab);
+                } else {
+                    setActiveTab(tab);
+                    const query = searchInput.value.trim();
+                    updateUrlParams(query, tab);
+                    if (query) performSearch(query);
+                }
             });
         });
 
@@ -293,6 +301,16 @@
 
         function updateUrlParams(query, tab, albumId = null) {
             const url = new URL(window.location);
+            // Clear all explore-specific params when updating search/tab params
+            url.searchParams.delete('view');
+            url.searchParams.delete('country');
+            url.searchParams.delete('params');
+            url.searchParams.delete('title');
+            url.searchParams.delete('playlistId');
+            url.searchParams.delete('playlistTitle');
+            url.searchParams.delete('moodParams');
+            url.searchParams.delete('moodTitle');
+
             if (query) {
                 url.searchParams.set('q', query);
             } else {
@@ -311,6 +329,45 @@
             window.history.pushState({}, '', url);
         }
 
+        // Update URL params for explore tab navigation states
+        // view: 'home' | 'charts' | 'mood' | 'playlist'
+        function updateExploreUrlParams(view, options = {}) {
+            const url = new URL(window.location);
+            // Clear search-specific params
+            url.searchParams.delete('q');
+            url.searchParams.delete('album');
+            // Always set tab=explore
+            url.searchParams.set('tab', 'explore');
+            // Clear all explore-specific params first
+            url.searchParams.delete('view');
+            url.searchParams.delete('country');
+            url.searchParams.delete('params');
+            url.searchParams.delete('title');
+            url.searchParams.delete('playlistId');
+            url.searchParams.delete('playlistTitle');
+            url.searchParams.delete('moodParams');
+            url.searchParams.delete('moodTitle');
+
+            if (view && view !== 'home') {
+                url.searchParams.set('view', view);
+            }
+            if (view === 'charts' && options.country && options.country !== 'ZZ') {
+                url.searchParams.set('country', options.country);
+            }
+            if (view === 'mood') {
+                if (options.params) url.searchParams.set('params', options.params);
+                if (options.title) url.searchParams.set('title', options.title);
+            }
+            if (view === 'playlist') {
+                if (options.playlistId) url.searchParams.set('playlistId', options.playlistId);
+                if (options.playlistTitle) url.searchParams.set('playlistTitle', options.playlistTitle);
+                // Preserve parent mood context for breadcrumb navigation
+                if (options.moodParams) url.searchParams.set('moodParams', options.moodParams);
+                if (options.moodTitle) url.searchParams.set('moodTitle', options.moodTitle);
+            }
+            window.history.pushState({}, '', url);
+        }
+
         // Initialize tab from URL
         function initTabFromUrl() {
             const tab = getQueryParam('tab') || 'songs';
@@ -322,7 +379,7 @@
         // Set active tab (updates UI and currentTab variable)
         const exploreResults = document.getElementById('explore-results');
 
-        function setActiveTab(tab) {
+        function setActiveTab(tab, skipExploreLoad = false) {
             currentTab = tab;
             tabButtons.forEach(b => {
                 if (b.dataset.tab === tab) {
@@ -342,7 +399,9 @@
                 albumsResults.classList.add('active');
             } else if (tab === 'explore') {
                 exploreResults.classList.add('active');
-                loadExploreContent();
+                if (!skipExploreLoad) {
+                    loadExploreContent();
+                }
             }
         }
 
@@ -350,6 +409,7 @@
         function initAutoSearch() {
             const query = getQueryParam('q');
             const albumId = getQueryParam('album');
+            const tab = getQueryParam('tab') || 'songs';
 
             // If we have an album ID, load album tracks directly
             if (albumId) {
@@ -360,11 +420,83 @@
                 return;
             }
 
+            // Restore explore tab state from URL params
+            if (tab === 'explore') {
+                const restored = restoreExploreFromUrl();
+                if (restored) return;
+            }
+
             initTabFromUrl();
             if (query) {
                 searchInput.value = query;
                 performSearch(query);
             }
+        }
+
+        // Restore explore navigation state from URL params on page load
+        // Returns true if a specific explore view was restored, false for default explore home
+        function restoreExploreFromUrl() {
+            const view = getQueryParam('view');
+            const country = getQueryParam('country');
+            const moodParams = getQueryParam('params');
+            const moodTitle = getQueryParam('title');
+            const playlistId = getQueryParam('playlistId');
+            const playlistTitle = getQueryParam('playlistTitle');
+            const parentMoodParams = getQueryParam('moodParams');
+            const parentMoodTitle = getQueryParam('moodTitle');
+
+            if (view === 'charts') {
+                // Restore charts view with specific country (skipUrlUpdate since we're restoring from URL)
+                setActiveTab('explore', true);
+                loadExploreContentWithCountry(country || 'ZZ', true);
+                return true;
+            } else if (view === 'mood' && moodParams) {
+                // Restore mood playlists view (skipUrlUpdate since we're restoring from URL)
+                setActiveTab('explore', true);
+                loadMoodPlaylists(moodParams, moodTitle || 'Category', true);
+                return true;
+            } else if (view === 'playlist' && playlistId) {
+                // Restore playlist tracks view (with parent mood context if available)
+                setActiveTab('explore', true);
+                if (parentMoodParams) {
+                    exploreBreadcrumb = [{type: 'category', title: parentMoodTitle || 'Category', params: parentMoodParams}];
+                }
+                loadPlaylistTracks(playlistId, playlistTitle || 'Playlist', true);
+                return true;
+            }
+
+            // No specific explore view to restore; default explore home will load via setActiveTab
+            return false;
+        }
+
+        // Load explore home with a specific country for charts (used by URL restore and country selector)
+        // skipUrlUpdate: true when restoring from URL to avoid redundant pushState
+        async function loadExploreContentWithCountry(country, skipUrlUpdate = false) {
+            exploreLoaded = true;
+            exploreBreadcrumb = [];
+            exploreResults.innerHTML = '<div class="explore-loading">Loading explore content...</div>';
+
+            const [moodsResult, chartsResult] = await Promise.allSettled([
+                fetch('/api/explore/moods').then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                }),
+                fetch(`/api/explore/charts?country=${encodeURIComponent(country)}`).then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                }),
+            ]);
+
+            let moods = moodsResult.status === 'fulfilled' ? moodsResult.value : null;
+            let charts = chartsResult.status === 'fulfilled' ? chartsResult.value : null;
+
+            if (!moods && !charts) {
+                exploreResults.innerHTML = '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
+                exploreLoaded = false;
+                return;
+            }
+
+            renderExploreHome(moods, charts, skipUrlUpdate);
         }
 
         // Extract search logic into reusable function
@@ -449,8 +581,25 @@
                 exitAlbumViewMode();
             }
 
+            // Handle explore tab state restoration from URL params
+            if (tab === 'explore') {
+                const view = getQueryParam('view');
+                if (view) {
+                    // Reset explore state before restoring
+                    exploreLoaded = false;
+                    exploreBreadcrumb = [];
+                    restoreExploreFromUrl();
+                    return;
+                }
+                // No view param means explore home - reset and reload
+                exploreLoaded = false;
+                exploreBreadcrumb = [];
+                setActiveTab('explore');
+                return;
+            }
+
             // Restore tab state
-            if (tab === 'songs' || tab === 'albums' || tab === 'explore') {
+            if (tab === 'songs' || tab === 'albums') {
                 setActiveTab(tab);
             }
 
@@ -1134,11 +1283,20 @@
             renderExploreHome(moods, charts);
         }
 
-        function renderExploreHome(moods, charts) {
+        function renderExploreHome(moods, charts, skipUrlUpdate = false) {
             exploreBreadcrumb = [];
             // Cache moods so country selector changes skip re-fetching them
             if (moods) {
                 cachedMoods = moods;
+            }
+            // Update URL to reflect charts country if not ZZ
+            if (!skipUrlUpdate) {
+                const chartsCountryCode = (charts && charts.country) ? charts.country : 'ZZ';
+                if (chartsCountryCode !== 'ZZ') {
+                    updateExploreUrlParams('charts', { country: chartsCountryCode });
+                } else {
+                    updateExploreUrlParams('home');
+                }
             }
             let html = '<div class="explore-home">';
 
@@ -1297,8 +1455,11 @@
             });
         }
 
-        async function loadMoodPlaylists(params, categoryTitle) {
+        async function loadMoodPlaylists(params, categoryTitle, skipUrlUpdate = false) {
             showStatus('Loading playlists...');
+            if (!skipUrlUpdate) {
+                updateExploreUrlParams('mood', { params, title: categoryTitle });
+            }
             try {
                 const res = await fetch(`/api/explore/mood-playlists?params=${encodeURIComponent(params)}`);
                 if (!res.ok) throw new Error('Failed to load playlists');
@@ -1341,6 +1502,7 @@
             document.getElementById('breadcrumb-home').addEventListener('click', () => {
                 exploreBreadcrumb = [];
                 exploreLoaded = false;
+                updateExploreUrlParams('home');
                 loadExploreContent();
             });
 
@@ -1384,8 +1546,17 @@
             });
         }
 
-        async function loadPlaylistTracks(playlistId, playlistTitle) {
+        async function loadPlaylistTracks(playlistId, playlistTitle, skipUrlUpdate = false) {
             showStatus('Loading tracks...');
+            if (!skipUrlUpdate) {
+                // Build URL params including parent mood context from breadcrumb
+                const urlOptions = { playlistId, playlistTitle };
+                if (exploreBreadcrumb.length > 0 && exploreBreadcrumb[0].type === 'category') {
+                    urlOptions.moodParams = exploreBreadcrumb[0].params;
+                    urlOptions.moodTitle = exploreBreadcrumb[0].title;
+                }
+                updateExploreUrlParams('playlist', urlOptions);
+            }
             try {
                 const res = await fetch(`/api/explore/playlist/${encodeURIComponent(playlistId)}/tracks`);
                 if (!res.ok) throw new Error('Failed to load tracks');
@@ -1447,12 +1618,14 @@
             document.getElementById('breadcrumb-home').addEventListener('click', () => {
                 exploreBreadcrumb = [];
                 exploreLoaded = false;
+                updateExploreUrlParams('home');
                 loadExploreContent();
             });
 
             const catBtn = document.getElementById('breadcrumb-category');
             if (catBtn && prevBreadcrumb.length > 0) {
                 catBtn.addEventListener('click', () => {
+                    exploreBreadcrumb = [];
                     loadMoodPlaylists(prevBreadcrumb[0].params, prevBreadcrumb[0].title);
                 });
             }
