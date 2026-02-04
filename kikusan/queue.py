@@ -68,13 +68,18 @@ class DownloadJob:
 class QueueManager:
     """Manages download job queue with async worker."""
 
-    def __init__(self):
-        """Initialize queue manager."""
+    def __init__(self, max_history: int = 100):
+        """Initialize queue manager.
+
+        Args:
+            max_history: Maximum number of completed/failed jobs to keep in history
+        """
         self.queue: Queue[DownloadJob] = Queue()
         self.jobs: dict[str, DownloadJob] = {}
         self.worker_task: Optional[Task] = None
         self._running = False
         self._jobs_lock = asyncio.Lock()  # Protect concurrent access to self.jobs
+        self.max_history = max_history
 
     async def start(self):
         """Start the background worker."""
@@ -211,6 +216,9 @@ class QueueManager:
             job.error = str(e)
             job.completed_at = datetime.now()
 
+        # Cleanup old jobs to prevent memory leak
+        await self.cleanup_old_jobs()
+
     async def get_job(self, job_id: str) -> Optional[DownloadJob]:
         """
         Get a job by ID.
@@ -263,6 +271,43 @@ class QueueManager:
                 return True
 
             return False
+
+    async def cleanup_old_jobs(self):
+        """Remove old completed/failed jobs beyond max_history limit.
+
+        Keeps the most recent completed/failed jobs up to max_history.
+        Active (queued/downloading) jobs are never removed.
+        """
+        async with self._jobs_lock:
+            # Separate completed/failed jobs from active jobs
+            completed_failed = [
+                job for job in self.jobs.values()
+                if job.status in (JobStatus.COMPLETED, JobStatus.FAILED)
+            ]
+
+            # If we're over the limit, remove oldest jobs
+            if len(completed_failed) > self.max_history:
+                # Sort by completion time (oldest first)
+                completed_failed.sort(
+                    key=lambda j: j.completed_at or j.created_at
+                )
+
+                # Remove oldest jobs beyond the limit
+                num_to_remove = len(completed_failed) - self.max_history
+                for job in completed_failed[:num_to_remove]:
+                    del self.jobs[job.id]
+                    logger.debug(
+                        "Cleaned up old job: %s (id=%s, completed=%s)",
+                        job.status.value,
+                        job.id,
+                        job.completed_at
+                    )
+
+                logger.info(
+                    "Cleaned up %d old jobs (keeping %d most recent)",
+                    num_to_remove,
+                    self.max_history
+                )
 
     async def get_stats(self) -> dict:
         """
