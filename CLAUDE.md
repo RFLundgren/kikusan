@@ -10,6 +10,18 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
 
 ### Web UI
 - Search functionality with results display
+  - **URL Support**: Paste YouTube Music URLs directly into search bar
+    - Single track URLs: `https://music.youtube.com/watch?v=VIDEO_ID`
+    - Playlist URLs: `https://music.youtube.com/playlist?list=PLAYLIST_ID`
+    - Also supports `youtube.com` and `youtu.be` URL variants
+    - Playlist URLs return ALL tracks (no 20-result limit like text search)
+    - Results displayed in same format as text search
+    - **Radio playlist handling**: Radio playlists (IDs starting with `RDAM`) are not supported due to different API structure
+      - URLs with both video and radio playlist (e.g., `?v=VIDEO_ID&list=RDAM...`) fall back to returning just the video
+      - Radio-only playlist URLs return clear error: "Radio playlists are not supported"
+      - Protection implemented in both `parse_youtube_url()` and `get_playlist_tracks()`
+  - Backend auto-detects URL vs text query using `parse_youtube_url()` in `search.py`
+  - URL metadata fetched via ytmusicapi: `get_track_from_video_id()` for singles, `get_playlist_tracks()` for playlists
 - View counts displayed for each song (e.g., "1.9B views", "47M views")
   - View counts are retrieved from ytmusicapi search results (no additional API calls needed)
   - Displayed alongside duration in the track metadata section

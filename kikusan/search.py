@@ -543,12 +543,26 @@ def get_charts(country: str = "ZZ") -> Charts:
 def get_playlist_tracks(playlist_id: str) -> list[Track]:
     """Get tracks from a YouTube Music playlist.
 
+    Radio playlists (IDs starting with 'RDAM') are not supported because they
+    use a different API structure and cannot be fetched via get_playlist().
+
     Args:
         playlist_id: YouTube Music playlist ID
 
     Returns:
         List of Track objects from the playlist.
+
+    Raises:
+        ValueError: If the playlist_id is a radio playlist (starts with 'RDAM')
+        Exception: If YouTube Music API fails
     """
+    # Check for radio playlists upfront
+    if playlist_id.startswith('RDAM'):
+        raise ValueError(
+            f"Radio playlists are not supported. Playlist ID: {playlist_id}. "
+            "Radio playlists use a different API structure and cannot be fetched."
+        )
+
     yt = YTMusic()
     try:
         raw = yt.get_playlist(playlist_id)
@@ -744,3 +758,137 @@ def _parse_duration(duration_text: str) -> int:
     except (ValueError, IndexError):
         # Invalid duration format (e.g., "NaN:30" or "--:--")
         return 0
+
+
+def _format_view_count(views: int) -> str:
+    """Format view count as '1.9B', '47M', '1.5K', etc."""
+    if views >= 1_000_000_000:
+        return f"{views / 1_000_000_000:.1f}B"
+    elif views >= 1_000_000:
+        return f"{views / 1_000_000:.1f}M"
+    elif views >= 1_000:
+        return f"{views / 1_000:.1f}K"
+    else:
+        return str(views)
+
+
+def parse_youtube_url(url: str) -> dict[str, str] | None:
+    """
+    Parse YouTube/YouTube Music URL and extract video_id or playlist_id.
+
+    Radio playlists (IDs starting with 'RDAM') are not supported because they
+    use a different API structure. For URLs containing both a video and a radio
+    playlist, the video is returned instead.
+
+    Args:
+        url: Full URL string
+
+    Returns:
+        Dictionary with 'type' and 'id' keys, or None if not a valid YouTube URL.
+        Example: {'type': 'video', 'id': 'dQw4w9WgXcQ'}
+                 {'type': 'playlist', 'id': 'PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf'}
+                 {'type': 'unsupported_radio', 'id': 'RDAMVMkX_n5Knuce4'}
+    """
+    from urllib.parse import urlparse, parse_qs
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return None
+
+    # Check if it's a YouTube domain
+    if parsed.netloc not in ['music.youtube.com', 'www.youtube.com', 'youtube.com', 'youtu.be']:
+        return None
+
+    # Handle youtu.be short URLs
+    if parsed.netloc == 'youtu.be':
+        video_id = parsed.path.lstrip('/')
+        if video_id and len(video_id) == 11:
+            return {'type': 'video', 'id': video_id}
+        return None
+
+    # Parse query parameters
+    query_params = parse_qs(parsed.query)
+
+    # Check for playlist
+    if 'list' in query_params:
+        playlist_id = query_params['list'][0]
+
+        # Radio playlists (RDAM*) are not supported
+        if playlist_id.startswith('RDAM'):
+            # If there's also a video ID, fall back to returning just the video
+            if 'v' in query_params:
+                video_id = query_params['v'][0]
+                if len(video_id) == 11:
+                    logger.info(
+                        "Radio playlist detected in URL, falling back to video: %s",
+                        video_id
+                    )
+                    return {'type': 'video', 'id': video_id}
+            # Radio-only playlist URL
+            logger.warning("Radio playlist URLs are not supported: %s", playlist_id)
+            return {'type': 'unsupported_radio', 'id': playlist_id}
+
+        return {'type': 'playlist', 'id': playlist_id}
+
+    # Check for video
+    if 'v' in query_params:
+        video_id = query_params['v'][0]
+        if len(video_id) == 11:
+            return {'type': 'video', 'id': video_id}
+
+    return None
+
+
+def get_track_from_video_id(video_id: str) -> Track:
+    """
+    Get complete track metadata from a YouTube video ID.
+
+    Uses ytmusicapi's get_song() to retrieve structured metadata including
+    title, artist, thumbnail, view count, and duration.
+
+    Args:
+        video_id: YouTube video ID (11 characters)
+
+    Returns:
+        Track object with full metadata
+
+    Raises:
+        Exception: If video is unavailable or API fails
+    """
+    yt = YTMusic()
+    try:
+        song_data = yt.get_song(video_id)
+    except Exception as e:
+        logger.error("Failed to fetch track for video_id '%s': %s", video_id, e)
+        raise
+
+    video_details = song_data.get("videoDetails", {})
+    if not video_details:
+        raise ValueError(f"No video details found for video_id: {video_id}")
+
+    # Extract fields
+    title = video_details.get("title", "Unknown Title")
+    artist = video_details.get("author", "Unknown Artist")
+    length_seconds = int(video_details.get("lengthSeconds", "0"))
+
+    # Extract thumbnail (prefer largest)
+    thumbnails = video_details.get("thumbnail", {}).get("thumbnails", [])
+    thumbnail_url = thumbnails[-1]["url"] if thumbnails else None
+
+    # Extract and format view count
+    view_count_raw = video_details.get("viewCount")
+    view_count = _format_view_count(int(view_count_raw)) if view_count_raw else None
+
+    logger.info("Fetched track from URL: %s - %s", artist, title)
+
+    return Track(
+        video_id=video_id,
+        title=title,
+        artist=artist,
+        artists=[artist],
+        album=None,  # get_song doesn't include album info
+        duration_seconds=length_seconds,
+        thumbnail_url=thumbnail_url,
+        view_count=view_count,
+    )
