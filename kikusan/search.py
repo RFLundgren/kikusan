@@ -731,9 +731,13 @@ def _get_metadata_from_watch_playlist(yt: YTMusic, video_id: str) -> SongMetadat
 
 def _parse_duration(duration_text: str) -> int:
     """Parse duration string (e.g., '3:45') to seconds."""
-    parts = duration_text.split(":")
-    if len(parts) == 2:
-        return int(parts[0]) * 60 + int(parts[1])
-    elif len(parts) == 3:
-        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-    return 0
+    try:
+        parts = duration_text.split(":")
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        elif len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        return 0
+    except (ValueError, IndexError):
+        # Invalid duration format (e.g., "NaN:30" or "--:--")
+        return 0
