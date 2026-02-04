@@ -168,11 +168,13 @@ explore:
     country: US # ISO 3166-1 Alpha-2 code (ZZ = global)
     sync: true # Remove tracks that fall off the charts
     schedule: "0 6 * * *"
+    limit: 10 # Optional: Only get top 10 songs from charts
 
   # Sync a mood/genre category weekly
   chill-vibes:
     type: mood
     params: "ggMPOg1uX1J" # Get params from: kikusan explore moods
+    playlist_id: "RDCLAK5uy_..." # Optional: target specific playlist (get from explore mood-playlists)
     sync: false
     schedule: "0 12 * * 0"
 ```
