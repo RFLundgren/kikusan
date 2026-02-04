@@ -643,6 +643,13 @@ async def api_explore_charts(country: str = Query("ZZ", description="ISO 3166-1 
     import logging
     logger = logging.getLogger(__name__)
 
+    # Validate country code format
+    if not re.match(r"^[A-Z]{2}$", country):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid country code '{country}': must be a 2-letter uppercase ISO 3166-1 Alpha-2 code (e.g., 'US', 'GB', 'ZZ')"
+        )
+
     try:
         charts = get_charts(country)
         return ChartsResponse(
