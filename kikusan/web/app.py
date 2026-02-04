@@ -721,11 +721,32 @@ async def upload_cookies(file: UploadFile = File(...)):
     if len(content) > 1024 * 1024:  # 1MB limit
         raise HTTPException(status_code=400, detail="File too large (max 1MB)")
 
-    # Basic validation - check for Netscape format
-    content_str = content.decode('utf-8', errors='ignore')
-    if '# Netscape HTTP Cookie File' not in content_str and '# HTTP Cookie File' not in content_str:
-        # Allow files without header as they might still work
-        pass
+    # Validate file encoding and content
+    try:
+        content_str = content.decode('utf-8')
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded text")
+
+    # Validate Netscape cookie file format
+    lines = content_str.strip().split('\n')
+    has_valid_cookies = False
+
+    for line in lines:
+        # Skip empty lines and comments
+        if not line.strip() or line.startswith('#'):
+            continue
+
+        # Cookie lines should have 7 tab-separated fields
+        parts = line.split('\t')
+        if len(parts) == 7:
+            has_valid_cookies = True
+            break
+
+    if not has_valid_cookies:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid cookie file format. Expected Netscape format with tab-separated values"
+        )
 
     # Create .kikusan directory if it doesn't exist
     kikusan_dir = Path(".kikusan")
