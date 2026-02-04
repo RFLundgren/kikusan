@@ -23,7 +23,8 @@ async def test_queue_manager_initialization():
     """Test queue manager can be initialized and started."""
     qm = QueueManager()
     assert qm.queue is not None
-    assert qm.jobs == {}
+    async with qm._jobs_lock:
+        assert qm.jobs == {}
     assert not qm._running
 
     await qm.start()
@@ -42,9 +43,10 @@ async def test_add_job(queue_manager):
     )
 
     assert job_id is not None
-    assert len(queue_manager.jobs) == 1
+    async with queue_manager._jobs_lock:
+        assert len(queue_manager.jobs) == 1
 
-    job = queue_manager.get_job(job_id)
+    job = await queue_manager.get_job(job_id)
     assert job is not None
     assert job.video_id == "test123"
     assert job.title == "Test Song"
@@ -60,13 +62,13 @@ async def test_get_job(queue_manager):
         video_id="test456", title="Another Song", artist="Another Artist", format="mp3"
     )
 
-    job = queue_manager.get_job(job_id)
+    job = await queue_manager.get_job(job_id)
     assert job is not None
     assert job.id == job_id
     assert job.video_id == "test456"
 
     # Test non-existent job
-    assert queue_manager.get_job("nonexistent") is None
+    assert await queue_manager.get_job("nonexistent") is None
 
 
 @pytest.mark.asyncio
@@ -80,7 +82,7 @@ async def test_list_jobs(queue_manager):
         video_id="test2", title="Song 2", artist="Artist 2", format="mp3"
     )
 
-    jobs = queue_manager.list_jobs()
+    jobs = await queue_manager.list_jobs()
     assert len(jobs) == 2
     # Jobs should be ordered by creation time (newest first)
     assert jobs[0].id == job_id2
@@ -95,13 +97,13 @@ async def test_remove_completed_job(queue_manager):
     )
 
     # Manually mark as completed
-    job = queue_manager.get_job(job_id)
+    job = await queue_manager.get_job(job_id)
     job.status = JobStatus.COMPLETED
 
     # Remove should succeed
     success = await queue_manager.remove_job(job_id)
     assert success
-    assert queue_manager.get_job(job_id) is None
+    assert await queue_manager.get_job(job_id) is None
 
 
 @pytest.mark.asyncio
@@ -112,21 +114,21 @@ async def test_remove_failed_job(queue_manager):
     )
 
     # Manually mark as failed
-    job = queue_manager.get_job(job_id)
+    job = await queue_manager.get_job(job_id)
     job.status = JobStatus.FAILED
     job.error = "Test error"
 
     # Remove should succeed
     success = await queue_manager.remove_job(job_id)
     assert success
-    assert queue_manager.get_job(job_id) is None
+    assert await queue_manager.get_job(job_id) is None
 
 
 @pytest.mark.asyncio
 async def test_get_stats(queue_manager):
     """Test getting queue statistics."""
     # Initially empty
-    stats = queue_manager.get_stats()
+    stats = await queue_manager.get_stats()
     assert stats["total"] == 0
     assert stats["queued"] == 0
     assert stats["downloading"] == 0
@@ -142,13 +144,13 @@ async def test_get_stats(queue_manager):
     )
 
     # Manually set different statuses
-    job1 = queue_manager.get_job(job_id1)
+    job1 = await queue_manager.get_job(job_id1)
     job1.status = JobStatus.DOWNLOADING
 
-    job2 = queue_manager.get_job(job_id2)
+    job2 = await queue_manager.get_job(job_id2)
     job2.status = JobStatus.COMPLETED
 
-    stats = queue_manager.get_stats()
+    stats = await queue_manager.get_stats()
     assert stats["total"] == 2
     assert stats["queued"] == 0
     assert stats["downloading"] == 1
@@ -198,7 +200,7 @@ async def test_worker_processes_job(queue_manager):
         await asyncio.sleep(0.5)
 
         # Check job was processed (status should change from QUEUED)
-        job = queue_manager.get_job(job_id)
+        job = await queue_manager.get_job(job_id)
         # Job might be completed or still downloading depending on timing
         assert job.status in (JobStatus.DOWNLOADING, JobStatus.COMPLETED, JobStatus.QUEUED)
 

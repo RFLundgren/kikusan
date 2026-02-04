@@ -526,7 +526,7 @@ async def list_queue_jobs():
     if not queue_manager:
         raise HTTPException(status_code=500, detail="Queue manager not initialized")
 
-    jobs = queue_manager.list_jobs()
+    jobs = await queue_manager.list_jobs()
     return {"jobs": [job.to_dict() for job in jobs]}
 
 
@@ -558,7 +558,7 @@ async def stream_queue_updates(request: Request):
                     break
 
                 # Get current jobs
-                jobs = queue_manager.list_jobs()
+                jobs = await queue_manager.list_jobs()
                 jobs_data = [job.to_dict() for job in jobs]
 
                 # Send update via SSE
@@ -587,7 +587,7 @@ async def get_queue_stats():
     if not queue_manager:
         raise HTTPException(status_code=500, detail="Queue manager not initialized")
 
-    return queue_manager.get_stats()
+    return await queue_manager.get_stats()
 
 
 # Explore endpoints

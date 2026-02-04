@@ -74,6 +74,7 @@ class QueueManager:
         self.jobs: dict[str, DownloadJob] = {}
         self.worker_task: Optional[Task] = None
         self._running = False
+        self._jobs_lock = asyncio.Lock()  # Protect concurrent access to self.jobs
 
     async def start(self):
         """Start the background worker."""
@@ -128,7 +129,8 @@ class QueueManager:
             artists=artists,
             playlist_name=playlist_name,
         )
-        self.jobs[job_id] = job
+        async with self._jobs_lock:
+            self.jobs[job_id] = job
         await self.queue.put(job)
         logger.info("Added job to queue: %s - %s (id=%s)", artist, title, job_id)
         return job_id
@@ -209,7 +211,7 @@ class QueueManager:
             job.error = str(e)
             job.completed_at = datetime.now()
 
-    def get_job(self, job_id: str) -> Optional[DownloadJob]:
+    async def get_job(self, job_id: str) -> Optional[DownloadJob]:
         """
         Get a job by ID.
 
@@ -219,16 +221,18 @@ class QueueManager:
         Returns:
             The job or None if not found
         """
-        return self.jobs.get(job_id)
+        async with self._jobs_lock:
+            return self.jobs.get(job_id)
 
-    def list_jobs(self) -> list[DownloadJob]:
+    async def list_jobs(self) -> list[DownloadJob]:
         """
         List all jobs ordered by creation time (newest first).
 
         Returns:
             List of jobs
         """
-        return sorted(self.jobs.values(), key=lambda j: j.created_at, reverse=True)
+        async with self._jobs_lock:
+            return sorted(self.jobs.values(), key=lambda j: j.created_at, reverse=True)
 
     async def remove_job(self, job_id: str) -> bool:
         """
@@ -240,41 +244,43 @@ class QueueManager:
         Returns:
             True if removed, False if not found
         """
-        job = self.jobs.get(job_id)
-        if not job:
+        async with self._jobs_lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                return False
+
+            # Can only remove queued jobs or clear completed/failed
+            if job.status in (JobStatus.COMPLETED, JobStatus.FAILED):
+                del self.jobs[job_id]
+                logger.info("Cleared job: %s (id=%s)", job.status.value, job_id)
+                return True
+            elif job.status == JobStatus.QUEUED:
+                # TODO: Implement removal from queue (requires queue modification)
+                # For now, just mark as failed
+                job.status = JobStatus.FAILED
+                job.error = "Cancelled by user"
+                logger.info("Cancelled job: %s (id=%s)", job_id)
+                return True
+
             return False
 
-        # Can only remove queued jobs or clear completed/failed
-        if job.status in (JobStatus.COMPLETED, JobStatus.FAILED):
-            del self.jobs[job_id]
-            logger.info("Cleared job: %s (id=%s)", job.status.value, job_id)
-            return True
-        elif job.status == JobStatus.QUEUED:
-            # TODO: Implement removal from queue (requires queue modification)
-            # For now, just mark as failed
-            job.status = JobStatus.FAILED
-            job.error = "Cancelled by user"
-            logger.info("Cancelled job: %s (id=%s)", job_id)
-            return True
-
-        return False
-
-    def get_stats(self) -> dict:
+    async def get_stats(self) -> dict:
         """
         Get queue statistics.
 
         Returns:
             Dict with queue stats
         """
-        queued = sum(1 for j in self.jobs.values() if j.status == JobStatus.QUEUED)
-        downloading = sum(1 for j in self.jobs.values() if j.status == JobStatus.DOWNLOADING)
-        completed = sum(1 for j in self.jobs.values() if j.status == JobStatus.COMPLETED)
-        failed = sum(1 for j in self.jobs.values() if j.status == JobStatus.FAILED)
+        async with self._jobs_lock:
+            queued = sum(1 for j in self.jobs.values() if j.status == JobStatus.QUEUED)
+            downloading = sum(1 for j in self.jobs.values() if j.status == JobStatus.DOWNLOADING)
+            completed = sum(1 for j in self.jobs.values() if j.status == JobStatus.COMPLETED)
+            failed = sum(1 for j in self.jobs.values() if j.status == JobStatus.FAILED)
 
-        return {
-            "total": len(self.jobs),
-            "queued": queued,
-            "downloading": downloading,
-            "completed": completed,
-            "failed": failed,
-        }
+            return {
+                "total": len(self.jobs),
+                "queued": queued,
+                "downloading": downloading,
+                "completed": completed,
+                "failed": failed,
+            }
