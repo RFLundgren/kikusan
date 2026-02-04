@@ -165,11 +165,14 @@ def _get_ydl_opts(
 ) -> dict:
     """Get common yt-dlp options."""
     # Calculate output path based on organization mode
-    output_path = _get_output_path(output_dir, info, filename_template, organization_mode, use_primary_artist)
+    output_path = _get_output_path(
+        output_dir, info, filename_template, organization_mode, use_primary_artist
+    )
 
     opts = {
         "format": f"bestaudio[ext={audio_format}]/bestaudio[acodec*={audio_format}]/bestaudio/best",
         "outtmpl": output_path,
+        "color": "never",
         "trim_file_name": MAX_FILENAME_BYTES,
         "postprocessors": [
             {
@@ -188,6 +191,11 @@ def _get_ydl_opts(
         "writethumbnail": True,
         "quiet": True,
         "no_warnings": True,
+        "retry_sleep_functions": {
+            "http": lambda n: min(2**n, 30),  # Cap at 30s
+            "fragment": lambda n: min(2**n, 30),
+        },
+        "remote_components": ["ejs:github"],
     }
 
     # Note: cookies are now handled by yt_dlp_wrapper, not here
@@ -248,7 +256,9 @@ def _compute_filename(info: dict, filename_template: str) -> str:
 
     Uses trim_file_name to match the truncation applied during download.
     """
-    with yt_dlp.YoutubeDL({"outtmpl": filename_template, "trim_file_name": MAX_FILENAME_BYTES}) as ydl:
+    with yt_dlp.YoutubeDL(
+        {"outtmpl": filename_template, "trim_file_name": MAX_FILENAME_BYTES}
+    ) as ydl:
         filename = ydl.prepare_filename(info)
     return yt_dlp.utils.sanitize_filename(filename)
 
@@ -367,7 +377,14 @@ def download(
     duration = info.get("duration", 0)
 
     # Check if already downloaded
-    existing = _file_exists(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
+    existing = _file_exists(
+        output_dir,
+        info,
+        audio_format,
+        filename_template,
+        organization_mode,
+        use_primary_artist,
+    )
     if existing:
         logger.info("Skipping (exists): %s - %s", artist, title)
         return existing
@@ -377,7 +394,14 @@ def download(
     try:
         # Download the track
         ydl_opts = _get_ydl_opts(
-            output_dir, audio_format, filename_template, organization_mode, info, progress_callback, use_primary_artist, cookie_file
+            output_dir,
+            audio_format,
+            filename_template,
+            organization_mode,
+            info,
+            progress_callback,
+            use_primary_artist,
+            cookie_file,
         )
         extract_info_with_retry(
             ydl_opts=ydl_opts,
@@ -393,7 +417,14 @@ def download(
         raise
 
     # Find the downloaded file
-    audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
+    audio_path = _find_downloaded_file(
+        output_dir,
+        info,
+        audio_format,
+        filename_template,
+        organization_mode,
+        use_primary_artist,
+    )
 
     if audio_path:
         # Write multi-valued ARTISTS/ALBUMARTISTS tags if artists provided
@@ -467,10 +498,29 @@ def download_url(
 
     # Check if this is a playlist
     if info.get("_type") == "playlist" or "entries" in info:
-        return _download_playlist(info, output_dir, audio_format, filename_template, fetch_lyrics, organization_mode, use_primary_artist, cookie_file)
+        return _download_playlist(
+            info,
+            output_dir,
+            audio_format,
+            filename_template,
+            fetch_lyrics,
+            organization_mode,
+            use_primary_artist,
+            cookie_file,
+        )
 
     # Single track
-    return _download_single(url, info, output_dir, audio_format, filename_template, fetch_lyrics, organization_mode, use_primary_artist, cookie_file)
+    return _download_single(
+        url,
+        info,
+        output_dir,
+        audio_format,
+        filename_template,
+        fetch_lyrics,
+        organization_mode,
+        use_primary_artist,
+        cookie_file,
+    )
 
 
 def _download_single(
@@ -494,7 +544,14 @@ def _download_single(
     video_id = info.get("id")
 
     # Check if already downloaded
-    existing = _file_exists(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
+    existing = _file_exists(
+        output_dir,
+        info,
+        audio_format,
+        filename_template,
+        organization_mode,
+        use_primary_artist,
+    )
     if existing:
         logger.info("Skipping (exists): %s - %s", artist, title)
         return existing
@@ -502,7 +559,16 @@ def _download_single(
     logger.info("Downloading: %s - %s", artist, title)
 
     try:
-        ydl_opts = _get_ydl_opts(output_dir, audio_format, filename_template, organization_mode, info, None, use_primary_artist, cookie_file)
+        ydl_opts = _get_ydl_opts(
+            output_dir,
+            audio_format,
+            filename_template,
+            organization_mode,
+            info,
+            None,
+            use_primary_artist,
+            cookie_file,
+        )
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
     except Exception as e:
@@ -511,10 +577,21 @@ def _download_single(
             record_unavailable(output_dir, video_id, str(e), title=title, artist=artist)
         raise
 
-    audio_path = _find_downloaded_file(output_dir, info, audio_format, filename_template, organization_mode, use_primary_artist)
+    audio_path = _find_downloaded_file(
+        output_dir,
+        info,
+        audio_format,
+        filename_template,
+        organization_mode,
+        use_primary_artist,
+    )
 
     if audio_path and fetch_lyrics:
-        lyrics = get_lyrics_for_video(video_id, title, artist, duration) if video_id else None
+        lyrics = (
+            get_lyrics_for_video(video_id, title, artist, duration)
+            if video_id
+            else None
+        )
         if lyrics:
             save_lyrics(lyrics, audio_path)
 
@@ -556,15 +633,27 @@ def _download_playlist(
         if video_id and is_on_cooldown(output_dir, video_id, cooldown_hours):
             logger.info(
                 "[%d/%d] Skipping (unavailable cooldown): %s - %s",
-                i, len(entries), artist, title,
+                i,
+                len(entries),
+                artist,
+                title,
             )
             skipped += 1
             continue
 
         # Check if already downloaded
-        existing = _file_exists(output_dir, entry, audio_format, filename_template, organization_mode, use_primary_artist)
+        existing = _file_exists(
+            output_dir,
+            entry,
+            audio_format,
+            filename_template,
+            organization_mode,
+            use_primary_artist,
+        )
         if existing:
-            logger.info("[%d/%d] Skipping (exists): %s - %s", i, len(entries), artist, title)
+            logger.info(
+                "[%d/%d] Skipping (exists): %s - %s", i, len(entries), artist, title
+            )
             downloaded.append(existing)
             skipped += 1
             continue
@@ -573,7 +662,16 @@ def _download_playlist(
 
         try:
             url = f"https://music.youtube.com/watch?v={video_id}"
-            ydl_opts = _get_ydl_opts(output_dir, audio_format, filename_template, organization_mode, entry, None, use_primary_artist, cookie_file)
+            ydl_opts = _get_ydl_opts(
+                output_dir,
+                audio_format,
+                filename_template,
+                organization_mode,
+                entry,
+                None,
+                use_primary_artist,
+                cookie_file,
+            )
             extract_info_with_retry(
                 ydl_opts=ydl_opts,
                 url=url,
@@ -582,7 +680,14 @@ def _download_playlist(
                 config=config,
             )
 
-            audio_path = _find_downloaded_file(output_dir, entry, audio_format, filename_template, organization_mode, use_primary_artist)
+            audio_path = _find_downloaded_file(
+                output_dir,
+                entry,
+                audio_format,
+                filename_template,
+                organization_mode,
+                use_primary_artist,
+            )
 
             if audio_path:
                 downloaded.append(audio_path)
@@ -595,7 +700,9 @@ def _download_playlist(
             logger.warning("Failed to download %s: %s", title, e)
             # Record unavailable videos for cooldown
             if video_id and is_unavailable_error(str(e)):
-                record_unavailable(output_dir, video_id, str(e), title=title, artist=artist)
+                record_unavailable(
+                    output_dir, video_id, str(e), title=title, artist=artist
+                )
 
     new_downloads = len(downloaded) - skipped
     logger.info("Downloaded %d new tracks (%d skipped)", new_downloads, skipped)
