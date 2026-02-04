@@ -78,7 +78,7 @@ def load_state(state_dir: Path, playlist_name: str) -> PlaylistState | None:
             tracks=tracks,
         )
 
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, KeyError) as e:
         logger.error("Corrupted state file: %s - %s", state_file, e)
         # Backup corrupted file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
