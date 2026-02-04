@@ -2,6 +2,10 @@
 
 Kikusan is a tool to search and download music from youtube music. It must use yt-dlp in the background. It must be usable through CLI and also have a web app (subcommand "web"). The web app should be really simple, but must support search functionality. It should be deployable with docker and have an example docker-compose file. It must add lyrics via lrc files to the downloaded files (via https://lrclib.net/).
 
+## Known Issues and Technical Debt
+
+See `todo.md` for a comprehensive list of identified bugs and technical debt. The file categorizes issues by priority (Critical, High, Medium, Low) and provides detailed explanations of problems and how to fix them. Always check this file before starting work on bug fixes or refactoring.
+
 ## Features
 
 ### Web UI
@@ -202,3 +206,35 @@ All major configuration variables have corresponding CLI flags:
   - `--add-to-playlist/-p`: Add to M3U playlist
 
 CLI flags take precedence over environment variables. Options with `envvar` attribute automatically read from the corresponding environment variable if not specified on the command line.
+
+## Recent Bug Fixes (2026-02-04)
+
+The following critical and high-priority bugs were identified and fixed:
+
+1. **QueueManager Thread Safety** (`kikusan/queue.py`)
+   - Added `asyncio.Lock` to protect concurrent access to `self.jobs` dict
+   - Made all access methods async to properly use the lock
+   - Prevents race conditions in job tracking
+
+2. **Cross-Platform Atomic File Writes** (`kikusan/cron/state.py`, `kikusan/plugins/state.py`, `kikusan/unavailable.py`)
+   - Replaced `Path.rename()` with `Path.replace()` for atomic file operations
+   - Fixes Windows compatibility (rename fails if target exists)
+   - Prevents TOCTOU vulnerabilities in state file writes
+
+3. **Duration Parsing Exception Handling** (`kikusan/search.py`)
+   - Added try-except block in `_parse_duration()` to handle invalid time formats
+   - Returns 0 for malformed durations (e.g., "NaN:30", "--:--") instead of crashing
+
+4. **Cookie File Validation** (`kikusan/web/app.py`)
+   - Strict UTF-8 decoding (no `errors='ignore'`)
+   - Validates Netscape cookie format (7 tab-separated fields)
+   - Prevents arbitrary .txt file uploads as cookies
+
+5. **Country Code Validation** (`kikusan/web/app.py`)
+   - Added regex validation (`^[A-Z]{2}$`) to `/api/explore/charts` endpoint
+   - Consistent with cron config validation logic
+
+6. **QueueManager Memory Leak** (`kikusan/queue.py`)
+   - Implemented automatic cleanup of old completed/failed jobs
+   - Keeps maximum 100 most recent jobs (configurable via `max_history`)
+   - Cleanup runs after each job completion to prevent unbounded memory growth
