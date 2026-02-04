@@ -389,12 +389,13 @@ def remove_old_tracks(tracks: list[TrackState], state: PlaylistState, download_d
 
             # Delete .lrc file if exists
             lrc_path = file_path.with_suffix(".lrc")
-            if lrc_path.exists():
-                try:
-                    lrc_path.unlink()
-                    logger.debug("Deleted lyrics: %s", lrc_path)
-                except Exception as e:
-                    logger.warning("Failed to delete lyrics %s: %s", lrc_path, e)
+            try:
+                lrc_path.unlink()
+                logger.debug("Deleted lyrics: %s", lrc_path)
+            except FileNotFoundError:
+                pass  # Already deleted, that's fine
+            except Exception as e:
+                logger.warning("Failed to delete lyrics %s: %s", lrc_path, e)
 
         # Remove from state
         state.tracks = [t for t in state.tracks if t.video_id != track.video_id]
