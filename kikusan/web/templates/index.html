@@ -53,14 +53,25 @@
       </header>
 
       <form id="search-form" class="search-form">
-        <input
-          type="text"
-          id="search-input"
-          name="q"
-          placeholder="Search for music or paste url..."
-          autocomplete="off"
-          required
-        />
+        <div class="search-input-wrapper">
+          <input
+            type="text"
+            id="search-input"
+            name="q"
+            placeholder="Search for music or paste url..."
+            autocomplete="off"
+            required
+          />
+          <button
+            type="button"
+            class="search-clear-btn"
+            id="search-clear-btn"
+            aria-label="Clear search"
+            title="Clear"
+          >
+            ✕
+          </button>
+        </div>
         <button type="submit">Search</button>
       </form>
 
@@ -252,6 +263,36 @@
       const searchInput = document.getElementById("search-input");
       const resultsDiv = document.getElementById("songs-results");
       const statusDiv = document.getElementById("status");
+      const searchClearBtn = document.getElementById("search-clear-btn");
+
+      // Toggle clear button visibility based on input content
+      function updateClearButtonVisibility() {
+        if (searchInput.value.trim()) {
+          searchClearBtn.classList.add("visible");
+        } else {
+          searchClearBtn.classList.remove("visible");
+        }
+      }
+
+      // Clear search input
+      function clearSearch() {
+        searchInput.value = "";
+        updateClearButtonVisibility();
+        searchInput.focus();
+
+        // Clear results and update URL
+        songsResults.innerHTML = "";
+        albumsResults.innerHTML = "";
+        showStatus("");
+        updateUrlParams("", currentTab);
+      }
+
+      // Event listeners for clear button
+      searchInput.addEventListener("input", updateClearButtonVisibility);
+      searchClearBtn.addEventListener("click", clearSearch);
+
+      // Initialize clear button visibility
+      updateClearButtonVisibility();
 
       // Tab management
       const tabButtons = document.querySelectorAll(".tab-btn");
