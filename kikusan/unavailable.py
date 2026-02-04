@@ -109,7 +109,7 @@ def save_unavailable(download_dir: Path, data: dict) -> None:
     try:
         json_str = json.dumps(data, indent=2, ensure_ascii=False)
         temp_file.write_text(json_str, encoding="utf-8")
-        temp_file.rename(unavailable_file)
+        temp_file.replace(unavailable_file)
         logger.debug("Saved unavailable registry (%d entries)", len(data))
     except Exception as e:
         logger.error("Failed to save unavailable file: %s", e)

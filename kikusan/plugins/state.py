@@ -111,8 +111,8 @@ def save_plugin_state(state_dir: Path, state: PluginState) -> None:
         # Write to temp file
         temp_file.write_text(json_str, encoding="utf-8")
 
-        # Atomic rename (POSIX guarantee)
-        temp_file.rename(state_file)
+        # Atomic replace (cross-platform, overwrites existing file)
+        temp_file.replace(state_file)
 
         logger.debug("Saved plugin state: %s", state.plugin_name)
 
