@@ -419,11 +419,11 @@ def _get_mood_playlists_fallback(yt: YTMusic, params: str) -> list[dict]:
             continue
 
         # Skip sections that don't contain playlist items (musicTwoRowItemRenderer)
-        if MTRIR_KEY not in results[0]:
+        if not results or MTRIR_KEY not in results[0]:
             logger.debug(
                 "Fallback: section %d uses %s, skipping (not playlist items)",
                 section_idx,
-                list(results[0].keys()),
+                list(results[0].keys()) if results else [],
             )
             continue
 
