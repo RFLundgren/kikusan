@@ -311,20 +311,19 @@ def download_new_tracks(
             )
 
             if audio_path:
-                # Check if it was skipped (already existed)
-                if audio_path in [Path(t.file_path) for t in state.tracks]:
-                    skipped += 1
-                else:
-                    # Add to state
-                    track_state = TrackState(
-                        video_id=video_id,
-                        title=title,
-                        artist=artist,
-                        file_path=str(audio_path),
-                        downloaded_at=datetime.now().isoformat(),
-                    )
-                    state.tracks.append(track_state)
-                    downloaded += 1
+                # Add to state
+                track_state = TrackState(
+                    video_id=video_id,
+                    title=title,
+                    artist=artist,
+                    file_path=str(audio_path),
+                    downloaded_at=datetime.now().isoformat(),
+                )
+                state.tracks.append(track_state)
+                downloaded += 1
+            else:
+                # download() returned None (file not found after download)
+                failed += 1
 
         except Exception as e:
             logger.error("Failed to download %s - %s: %s", artist, title, e)
