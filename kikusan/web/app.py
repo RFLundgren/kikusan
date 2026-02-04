@@ -348,7 +348,9 @@ async def download_file(file_path: str):
         abs_download_dir = config.download_dir.resolve()
 
         # Security: ensure path is within download_dir
-        if not str(abs_requested).startswith(str(abs_download_dir)):
+        try:
+            abs_requested.relative_to(abs_download_dir)
+        except ValueError:
             raise HTTPException(status_code=403, detail="Access denied")
 
         if not abs_requested.exists():
