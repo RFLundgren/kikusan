@@ -330,5 +330,5 @@ def get_navidrome_protection_cache() -> NavidromeProtectionCache:
 
     except Exception as e:
         logger.warning("Failed to load Navidrome protection: %s", e)
-        # Fail-safe: return empty cache but mark as enabled (will block deletions)
-        return NavidromeProtectionCache([], [], True)
+        # Disable protection on error, will fall back to on-demand checks
+        return NavidromeProtectionCache([], [], False)
