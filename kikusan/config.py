@@ -1,8 +1,11 @@
 """Configuration handling for Kikusan."""
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Default filename template: Artist - Title
 DEFAULT_FILENAME_TEMPLATE = "%(artist,uploader)s - %(title)s"
@@ -68,10 +71,11 @@ class Config:
         # Parse and validate cookie mode
         cookie_mode = os.getenv("KIKUSAN_COOKIE_MODE", "auto").lower()
         if cookie_mode not in ("auto", "always", "never"):
-            raise ValueError(
-                f"Invalid KIKUSAN_COOKIE_MODE: {cookie_mode}. "
-                f"Must be one of: auto, always, never"
+            logger.warning(
+                "Invalid KIKUSAN_COOKIE_MODE '%s', falling back to 'auto'",
+                cookie_mode
             )
+            cookie_mode = "auto"
 
         # Parse cookie retry delay
         cookie_retry_delay = float(os.getenv("KIKUSAN_COOKIE_RETRY_DELAY", "1.0"))
