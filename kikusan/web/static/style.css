@@ -593,10 +593,40 @@ header p {
     .search-form button {
         width: 100%;
     }
+
+    /* Fix tab overflow on mobile */
+    .search-tabs {
+        gap: 0.25rem;
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 0.75rem 0.5rem;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
 }
 
 /* Small screens (< 640px) */
 @media (max-width: 640px) {
+    /* Fix tab overflow on mobile */
+    .search-tabs {
+        gap: 0.25rem;
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 0.75rem 0.5rem;
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
     .albums-grid {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 0.75rem;
