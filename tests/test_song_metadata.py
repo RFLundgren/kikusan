@@ -172,8 +172,8 @@ class TestGetSongMetadata:
 
         result = get_song_metadata("test123")
 
-        assert result is not None
-        assert result.duration_seconds == 0
+        # Should return None for invalid duration instead of returning metadata with duration=0
+        assert result is None
 
 
 class TestSongMetadataDataclass:

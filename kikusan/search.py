@@ -636,7 +636,10 @@ def get_song_metadata(video_id: str) -> SongMetadata | None:
         logger.debug("Incomplete videoDetails for video_id '%s', trying watch playlist", video_id)
         return _get_metadata_from_watch_playlist(yt, video_id)
 
-    duration_seconds = int(length_seconds_str) if length_seconds_str.isdigit() else 0
+    if not length_seconds_str or not length_seconds_str.isdigit():
+        logger.warning("Invalid duration for video %s", video_id)
+        return None
+    duration_seconds = int(length_seconds_str)
 
     # videoDetails does not include album; try watch playlist for album info
     album = _get_album_from_watch_playlist(yt, video_id)
