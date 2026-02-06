@@ -415,7 +415,7 @@ wheels = [
 
 [[package]]
 name = "kikusan"
-version = "0.15.8"
+version = "0.15.9"
 source = { editable = "." }
 dependencies = [
     { name = "apscheduler" },
