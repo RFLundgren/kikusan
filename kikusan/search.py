@@ -383,6 +383,12 @@ def _get_mood_playlists_fallback(yt: YTMusic, params: str) -> list[dict]:
 
     MTRIR_KEY = "musicTwoRowItemRenderer"
 
+    # WARNING: Using private ytmusicapi method _send_request()
+    # This is not part of the public API and may break in future versions.
+    # TODO: Monitor ytmusicapi updates for breaking changes or consider submitting
+    # a PR to ytmusicapi to expose this functionality as a public method.
+    # This is necessary because the public get_mood_playlists() method crashes on
+    # responses containing mixed content types (playlists + songs).
     response = yt._send_request(
         "browse",
         {"browseId": "FEmusic_moods_and_genres_category", "params": params},

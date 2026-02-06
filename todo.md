@@ -13,16 +13,6 @@ This file tracks identified bugs and technical debt that need to be addressed.
 - Standardize on one pattern (recommend: let exceptions propagate, handle at API boundary)
 - Document the error handling strategy in each function
 
-### 10. Uses Private ytmusicapi Method
-**File**: `kikusan/search.py:360-367`
-
-**Problem**: `_get_mood_playlists_fallback()` uses private `yt._send_request()` method, not documented as part of public API.
-
-**How to Fix**:
-- Monitor ytmusicapi updates for breaking changes
-- Consider submitting PR to ytmusicapi to make this a public method
-- Add comment documenting the risk
-
 ---
 
 ## Completed Fixes ✅
@@ -35,3 +25,4 @@ This file tracks identified bugs and technical debt that need to be addressed.
 6. ✅ Memory leak in QueueManager - Automatic cleanup of old jobs (max 100)
 7. ✅ CookieUsageStats thread safety - Added threading.Lock with class methods for atomic counter operations
 8. ✅ Numeric config validation - Added bounds checking for cookie_retry_delay, unavailable_cooldown_hours, and web_port
+9. ✅ Private ytmusicapi method documentation - Added comprehensive warning comment about _send_request() usage risks
