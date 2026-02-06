@@ -79,6 +79,10 @@ class Config:
 
         # Parse cookie retry delay
         cookie_retry_delay = float(os.getenv("KIKUSAN_COOKIE_RETRY_DELAY", "1.0"))
+        if cookie_retry_delay < 0:
+            raise ValueError(
+                f"KIKUSAN_COOKIE_RETRY_DELAY must be non-negative, got {cookie_retry_delay}"
+            )
 
         # Parse log cookie usage flag
         log_cookie_usage = os.getenv("KIKUSAN_LOG_COOKIE_USAGE", "true").lower() in (
@@ -89,9 +93,22 @@ class Config:
 
         # Parse unavailable cooldown hours (0 = disabled)
         unavailable_cooldown_hours = int(os.getenv("KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS", "168"))
+        if unavailable_cooldown_hours < 0:
+            logger.warning(
+                "KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS is negative (%d), using 0 (disabled)",
+                unavailable_cooldown_hours
+            )
+            unavailable_cooldown_hours = 0
 
         # Parse multi-user mode flag
         multi_user = os.getenv("KIKUSAN_MULTI_USER", "false").lower() in ("true", "1", "yes")
+
+        # Parse web port
+        web_port = int(os.getenv("KIKUSAN_WEB_PORT", "8000"))
+        if not (1 <= web_port <= 65535):
+            raise ValueError(
+                f"KIKUSAN_WEB_PORT must be between 1 and 65535, got {web_port}"
+            )
 
         return cls(
             download_dir=Path(os.getenv("KIKUSAN_DOWNLOAD_DIR", "./downloads")),
@@ -99,7 +116,7 @@ class Config:
             filename_template=os.getenv("KIKUSAN_FILENAME_TEMPLATE", DEFAULT_FILENAME_TEMPLATE),
             organization_mode=os.getenv("KIKUSAN_ORGANIZATION_MODE", "flat"),
             use_primary_artist=os.getenv("KIKUSAN_USE_PRIMARY_ARTIST", "false").lower() in ("true", "1", "yes"),
-            web_port=int(os.getenv("KIKUSAN_WEB_PORT", "8000")),
+            web_port=web_port,
             spotify_client_id=os.getenv("SPOTIFY_CLIENT_ID"),
             spotify_client_secret=os.getenv("SPOTIFY_CLIENT_SECRET"),
             web_playlist_name=os.getenv("KIKUSAN_WEB_PLAYLIST"),

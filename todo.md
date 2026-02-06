@@ -23,33 +23,6 @@ This file tracks identified bugs and technical debt that need to be addressed.
 - Consider submitting PR to ytmusicapi to make this a public method
 - Add comment documenting the risk
 
-## Architectural Issues
-
-### 12. No Validation of Numeric Config Values
-**File**: `kikusan/config.py:77, 87`
-
-**Problem**: Float and int configuration values are parsed without bounds checking. Could accept negative or invalid values.
-
-```python
-cookie_retry_delay = float(os.getenv("KIKUSAN_COOKIE_RETRY_DELAY", "1.0"))  # Could be -5.0
-unavailable_cooldown_hours = int(os.getenv("KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS", "168"))  # Could be -100
-```
-
-**How to Fix**:
-- Add validation after parsing
-- Raise `ValueError` or log warning and use default
-
-```python
-cookie_retry_delay = float(os.getenv("KIKUSAN_COOKIE_RETRY_DELAY", "1.0"))
-if cookie_retry_delay < 0:
-    raise ValueError(f"KIKUSAN_COOKIE_RETRY_DELAY must be non-negative, got {cookie_retry_delay}")
-
-unavailable_cooldown_hours = int(os.getenv("KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS", "168"))
-if unavailable_cooldown_hours < 0:
-    logger.warning("KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS is negative, using 0 (disabled)")
-    unavailable_cooldown_hours = 0
-```
-
 ---
 
 ## Completed Fixes ✅
@@ -61,3 +34,4 @@ if unavailable_cooldown_hours < 0:
 5. ✅ Country code validation - Added regex validation to web endpoint
 6. ✅ Memory leak in QueueManager - Automatic cleanup of old jobs (max 100)
 7. ✅ CookieUsageStats thread safety - Added threading.Lock with class methods for atomic counter operations
+8. ✅ Numeric config validation - Added bounds checking for cookie_retry_delay, unavailable_cooldown_hours, and web_port
