@@ -13,6 +13,7 @@ Responsibilities:
 
 import logging
 import re
+import threading
 import time
 from typing import Any, Optional
 
@@ -49,23 +50,43 @@ AUTH_REQUIRED_PATTERNS = [
 class CookieUsageStats:
     """Track cookie usage statistics for observability."""
 
+    _lock = threading.Lock()
     total_requests: int = 0
     cookie_fallback_count: int = 0
     always_cookie_count: int = 0
 
     @classmethod
+    def increment_total(cls):
+        """Thread-safe increment of total requests counter."""
+        with cls._lock:
+            cls.total_requests += 1
+
+    @classmethod
+    def increment_cookie_fallback(cls):
+        """Thread-safe increment of cookie fallback counter."""
+        with cls._lock:
+            cls.cookie_fallback_count += 1
+
+    @classmethod
+    def increment_always_cookie(cls):
+        """Thread-safe increment of always cookie counter."""
+        with cls._lock:
+            cls.always_cookie_count += 1
+
+    @classmethod
     def log_summary(cls):
         """Log summary of cookie usage statistics."""
-        if cls.total_requests == 0:
-            return
+        with cls._lock:
+            if cls.total_requests == 0:
+                return
 
-        fallback_pct = (cls.cookie_fallback_count / cls.total_requests) * 100
-        logger.info(
-            "Cookie usage stats: %d/%d requests (%.1f%%) required cookie fallback",
-            cls.cookie_fallback_count,
-            cls.total_requests,
-            fallback_pct,
-        )
+            fallback_pct = (cls.cookie_fallback_count / cls.total_requests) * 100
+            logger.info(
+                "Cookie usage stats: %d/%d requests (%.1f%%) required cookie fallback",
+                cls.cookie_fallback_count,
+                cls.total_requests,
+                fallback_pct,
+            )
 
 
 def is_auth_error(exception: Exception) -> bool:
@@ -123,7 +144,7 @@ def extract_info_with_retry(
         config = get_config()
 
     # Track statistics
-    CookieUsageStats.total_requests += 1
+    CookieUsageStats.increment_total()
 
     # Determine cookie usage based on mode
     cookie_mode = getattr(config, "cookie_mode", "auto")
@@ -134,7 +155,7 @@ def extract_info_with_retry(
     if cookie_mode == "always":
         if log_cookie_usage:
             logger.debug("Cookie mode=always: Using cookies for all requests")
-        CookieUsageStats.always_cookie_count += 1
+        CookieUsageStats.increment_always_cookie()
         return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=True)
 
     # Mode: never - never use cookies
@@ -168,7 +189,7 @@ def extract_info_with_retry(
             logger.info("Cookie fallback for: %s", url)
             logger.debug("Retrying with cookies after %.1fs delay", retry_delay)
 
-        CookieUsageStats.cookie_fallback_count += 1
+        CookieUsageStats.increment_cookie_fallback()
 
         # Wait before retrying
         time.sleep(retry_delay)

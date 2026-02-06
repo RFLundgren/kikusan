@@ -25,36 +25,6 @@ This file tracks identified bugs and technical debt that need to be addressed.
 
 ## Architectural Issues
 
-### 11. CookieUsageStats Not Thread-Safe
-**File**: `kikusan/yt_dlp_wrapper.py:49-68`
-
-**Problem**: Static class variables are modified without synchronization in a multi-threaded context.
-
-```python
-class CookieUsageStats:
-    total_requests: int = 0  # Class variable
-    cookie_fallback_count: int = 0
-    always_cookie_count: int = 0
-```
-
-**How to Fix**:
-- Add `threading.Lock` to synchronize counter increments
-- Or use `threading.local()` for per-thread counters
-- Or use atomic operations from `multiprocessing.Value`
-
-```python
-import threading
-
-class CookieUsageStats:
-    _lock = threading.Lock()
-    total_requests: int = 0
-
-    @classmethod
-    def increment_total(cls):
-        with cls._lock:
-            cls.total_requests += 1
-```
-
 ### 12. No Validation of Numeric Config Values
 **File**: `kikusan/config.py:77, 87`
 
@@ -90,3 +60,4 @@ if unavailable_cooldown_hours < 0:
 4. ✅ Cookie file validation - Strict UTF-8 + Netscape format validation
 5. ✅ Country code validation - Added regex validation to web endpoint
 6. ✅ Memory leak in QueueManager - Automatic cleanup of old jobs (max 100)
+7. ✅ CookieUsageStats thread safety - Added threading.Lock with class methods for atomic counter operations
