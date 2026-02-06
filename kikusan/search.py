@@ -286,6 +286,9 @@ def get_mood_categories() -> list[MoodSection]:
 
     Returns:
         List of MoodSection objects, each containing a section title and list of categories.
+
+    Raises:
+        Exception: If YouTube Music API fails (e.g., JSONDecodeError, network error)
     """
     yt = YTMusic()
     try:
@@ -324,6 +327,10 @@ def get_mood_playlists(params: str) -> list[MoodPlaylist]:
 
     Returns:
         List of MoodPlaylist objects for the given category.
+
+    Raises:
+        Exception: If YouTube Music API fails (non-KeyError exceptions propagate;
+                   KeyError triggers fallback to manual parsing)
     """
     yt = YTMusic()
     try:
@@ -366,6 +373,11 @@ def _get_mood_playlists_fallback(yt: YTMusic, params: str) -> list[dict]:
 
     The function skips sections with incompatible renderers and handles individual
     item parse failures within valid sections.
+
+    Error Handling Strategy:
+        Navigation errors return empty list instead of raising. This is a fallback
+        function called after the primary method fails - returning empty list is
+        safer than cascading failures, allowing partial results if some sections parse.
 
     Args:
         yt: YTMusic instance (reused from caller to avoid re-initialization)
@@ -472,6 +484,10 @@ def get_charts(country: str = "ZZ") -> Charts:
 
     Returns:
         Charts object with tracks and artists.
+
+    Raises:
+        Exception: If YouTube Music API fails to fetch chart metadata. Individual
+                   playlist fetch errors are logged and retried with next playlist.
     """
     yt = YTMusic()
     try:
@@ -483,6 +499,9 @@ def get_charts(country: str = "ZZ") -> Charts:
     # Videos section is a list of playlist references -- try each until one succeeds.
     # Some entries use album-style IDs (OLAK5uy_...) that fail with get_playlist,
     # so we iterate through all playlist references and use the first that works.
+    # Error Handling: Individual playlist fetch errors are logged and the loop continues
+    # to try the next playlist (retry pattern). This ensures we get chart data even if
+    # some playlist references are broken.
     tracks = []
     video_playlists = raw.get("videos", [])
     if isinstance(video_playlists, list):
@@ -634,6 +653,11 @@ def get_song_metadata(video_id: str) -> SongMetadata | None:
     The clean metadata significantly improves lyrics lookup success rates
     on lrclib.net.
 
+    Error Handling Strategy:
+        This function is used for optional metadata enhancement. Errors are
+        caught and logged, returning None to allow the caller to continue with
+        fallback metadata instead of failing the entire operation.
+
     Args:
         video_id: YouTube video ID
 
@@ -683,6 +707,11 @@ def _get_album_from_watch_playlist(yt: YTMusic, video_id: str) -> str | None:
     The get_song() endpoint does not include album info in videoDetails,
     but get_watch_playlist() returns it per track.
 
+    Error Handling Strategy:
+        Errors are caught and logged at debug level, returning None. This is
+        internal helper for optional album metadata - failures should not break
+        the metadata fetch operation.
+
     Args:
         yt: YTMusic instance (reused to avoid re-initialization)
         video_id: YouTube video ID
@@ -706,6 +735,11 @@ def _get_metadata_from_watch_playlist(yt: YTMusic, video_id: str) -> SongMetadat
     """Fallback: extract full metadata from watch playlist.
 
     Used when get_song() returns incomplete videoDetails.
+
+    Error Handling Strategy:
+        Errors are caught and logged, returning None. This is a fallback helper
+        for optional metadata enhancement - failures allow the caller to proceed
+        with yt-dlp metadata instead of blocking the download operation.
 
     Args:
         yt: YTMusic instance (reused to avoid re-initialization)

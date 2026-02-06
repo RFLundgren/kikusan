@@ -2,17 +2,6 @@
 
 This file tracks identified bugs and technical debt that need to be addressed.
 
-## Low Priority
-
-### 9. Inconsistent Error Handling Patterns
-**File**: `kikusan/search.py:127-195`
-
-**Problem**: Search functions have different error handling patterns. Some re-raise, others catch and return empty lists. Makes error handling unpredictable for callers.
-
-**How to Fix**:
-- Standardize on one pattern (recommend: let exceptions propagate, handle at API boundary)
-- Document the error handling strategy in each function
-
 ---
 
 ## Completed Fixes ✅
@@ -26,3 +15,4 @@ This file tracks identified bugs and technical debt that need to be addressed.
 7. ✅ CookieUsageStats thread safety - Added threading.Lock with class methods for atomic counter operations
 8. ✅ Numeric config validation - Added bounds checking for cookie_retry_delay, unavailable_cooldown_hours, and web_port
 9. ✅ Private ytmusicapi method documentation - Added comprehensive warning comment about _send_request() usage risks
+10. ✅ Inconsistent error handling patterns - Documented error handling strategy in all search functions (propagate vs. return None/empty)
