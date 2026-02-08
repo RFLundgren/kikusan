@@ -228,11 +228,11 @@ def _get_ydl_opts(
                 # Format ETA
                 if eta:
                     if eta > 3600:
-                        eta_str = f"{eta // 3600}h {(eta % 3600) // 60}m"
+                        eta_str = f"{int(eta) // 3600}h {(int(eta) % 3600) // 60}m"
                     elif eta > 60:
-                        eta_str = f"{eta // 60}m {eta % 60}s"
+                        eta_str = f"{int(eta) // 60}m {int(eta) % 60}s"
                     else:
-                        eta_str = f"{eta}s"
+                        eta_str = f"{int(eta)}s"
                 else:
                     eta_str = "N/A"
 

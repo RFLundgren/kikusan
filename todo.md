@@ -1,0 +1,2 @@
+- [ ] The preview for https://music.youtube.com/watch?v=F0xM-j6_sDo does not work
+- [x] The ETA for a download I just did was 0.13992302873763285s. Please only show whole seconds.
