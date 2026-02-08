@@ -79,6 +79,7 @@
         <button class="tab-btn active" data-tab="songs">Songs</button>
         <button class="tab-btn" data-tab="albums">Albums</button>
         <button class="tab-btn" data-tab="explore">Explore</button>
+        <button class="tab-btn" data-tab="downloads" id="downloads-tab-btn" style="display:none">Downloads</button>
       </div>
 
       <div id="status" class="status"></div>
@@ -97,6 +98,7 @@
       <div id="songs-results" class="results active"></div>
       <div id="albums-results" class="albums-grid"></div>
       <div id="explore-results" class="explore-section"></div>
+      <div id="downloads-results" class="downloads-section"></div>
     </div>
 
     <!-- Settings Modal -->
@@ -323,6 +325,9 @@
             exploreLoaded = false;
             exploreBreadcrumb = [];
             setActiveTab(tab);
+          } else if (tab === "downloads") {
+            setActiveTab(tab);
+            updateUrlParams("", tab);
           } else {
             setActiveTab(tab);
             const query = searchInput.value.trim();
@@ -465,13 +470,14 @@
       // Initialize tab from URL
       function initTabFromUrl() {
         const tab = getQueryParam("tab") || "songs";
-        if (tab === "songs" || tab === "albums" || tab === "explore") {
+        if (tab === "songs" || tab === "albums" || tab === "explore" || tab === "downloads") {
           setActiveTab(tab);
         }
       }
 
       // Set active tab (updates UI and currentTab variable)
       const exploreResults = document.getElementById("explore-results");
+      const downloadsResults = document.getElementById("downloads-results");
 
       function setActiveTab(tab, skipExploreLoad = false) {
         currentTab = tab;
@@ -486,6 +492,7 @@
         songsResults.classList.remove("active");
         albumsResults.classList.remove("active");
         exploreResults.classList.remove("active");
+        downloadsResults.classList.remove("active");
 
         if (tab === "songs") {
           songsResults.classList.add("active");
@@ -496,6 +503,9 @@
           if (!skipExploreLoad) {
             loadExploreContent();
           }
+        } else if (tab === "downloads") {
+          downloadsResults.classList.add("active");
+          loadDownloads();
         }
       }
 
@@ -518,6 +528,12 @@
         if (tab === "explore") {
           const restored = restoreExploreFromUrl();
           if (restored) return;
+        }
+
+        // Downloads tab: just activate it, loadDownloads is called by setActiveTab
+        if (tab === "downloads") {
+          initTabFromUrl();
+          return;
         }
 
         initTabFromUrl();
@@ -716,7 +732,7 @@
         }
 
         // Restore tab state
-        if (tab === "songs" || tab === "albums") {
+        if (tab === "songs" || tab === "albums" || tab === "downloads") {
           setActiveTab(tab);
         }
 
@@ -1087,9 +1103,23 @@
         }
       }
 
+      let previousJobStatuses = {};
+
       function updateQueueUI(jobs) {
         const queueList = document.getElementById("queue-list");
         const queueSection = document.getElementById("queue-section");
+
+        // Detect newly completed jobs and refresh downloads tab if active
+        let hasNewlyCompleted = false;
+        for (const job of jobs) {
+          if (job.status === "completed" && previousJobStatuses[job.id] && previousJobStatuses[job.id] !== "completed") {
+            hasNewlyCompleted = true;
+          }
+          previousJobStatuses[job.id] = job.status;
+        }
+        if (hasNewlyCompleted && currentTab === "downloads") {
+          loadDownloads();
+        }
 
         if (jobs.length === 0) {
           queueSection.style.display = "none";
@@ -1963,6 +1993,120 @@
           btn.textContent = originalText;
           btn.disabled = false;
         }, 3000);
+      }
+
+      // --- Downloads tab ---
+
+      async function checkPlaylistStatus() {
+        try {
+          const response = await fetch("/api/playlist/status");
+          const data = await response.json();
+          const btn = document.getElementById("downloads-tab-btn");
+          if (data.enabled) {
+            btn.style.display = "";
+          }
+        } catch (error) {
+          console.error("Failed to check playlist status:", error);
+        }
+      }
+
+      // Check on load
+      checkPlaylistStatus();
+
+      async function loadDownloads() {
+        downloadsResults.innerHTML = '<div class="explore-loading">Loading playlist...</div>';
+        try {
+          const response = await fetch("/api/playlist/tracks");
+          if (!response.ok) {
+            if (response.status === 404) {
+              downloadsResults.innerHTML = '<div class="downloads-empty">Playlist not configured.</div>';
+              return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const data = await response.json();
+          renderDownloads(data.tracks, data.total);
+        } catch (error) {
+          downloadsResults.innerHTML = `<div class="explore-error">Failed to load playlist: ${escapeHtml(error.message)}</div>`;
+        }
+      }
+
+      function renderDownloads(tracks, total) {
+        if (!tracks || tracks.length === 0) {
+          downloadsResults.innerHTML = '<div class="downloads-empty">Your download playlist is empty. Download some tracks to see them here.</div>';
+          return;
+        }
+
+        let html = `
+          <div class="downloads-header">
+            <h2>Downloads</h2>
+            <span class="downloads-count">${total} track${total !== 1 ? "s" : ""}</span>
+          </div>
+          <div class="downloads-list">
+        `;
+
+        html += tracks.map(track => {
+          const missingClass = track.file_exists ? "" : " track-missing";
+          const missingLabel = track.file_exists ? "" : '<span class="track-missing-label">File missing</span>';
+          const saveLink = track.file_exists
+            ? `<a href="/api/download-file/${encodeURIComponent(track.entry_path)}" class="download-file-btn" download>Save</a>`
+            : "";
+
+          return `
+            <div class="track${missingClass}">
+              <div class="track-main">
+                <div class="track-info">
+                  <div class="track-title">${escapeHtml(track.title)}</div>
+                  <div class="track-artist">${escapeHtml(track.artist)}${track.album ? " - " + escapeHtml(track.album) : ""}</div>
+                  <div class="track-meta">
+                    ${track.duration ? `<span class="track-duration">${track.duration}</span>` : ""}
+                    ${missingLabel}
+                  </div>
+                </div>
+              </div>
+              <div class="track-actions">
+                ${saveLink}
+                <button class="remove-btn" data-entry-path="${escapeHtml(track.entry_path)}">Remove</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        html += "</div>";
+        downloadsResults.innerHTML = html;
+
+        // Attach remove handlers
+        downloadsResults.querySelectorAll(".remove-btn").forEach(btn => {
+          btn.addEventListener("click", handleRemoveTrack);
+        });
+      }
+
+      async function handleRemoveTrack(e) {
+        const btn = e.target;
+        const entryPath = btn.dataset.entryPath;
+        btn.disabled = true;
+        btn.textContent = "Removing...";
+
+        try {
+          const response = await fetch(`/api/playlist/tracks?entry_path=${encodeURIComponent(entryPath)}`, {
+            method: "DELETE",
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({ detail: "Unknown error" }));
+            throw new Error(data.detail || `HTTP ${response.status}`);
+          }
+
+          // Reload downloads list
+          await loadDownloads();
+        } catch (error) {
+          btn.textContent = "Failed";
+          showStatus("Failed to remove track: " + error.message, true);
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = "Remove";
+          }, 3000);
+        }
       }
 
       function escapeHtml(text) {

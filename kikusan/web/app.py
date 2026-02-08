@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from kikusan import __version__
 from kikusan.config import get_config
 from kikusan.download import download
-from kikusan.playlist import add_to_m3u
+from kikusan.playlist import add_to_m3u, read_m3u, remove_from_m3u
 from kikusan.queue import QueueManager
 from kikusan.search import search
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
@@ -395,6 +395,10 @@ async def download_file(file_path: str):
     requested_path = Path(file_path)
 
     try:
+        # If relative path, resolve against download_dir (e.g. M3U entries)
+        if not requested_path.is_absolute():
+            requested_path = config.download_dir / requested_path
+
         abs_requested = requested_path.resolve()
         abs_download_dir = config.download_dir.resolve()
 
@@ -415,6 +419,8 @@ async def download_file(file_path: str):
             filename=abs_requested.name,
             media_type='application/octet-stream'
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to serve file")
 
@@ -934,3 +940,133 @@ async def delete_cookies():
         return {"success": True, "message": "Cookie file deleted"}
     else:
         raise HTTPException(status_code=404, detail="No uploaded cookie file found")
+
+
+# Playlist (Downloads tab) endpoints
+
+
+def _extract_track_info(entry_path: str, download_dir: Path) -> dict:
+    """Extract track metadata from an audio file using mutagen, with path-based fallback."""
+    full_path = download_dir / entry_path
+    file_exists = full_path.exists()
+
+    info = {
+        "entry_path": entry_path,
+        "title": "",
+        "artist": "",
+        "album": None,
+        "duration": None,
+        "file_exists": file_exists,
+    }
+
+    # Try mutagen metadata extraction
+    if file_exists:
+        try:
+            from mutagen import File as MutagenFile
+
+            audio = MutagenFile(full_path)
+            if audio:
+                title = audio.get("title", [])
+                artist = audio.get("artist", []) or audio.get("ARTISTS", []) or audio.get("artists", [])
+                album = audio.get("album", [])
+
+                info["title"] = str(title[0]) if isinstance(title, list) and title else str(title) if title else ""
+                info["artist"] = str(artist[0]) if isinstance(artist, list) and artist else str(artist) if artist else ""
+                info["album"] = str(album[0]) if isinstance(album, list) and album else str(album) if album else None
+
+                if audio.info and hasattr(audio.info, "length") and audio.info.length:
+                    total_seconds = int(audio.info.length)
+                    minutes = total_seconds // 60
+                    seconds = total_seconds % 60
+                    info["duration"] = f"{minutes}:{seconds:02d}"
+        except Exception:
+            pass
+
+    # Fallback to path parsing if metadata is incomplete
+    if not info["title"]:
+        title, artist = _parse_track_info_from_path(entry_path)
+        info["title"] = title
+        if not info["artist"]:
+            info["artist"] = artist
+
+    return info
+
+
+def _parse_track_info_from_path(entry_path: str) -> tuple[str, str]:
+    """Parse title and artist from file path.
+
+    Handles:
+      - Flat mode: "Artist - Title.opus"
+      - Album mode: "Artist/Album/01 - Title.opus"
+    """
+    p = Path(entry_path)
+    stem = p.stem
+    parts = p.parts
+
+    # Album mode: Artist/Album/TrackNum - Title.ext
+    if len(parts) >= 3:
+        artist = parts[0]
+        # Strip leading track number pattern like "01 - "
+        title = stem
+        if " - " in title:
+            title = title.split(" - ", 1)[1]
+        return title, artist
+
+    # Flat mode: Artist - Title.ext
+    if " - " in stem:
+        artist, title = stem.split(" - ", 1)
+        return title.strip(), artist.strip()
+
+    return stem, ""
+
+
+@app.get("/api/playlist/status")
+async def api_playlist_status(http_request: Request):
+    """Check if playlist feature is enabled for the current user."""
+    config = get_config()
+    remote_user = _get_remote_user(http_request, config)
+    playlist_name = config.effective_playlist_name(remote_user)
+    return {"enabled": playlist_name is not None}
+
+
+@app.get("/api/playlist/tracks")
+async def api_playlist_tracks(http_request: Request):
+    """List tracks in the user's download playlist with metadata."""
+    import asyncio
+    import logging
+
+    logger = logging.getLogger(__name__)
+    config = get_config()
+    remote_user = _get_remote_user(http_request, config)
+    playlist_name = config.effective_playlist_name(remote_user)
+
+    if not playlist_name:
+        raise HTTPException(status_code=404, detail="Playlist not configured")
+
+    entries = read_m3u(playlist_name, config.download_dir)
+    loop = asyncio.get_event_loop()
+
+    # Extract metadata in thread pool to avoid blocking the event loop
+    tracks = []
+    for entry in entries:
+        info = await loop.run_in_executor(None, _extract_track_info, entry, config.download_dir)
+        tracks.append(info)
+
+    return {"tracks": tracks, "total": len(tracks), "playlist_name": playlist_name}
+
+
+@app.delete("/api/playlist/tracks")
+async def api_playlist_remove_track(entry_path: str = Query(..., description="Exact M3U entry to remove"), http_request: Request = None):
+    """Remove a track entry from the playlist (does not delete the audio file)."""
+    config = get_config()
+    remote_user = _get_remote_user(http_request, config)
+    playlist_name = config.effective_playlist_name(remote_user)
+
+    if not playlist_name:
+        raise HTTPException(status_code=404, detail="Playlist not configured")
+
+    removed = remove_from_m3u(entry_path, playlist_name, config.download_dir)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Entry not found in playlist")
+
+    return {"success": True, "message": "Track removed from playlist"}

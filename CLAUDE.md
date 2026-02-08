@@ -44,6 +44,21 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
     - CSS: `.cron-btn` (standard) and `.cron-btn-inline` (breadcrumb variant) in `style.css`
     - JS: `generateCronYaml()` and `copyCronConfig()` in embedded script
   - Reuses existing download queue infrastructure (`/api/queue/add`)
+- **Downloads tab**: View and manage the M3U download playlist from the web UI
+  - Tab is conditionally shown only when `KIKUSAN_WEB_PLAYLIST` is configured (checked via `/api/playlist/status`)
+  - Displays track list with metadata (title, artist, album, duration) extracted via mutagen
+  - Falls back to path-based parsing when mutagen metadata is unavailable
+  - "Save" link per track to download the file to the browser (reuses `/api/download-file/` endpoint)
+  - "Remove" button per track to remove from playlist (does not delete audio file from disk)
+  - Missing files shown with dashed border and "File missing" label
+  - Auto-refreshes when a download job completes (detected via existing SSE stream)
+  - Multi-user aware: each user sees their own playlist via `effective_playlist_name()`
+  - API endpoints: `GET /api/playlist/status`, `GET /api/playlist/tracks`, `DELETE /api/playlist/tracks`
+  - Metadata extraction runs in thread pool executor to avoid blocking async event loop
+  - CSS classes: `.downloads-section`, `.downloads-header`, `.downloads-empty`, `.downloads-list`, `.track-missing`, `.track-missing-label`, `.remove-btn`
+  - JS functions: `checkPlaylistStatus()`, `loadDownloads()`, `renderDownloads()`, `handleRemoveTrack()`
+  - Helpers: `_extract_track_info()` (mutagen + path fallback), `_parse_track_info_from_path()` (flat + album mode)
+  - Playlist read/remove functions: `read_m3u()`, `remove_from_m3u()` in `kikusan/playlist.py`
 - **Multi-user playlist support**: When `KIKUSAN_MULTI_USER=true` (or `--multi-user` flag), parses the `Remote-User` header (set by reverse proxy SSO like Authelia) and prefixes the M3U playlist name with the username (e.g., `alice-webplaylist.m3u`)
   - Opt-in: requires `KIKUSAN_MULTI_USER=true` env var or `--multi-user` CLI flag
   - Falls back to shared playlist when header is absent or feature is disabled

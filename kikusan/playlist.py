@@ -81,6 +81,70 @@ def _get_m3u_path(playlist_name: str, download_dir: Path) -> Path:
     return download_dir / f"{name}.m3u"
 
 
+def read_m3u(playlist_name: str, download_dir: Path) -> list[str]:
+    """
+    Read entries from an M3U playlist file.
+
+    Args:
+        playlist_name: Playlist name (without .m3u extension)
+        download_dir: Directory where playlist file is stored
+
+    Returns:
+        List of entry strings (relative paths). Empty list if file doesn't exist.
+    """
+    m3u_path = _get_m3u_path(playlist_name, download_dir)
+
+    if not m3u_path.exists():
+        return []
+
+    content = m3u_path.read_text().strip()
+    if not content:
+        return []
+
+    return [line for line in content.split("\n") if line]
+
+
+def remove_from_m3u(entry_path: str, playlist_name: str, download_dir: Path) -> bool:
+    """
+    Remove an exact entry from an M3U playlist.
+
+    Writes atomically via temp file + replace.
+
+    Args:
+        entry_path: Exact entry string to remove (relative path as stored in M3U)
+        playlist_name: Playlist name (without .m3u extension)
+        download_dir: Directory where playlist file is stored
+
+    Returns:
+        True if entry was found and removed, False otherwise.
+    """
+    m3u_path = _get_m3u_path(playlist_name, download_dir)
+
+    if not m3u_path.exists():
+        return False
+
+    content = m3u_path.read_text().strip()
+    if not content:
+        return False
+
+    entries = [line for line in content.split("\n") if line]
+    if entry_path not in entries:
+        return False
+
+    entries = [e for e in entries if e != entry_path]
+
+    # Write atomically
+    temp_path = m3u_path.with_suffix(".m3u.tmp")
+    if entries:
+        temp_path.write_text("\n".join(entries) + "\n")
+    else:
+        temp_path.write_text("")
+    temp_path.replace(m3u_path)
+
+    logger.info("Removed entry from playlist %s: %s", m3u_path.name, entry_path)
+    return True
+
+
 def _make_relative_path(file_path: Path, relative_to: Path) -> str:
     """
     Convert absolute path to relative path.

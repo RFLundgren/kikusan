@@ -1587,3 +1587,88 @@ header p {
         min-width: 0;
     }
 }
+
+/* --- Downloads Tab --- */
+
+.downloads-section {
+    display: none;
+}
+.downloads-section.active {
+    display: block;
+}
+
+.downloads-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.downloads-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+.downloads-count {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.downloads-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.downloads-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Missing file indicator */
+.track.track-missing {
+    border-style: dashed;
+    opacity: 0.6;
+}
+.track-missing-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #ef4444;
+    white-space: nowrap;
+}
+
+/* Remove button */
+.remove-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    min-height: 36px;
+    flex-shrink: 0;
+}
+.remove-btn:hover:not(:disabled) {
+    background: #ef4444;
+    color: white;
+}
+.remove-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Mobile adjustments for downloads */
+@media (max-width: 640px) {
+    .downloads-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    .remove-btn {
+        width: 100%;
+    }
+}
