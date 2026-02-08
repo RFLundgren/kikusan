@@ -144,6 +144,7 @@ class StreamUrlResponse(BaseModel):
     video_id: str
     url: str
     expires_in: int
+    is_hls: bool = False
 
 
 class MoodCategoryResponse(BaseModel):
@@ -451,13 +452,90 @@ async def get_stream_url(video_id: str):
         else:
             raise HTTPException(status_code=404, detail="No stream URL available")
 
+        is_hls = info.get('protocol', '') == 'm3u8_native' or '.m3u8' in stream_url
+
         return StreamUrlResponse(
             video_id=video_id,
             url=stream_url,
-            expires_in=21600
+            expires_in=21600,
+            is_hls=is_hls,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get stream URL: {str(e)}")
+
+
+@app.get("/api/preview/{video_id}")
+async def preview_audio(video_id: str):
+    """Stream audio through the server to avoid CORS issues with HLS streams.
+
+    Uses yt-dlp to resolve the stream URL, then ffmpeg to remux HLS into
+    a fragmented MP4 that the browser can play progressively.
+    """
+    if not re.match(r'^[a-zA-Z0-9_-]{11}$', video_id):
+        raise HTTPException(status_code=400, detail="Invalid video ID")
+
+    config = get_config()
+    youtube_url = f"https://music.youtube.com/watch?v={video_id}"
+
+    try:
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+        }
+        info = extract_info_with_retry(
+            ydl_opts=ydl_opts,
+            url=youtube_url,
+            download=False,
+            cookie_file=config.cookie_file_path,
+            config=config,
+        )
+
+        if 'url' in info:
+            stream_url = info['url']
+        elif 'formats' in info:
+            audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none']
+            if audio_formats:
+                audio_formats.sort(key=lambda f: f.get('abr', 0), reverse=True)
+                stream_url = audio_formats[0]['url']
+            else:
+                raise HTTPException(status_code=404, detail="No audio stream found")
+        else:
+            raise HTTPException(status_code=404, detail="No stream URL available")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get stream URL: {str(e)}")
+
+    # Convert HLS stream to MP3 via ffmpeg for browser playback
+    cmd = [
+        'ffmpeg',
+        '-i', stream_url,
+        '-vn',
+        '-f', 'mp3',
+        '-ab', '128k',
+        '-loglevel', 'error',
+        'pipe:1',
+    ]
+
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    async def stream_audio():
+        try:
+            while True:
+                chunk = await process.stdout.read(8192)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            if process.returncode is None:
+                process.kill()
+
+    return StreamingResponse(stream_audio(), media_type="audio/mpeg")
 
 
 # Queue endpoints

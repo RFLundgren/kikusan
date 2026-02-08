@@ -231,7 +231,7 @@
           if (!response.ok) throw new Error("Failed to get stream URL");
           const data = await response.json();
 
-          currentAudio = new Audio(data.url);
+          currentAudio = new Audio();
           currentPlayingButton = button;
 
           currentAudio.addEventListener("loadedmetadata", () => {
@@ -249,7 +249,18 @@
             stopCurrentAudio();
           });
 
-          await currentAudio.play();
+          // HLS URLs can't be played directly due to CORS; use server proxy
+          if (data.is_hls) {
+            currentAudio.src = `/api/preview/${videoId}`;
+            await new Promise((resolve, reject) => {
+              currentAudio.addEventListener("canplay", () => resolve(), { once: true });
+              currentAudio.addEventListener("error", () => reject(new Error("Playback failed")), { once: true });
+            });
+            await currentAudio.play();
+          } else {
+            currentAudio.src = data.url;
+            await currentAudio.play();
+          }
         } catch (error) {
           console.error("Failed to play:", error);
           showStatus("Failed to start playback: " + error.message, true);
