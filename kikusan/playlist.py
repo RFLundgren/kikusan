@@ -145,6 +145,47 @@ def remove_from_m3u(entry_path: str, playlist_name: str, download_dir: Path) -> 
     return True
 
 
+def rebuild_m3u(
+    file_paths: list[Path],
+    playlist_name: str,
+    download_dir: Path,
+) -> Path:
+    """
+    Rewrite an M3U playlist to contain exactly the given entries.
+
+    Unlike add_to_m3u() which only appends, this function replaces the
+    playlist contents entirely. Used by sync operations to remove stale
+    entries for deleted tracks.
+
+    Args:
+        file_paths: Authoritative list of audio file paths
+        playlist_name: Playlist name (without .m3u extension)
+        download_dir: Directory where playlist file is stored
+
+    Returns:
+        Path to the playlist file
+    """
+    m3u_path = _get_m3u_path(playlist_name, download_dir)
+
+    entries = []
+    for file_path in file_paths:
+        if not file_path.exists():
+            logger.warning("File not found, skipping: %s", file_path)
+            continue
+        entries.append(_make_relative_path(file_path, m3u_path.parent))
+
+    # Write atomically
+    temp_path = m3u_path.with_suffix(".m3u.tmp")
+    if entries:
+        temp_path.write_text("\n".join(entries) + "\n")
+    else:
+        temp_path.write_text("")
+    temp_path.replace(m3u_path)
+
+    logger.debug("Rebuilt M3U playlist: %s (%d tracks)", m3u_path.name, len(entries))
+    return m3u_path
+
+
 def _make_relative_path(file_path: Path, relative_to: Path) -> str:
     """
     Convert absolute path to relative path.

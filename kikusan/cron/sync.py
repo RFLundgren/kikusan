@@ -11,7 +11,7 @@ from kikusan.config import get_config
 from kikusan.cron.config import PlaylistConfig
 from kikusan.cron.state import PlaylistState, TrackState, get_state_dir, load_state, save_state
 from kikusan.download import download
-from kikusan.playlist import add_to_m3u
+from kikusan.playlist import add_to_m3u, rebuild_m3u
 from kikusan.reference_checker import get_navidrome_protection_cache, is_safe_to_delete
 from kikusan.unavailable import is_on_cooldown, is_unavailable_error, record_unavailable
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
@@ -435,9 +435,8 @@ def update_m3u_playlist(
         else:
             logger.warning("Track file not found: %s", path)
 
-    if file_paths:
-        try:
-            add_to_m3u(file_paths, playlist_name, download_dir)
-            logger.debug("Updated M3U playlist: %s.m3u", playlist_name)
-        except Exception as e:
-            logger.error("Failed to update M3U playlist: %s", e)
+    try:
+        rebuild_m3u(file_paths, playlist_name, download_dir)
+        logger.debug("Updated M3U playlist: %s.m3u", playlist_name)
+    except Exception as e:
+        logger.error("Failed to update M3U playlist: %s", e)

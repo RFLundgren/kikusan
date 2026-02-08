@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from kikusan.download import download
-from kikusan.playlist import add_to_m3u
+from kikusan.playlist import rebuild_m3u
 from kikusan.plugins.base import Plugin, PluginConfig, Song, SyncResult
 from kikusan.plugins.state import (
     PluginState,
@@ -306,8 +306,7 @@ def _update_m3u(name: str, state: PluginState, download_dir: Path) -> None:
         if path.exists():
             file_paths.append(path)
 
-    if file_paths:
-        try:
-            add_to_m3u(file_paths, name, download_dir)
-        except Exception as e:
-            logger.error("Failed to update M3U: %s", e)
+    try:
+        rebuild_m3u(file_paths, name, download_dir)
+    except Exception as e:
+        logger.error("Failed to update M3U: %s", e)
