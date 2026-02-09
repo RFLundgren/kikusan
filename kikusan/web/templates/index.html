@@ -79,7 +79,14 @@
         <button class="tab-btn active" data-tab="songs">Songs</button>
         <button class="tab-btn" data-tab="albums">Albums</button>
         <button class="tab-btn" data-tab="explore">Explore</button>
-        <button class="tab-btn" data-tab="downloads" id="downloads-tab-btn" style="display:none">Downloads</button>
+        <button
+          class="tab-btn"
+          data-tab="downloads"
+          id="downloads-tab-btn"
+          style="display: none"
+        >
+          Local
+        </button>
       </div>
 
       <div id="status" class="status"></div>
@@ -255,8 +262,14 @@
           if (data.is_hls) {
             currentAudio.src = `/api/preview/${videoId}`;
             await new Promise((resolve, reject) => {
-              currentAudio.addEventListener("canplay", () => resolve(), { once: true });
-              currentAudio.addEventListener("error", () => reject(new Error("Playback failed")), { once: true });
+              currentAudio.addEventListener("canplay", () => resolve(), {
+                once: true,
+              });
+              currentAudio.addEventListener(
+                "error",
+                () => reject(new Error("Playback failed")),
+                { once: true },
+              );
             });
             await currentAudio.play();
           } else {
@@ -470,7 +483,12 @@
       // Initialize tab from URL
       function initTabFromUrl() {
         const tab = getQueryParam("tab") || "songs";
-        if (tab === "songs" || tab === "albums" || tab === "explore" || tab === "downloads") {
+        if (
+          tab === "songs" ||
+          tab === "albums" ||
+          tab === "explore" ||
+          tab === "downloads"
+        ) {
           setActiveTab(tab);
         }
       }
@@ -1112,7 +1130,11 @@
         // Detect newly completed jobs and refresh downloads tab if active
         let hasNewlyCompleted = false;
         for (const job of jobs) {
-          if (job.status === "completed" && previousJobStatuses[job.id] && previousJobStatuses[job.id] !== "completed") {
+          if (
+            job.status === "completed" &&
+            previousJobStatuses[job.id] &&
+            previousJobStatuses[job.id] !== "completed"
+          ) {
             hasNewlyCompleted = true;
           }
           previousJobStatuses[job.id] = job.status;
@@ -2014,12 +2036,14 @@
       checkPlaylistStatus();
 
       async function loadDownloads() {
-        downloadsResults.innerHTML = '<div class="explore-loading">Loading playlist...</div>';
+        downloadsResults.innerHTML =
+          '<div class="explore-loading">Loading playlist...</div>';
         try {
           const response = await fetch("/api/playlist/tracks");
           if (!response.ok) {
             if (response.status === 404) {
-              downloadsResults.innerHTML = '<div class="downloads-empty">Playlist not configured.</div>';
+              downloadsResults.innerHTML =
+                '<div class="downloads-empty">Playlist not configured.</div>';
               return;
             }
             throw new Error(`HTTP ${response.status}`);
@@ -2033,7 +2057,8 @@
 
       function renderDownloads(tracks, total) {
         if (!tracks || tracks.length === 0) {
-          downloadsResults.innerHTML = '<div class="downloads-empty">Your download playlist is empty. Download some tracks to see them here.</div>';
+          downloadsResults.innerHTML =
+            '<div class="downloads-empty">Your download playlist is empty. Download some tracks to see them here.</div>';
           return;
         }
 
@@ -2045,14 +2070,17 @@
           <div class="downloads-list">
         `;
 
-        html += tracks.map(track => {
-          const missingClass = track.file_exists ? "" : " track-missing";
-          const missingLabel = track.file_exists ? "" : '<span class="track-missing-label">File missing</span>';
-          const saveLink = track.file_exists
-            ? `<a href="/api/download-file/${encodeURIComponent(track.entry_path)}" class="download-file-btn" download>Save</a>`
-            : "";
+        html += tracks
+          .map((track) => {
+            const missingClass = track.file_exists ? "" : " track-missing";
+            const missingLabel = track.file_exists
+              ? ""
+              : '<span class="track-missing-label">File missing</span>';
+            const saveLink = track.file_exists
+              ? `<a href="/api/download-file/${encodeURIComponent(track.entry_path)}" class="download-file-btn" download>Save</a>`
+              : "";
 
-          return `
+            return `
             <div class="track${missingClass}">
               <div class="track-main">
                 <div class="track-info">
@@ -2070,13 +2098,14 @@
               </div>
             </div>
           `;
-        }).join("");
+          })
+          .join("");
 
         html += "</div>";
         downloadsResults.innerHTML = html;
 
         // Attach remove handlers
-        downloadsResults.querySelectorAll(".remove-btn").forEach(btn => {
+        downloadsResults.querySelectorAll(".remove-btn").forEach((btn) => {
           btn.addEventListener("click", handleRemoveTrack);
         });
       }
@@ -2088,12 +2117,17 @@
         btn.textContent = "Removing...";
 
         try {
-          const response = await fetch(`/api/playlist/tracks?entry_path=${encodeURIComponent(entryPath)}`, {
-            method: "DELETE",
-          });
+          const response = await fetch(
+            `/api/playlist/tracks?entry_path=${encodeURIComponent(entryPath)}`,
+            {
+              method: "DELETE",
+            },
+          );
 
           if (!response.ok) {
-            const data = await response.json().catch(() => ({ detail: "Unknown error" }));
+            const data = await response
+              .json()
+              .catch(() => ({ detail: "Unknown error" }));
             throw new Error(data.detail || `HTTP ${response.status}`);
           }
 

@@ -639,16 +639,13 @@ header p {
 
     /* Fix tab overflow on mobile */
     .search-tabs {
-        gap: 0.25rem;
+        gap: 0;
     }
 
     .tab-btn {
         flex: 1;
-        padding: 0.75rem 0.5rem;
-        font-size: 0.9rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        padding: 0.75rem 0.25rem;
+        font-size: 0.8rem;
         min-width: 0;
     }
 }
@@ -657,16 +654,13 @@ header p {
 @media (max-width: 640px) {
     /* Fix tab overflow on mobile */
     .search-tabs {
-        gap: 0.25rem;
+        gap: 0;
     }
 
     .tab-btn {
         flex: 1;
         padding: 0.75rem 0.5rem;
-        font-size: 0.95rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 0.85rem;
         min-width: 0;
     }
 
@@ -1035,8 +1029,8 @@ header p {
         font-size: 0.75rem;
     }
 
-    .download-file-btn,
-    .clear-job-btn {
+    .queue-list .download-file-btn,
+    .queue-list .clear-job-btn {
         width: 100%;
         margin-right: 0;
         margin-bottom: 0.25rem;
@@ -1668,7 +1662,14 @@ header p {
         align-items: stretch;
         gap: 0.5rem;
     }
-    .remove-btn {
-        width: 100%;
+    .downloads-list .track-actions .download-file-btn {
+        flex: 0 0 auto;
+        width: auto;
+        text-align: center;
+        margin: 0;
+    }
+    .downloads-list .track-actions .remove-btn {
+        flex: 1 1 0;
+        min-width: 0;
     }
 }
