@@ -11,7 +11,13 @@ from kikusan.queue import DownloadJob, JobStatus, QueueManager
 
 @pytest_asyncio.fixture
 async def queue_manager():
-    """Create a queue manager instance for testing."""
+    """Create a queue manager instance without starting the worker."""
+    return QueueManager()
+
+
+@pytest_asyncio.fixture
+async def running_queue_manager():
+    """Create a queue manager with a running worker."""
     qm = QueueManager()
     await qm.start()
     yield qm
@@ -186,13 +192,13 @@ async def test_job_to_dict():
 
 
 @pytest.mark.asyncio
-async def test_worker_processes_job(queue_manager):
+async def test_worker_processes_job(running_queue_manager):
     """Test that worker processes jobs from the queue."""
     # Mock the download function
     with patch("kikusan.queue.download") as mock_download:
         mock_download.return_value = "/fake/path/song.opus"
 
-        job_id = await queue_manager.add_job(
+        job_id = await running_queue_manager.add_job(
             video_id="test123", title="Test Song", artist="Test Artist", format="opus"
         )
 
@@ -200,9 +206,37 @@ async def test_worker_processes_job(queue_manager):
         await asyncio.sleep(0.5)
 
         # Check job was processed (status should change from QUEUED)
-        job = await queue_manager.get_job(job_id)
+        job = await running_queue_manager.get_job(job_id)
         # Job might be completed or still downloading depending on timing
         assert job.status in (JobStatus.DOWNLOADING, JobStatus.COMPLETED, JobStatus.QUEUED)
+
+
+@pytest.mark.asyncio
+async def test_remove_queued_job_removes_it_immediately(queue_manager):
+    """Cancelling a queued job removes it instead of marking it failed."""
+    job_id = await queue_manager.add_job(
+        video_id="cancel123", title="Cancel Song", artist="Cancel Artist", format="opus"
+    )
+
+    success = await queue_manager.remove_job(job_id)
+
+    assert success
+    assert await queue_manager.get_job(job_id) is None
+
+
+@pytest.mark.asyncio
+async def test_removed_queued_job_is_never_processed():
+    """Worker skips queue entries for jobs removed before processing."""
+    qm = QueueManager()
+    job_id = await qm.add_job(
+        video_id="skip123", title="Skip Song", artist="Skip Artist", format="opus"
+    )
+    await qm.remove_job(job_id)
+
+    with patch("kikusan.queue.download", side_effect=AssertionError("download should not run")):
+        await qm.start()
+        await asyncio.sleep(1.2)
+        await qm.stop()
 
 
 @pytest.mark.asyncio

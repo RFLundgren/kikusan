@@ -395,8 +395,14 @@ async def download_file(file_path: str):
     requested_path = Path(file_path)
 
     try:
-        # If relative path, resolve against download_dir (e.g. M3U entries)
+        # Normalize relative paths from different callers:
+        # - M3U entries: "Artist - Song.opus"
+        # - Queue jobs in some setups: "downloads/Artist - Song.opus"
+        # Both should resolve to config.download_dir / "<entry>"
         if not requested_path.is_absolute():
+            download_dir_name = config.download_dir.name
+            if requested_path.parts and requested_path.parts[0] == download_dir_name:
+                requested_path = Path(*requested_path.parts[1:])
             requested_path = config.download_dir / requested_path
 
         abs_requested = requested_path.resolve()

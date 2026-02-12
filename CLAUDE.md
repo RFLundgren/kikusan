@@ -6,6 +6,15 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 
 See `todo.md` for a comprehensive list of identified bugs and technical debt. The file categorizes issues by priority (Critical, High, Medium, Low) and provides detailed explanations of problems and how to fix them. Always check this file before starting work on bug fixes or refactoring.
 
+## Recent Bug Fixes (2026-02-12)
+
+1. **Web Save Link 404 with `downloads/`-prefixed paths** (`kikusan/web/app.py`)
+   - Fixed `/api/download-file/{file_path:path}` path normalization to support both:
+     - playlist-relative entries like `Artist/Song.opus`
+     - queue-provided paths like `downloads/Artist - Song.opus`
+   - Preserved path traversal protection by keeping `relative_to(download_dir)` check after normalization.
+   - Added regression tests in `tests/test_web_download_file.py`.
+
 ## Features
 
 ### Web UI
@@ -265,3 +274,19 @@ The following critical and high-priority bugs were identified and fixed:
    - Implemented automatic cleanup of old completed/failed jobs
    - Keeps maximum 100 most recent jobs (configurable via `max_history`)
    - Cleanup runs after each job completion to prevent unbounded memory growth
+
+## Recent Updates (2026-02-12)
+
+1. **Queue cancel now means full removal** (`kikusan/queue.py`)
+   - Removing a `QUEUED` job now deletes it immediately from `jobs`
+   - Worker skips stale queue entries for removed job IDs
+   - This guarantees canceled queued jobs are never downloaded
+
+2. **Queue tests stabilized** (`tests/test_queue.py`)
+   - Default queue fixture no longer starts background worker
+   - Worker is started only in tests that explicitly validate worker behavior
+   - Prevents hangs from accidental real download execution in queue unit tests
+
+3. **Web download endpoint status**
+   - `/api/download` is considered legacy/not used by current frontend flow
+   - Active frontend download path is queue-based (`/api/queue/*`)

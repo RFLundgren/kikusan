@@ -79,6 +79,7 @@ class QueueManager:
         self.worker_task: Optional[Task] = None
         self._running = False
         self._jobs_lock = asyncio.Lock()  # Protect concurrent access to self.jobs
+        self._cancelled_job_ids: set[str] = set()
         self.max_history = max_history
 
     async def start(self):
@@ -98,6 +99,8 @@ class QueueManager:
                 await self.worker_task
             except asyncio.CancelledError:
                 pass
+        async with self._jobs_lock:
+            self._cancelled_job_ids.clear()
         logger.info("Queue manager stopped")
 
     async def add_job(
@@ -151,6 +154,20 @@ class QueueManager:
                 except asyncio.TimeoutError:
                     continue
 
+                # Skip jobs that were removed before the worker picked them up.
+                async with self._jobs_lock:
+                    should_skip = (
+                        job.id in self._cancelled_job_ids
+                        or job.id not in self.jobs
+                        or self.jobs[job.id].status != JobStatus.QUEUED
+                    )
+                    if should_skip:
+                        self._cancelled_job_ids.discard(job.id)
+
+                if should_skip:
+                    logger.info("Skipping removed/cancelled job (id=%s)", job.id)
+                    continue
+
                 # Process the job
                 await self._process_job(job)
 
@@ -169,7 +186,12 @@ class QueueManager:
             job: The job to process
         """
         logger.info("Processing job: %s - %s (id=%s)", job.artist, job.title, job.id)
-        job.status = JobStatus.DOWNLOADING
+        async with self._jobs_lock:
+            existing_job = self.jobs.get(job.id)
+            if existing_job is None:
+                logger.info("Job no longer exists before processing (id=%s)", job.id)
+                return
+            existing_job.status = JobStatus.DOWNLOADING
         config = get_config()
 
         def progress_callback(progress_data: dict):
@@ -204,17 +226,27 @@ class QueueManager:
                     None, lambda: add_to_m3u([audio_path], playlist_name, config.download_dir)
                 )
 
-            job.status = JobStatus.COMPLETED
-            job.file_path = str(audio_path) if audio_path else None
-            job.completed_at = datetime.now()
-            job.progress = 100.0
+            async with self._jobs_lock:
+                current_job = self.jobs.get(job.id)
+                if current_job is None:
+                    logger.info("Job removed while finishing (id=%s)", job.id)
+                    return
+                current_job.status = JobStatus.COMPLETED
+                current_job.file_path = str(audio_path) if audio_path else None
+                current_job.completed_at = datetime.now()
+                current_job.progress = 100.0
             logger.info("Job completed: %s - %s (id=%s)", job.artist, job.title, job.id)
 
         except Exception as e:
             logger.exception("Job failed: %s - %s (id=%s): %s", job.artist, job.title, job.id, e)
-            job.status = JobStatus.FAILED
-            job.error = str(e)
-            job.completed_at = datetime.now()
+            async with self._jobs_lock:
+                current_job = self.jobs.get(job.id)
+                if current_job is None:
+                    logger.info("Job removed while failing (id=%s)", job.id)
+                    return
+                current_job.status = JobStatus.FAILED
+                current_job.error = str(e)
+                current_job.completed_at = datetime.now()
 
         # Cleanup old jobs to prevent memory leak
         await self.cleanup_old_jobs()
@@ -260,14 +292,14 @@ class QueueManager:
             # Can only remove queued jobs or clear completed/failed
             if job.status in (JobStatus.COMPLETED, JobStatus.FAILED):
                 del self.jobs[job_id]
+                self._cancelled_job_ids.discard(job_id)
                 logger.info("Cleared job: %s (id=%s)", job.status.value, job_id)
                 return True
             elif job.status == JobStatus.QUEUED:
-                # TODO: Implement removal from queue (requires queue modification)
-                # For now, just mark as failed
-                job.status = JobStatus.FAILED
-                job.error = "Cancelled by user"
-                logger.info("Cancelled job: %s (id=%s)", job_id)
+                # Remove job immediately and mark its id so worker skips stale queue entry.
+                del self.jobs[job_id]
+                self._cancelled_job_ids.add(job_id)
+                logger.info("Cancelled and removed queued job (id=%s)", job_id)
                 return True
 
             return False
