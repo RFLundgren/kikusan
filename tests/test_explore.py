@@ -119,6 +119,22 @@ class TestGetMoodPlaylists:
         assert playlists[0].thumbnail_url is None
         assert playlists[0].author is None
 
+    @patch("kikusan.search.YTMusic")
+    def test_normalizes_author_list_payload(self, mock_ytmusic_cls):
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_mood_playlists.return_value = [
+            {
+                "playlistId": "RDCLAK5uy_list",
+                "title": "Mixed Author",
+                "author": [{"name": "Album", "id": None}],
+            }
+        ]
+
+        playlists = get_mood_playlists("params")
+        assert len(playlists) == 1
+        assert playlists[0].author == "Album"
+
     @patch("kikusan.search._get_mood_playlists_fallback")
     @patch("kikusan.search.YTMusic")
     def test_falls_back_on_key_error(self, mock_ytmusic_cls, mock_fallback):

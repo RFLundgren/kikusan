@@ -351,17 +351,56 @@ def get_mood_playlists(params: str) -> list[MoodPlaylist]:
     for item in raw:
         thumbnails = item.get("thumbnails", [])
         thumbnail_url = thumbnails[-1]["url"] if thumbnails else None
+        author = _normalize_mood_playlist_author(item.get("author"))
         playlists.append(
             MoodPlaylist(
                 playlist_id=item.get("playlistId", ""),
                 title=item.get("title", "Unknown"),
                 thumbnail_url=thumbnail_url,
-                author=item.get("author", None),
+                author=author,
             )
         )
 
     logger.info("Found %d playlists for mood/genre params", len(playlists))
     return playlists
+
+
+def _normalize_mood_playlist_author(value: object) -> str | None:
+    """Normalize ytmusicapi/fallback author payloads to a string."""
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        author = value.strip()
+        return author or None
+
+    if isinstance(value, dict):
+        name = value.get("name")
+        if isinstance(name, str):
+            author = name.strip()
+            return author or None
+        return None
+
+    if isinstance(value, list):
+        names: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                author = item.strip()
+                if author:
+                    names.append(author)
+                continue
+            if isinstance(item, dict):
+                name = item.get("name")
+                if isinstance(name, str):
+                    author = name.strip()
+                    if author:
+                        names.append(author)
+        if names:
+            return ", ".join(names)
+        return None
+
+    author = str(value).strip()
+    return author or None
 
 
 def _get_mood_playlists_fallback(yt: YTMusic, params: str) -> list[dict]:

@@ -2,22 +2,10 @@
 
 Kikusan is a tool to search and download music from youtube music. It must use yt-dlp in the background. It must be usable through CLI and also have a web app (subcommand "web"). The web app should be really simple, but must support search functionality. It should be deployable with docker and have an example docker-compose file. It must add lyrics via lrc files to the downloaded files (via https://lrclib.net/).
 
-## Known Issues and Technical Debt
-
-See `todo.md` for a comprehensive list of identified bugs and technical debt. The file categorizes issues by priority (Critical, High, Medium, Low) and provides detailed explanations of problems and how to fix them. Always check this file before starting work on bug fixes or refactoring.
-
-## Recent Bug Fixes (2026-02-12)
-
-1. **Web Save Link 404 with `downloads/`-prefixed paths** (`kikusan/web/app.py`)
-   - Fixed `/api/download-file/{file_path:path}` path normalization to support both:
-     - playlist-relative entries like `Artist/Song.opus`
-     - queue-provided paths like `downloads/Artist - Song.opus`
-   - Preserved path traversal protection by keeping `relative_to(download_dir)` check after normalization.
-   - Added regression tests in `tests/test_web_download_file.py`.
-
 ## Features
 
 ### Web UI
+
 - Search functionality with results display
   - **URL Support**: Paste YouTube Music URLs directly into search bar
     - Single track URLs: `https://music.youtube.com/watch?v=VIDEO_ID`
@@ -76,6 +64,7 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
   - Playlist name is resolved at request time and stored on `DownloadJob.playlist_name` for queue-based downloads
 
 ### Sync Safety Features
+
 - **Cross-Reference Protection**: When `sync=True` for a playlist/plugin, songs are only deleted from disk if they are not referenced by any other playlist or plugin
 - Implementation in `kikusan/reference_checker.py`: Scans all playlist and plugin state files before deletion
 - Each deletion operation checks both `.kikusan/state/*.json` (playlists) and `.kikusan/plugin_state/*.json` (plugins)
@@ -89,6 +78,7 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
 - Opt-in via environment variables: NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD, NAVIDROME_KEEP_PLAYLIST
 
 ### Filename Length Safety
+
 - Filenames are truncated to `MAX_FILENAME_BYTES` (200 bytes) to prevent `[Errno 36] File name too long` errors
 - Two layers of protection:
   1. **yt-dlp level**: `trim_file_name` option in `_get_ydl_opts()` and `_compute_filename()` truncates rendered filenames
@@ -97,6 +87,7 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
 - The constant `MAX_FILENAME_BYTES` is defined in `kikusan/config.py`
 
 ### Unavailable Video Cooldown
+
 - When a video returns "Video unavailable" during download, the video ID is recorded with a timestamp
 - Subsequent sync/download attempts skip that video until the cooldown period expires
 - Storage: `.kikusan/unavailable.json` - maps video_id to failure record (timestamp, error, title, artist)
@@ -113,10 +104,12 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
 - Corrupted unavailable files are backed up and reset (same pattern as state files)
 
 ### Architecture Notes
+
 - `kikusan/search.py`: Uses ytmusicapi to search and explore YouTube Music
   - Search: `search()`, `search_albums()`, `get_album_tracks()` — song/album search with view_count extraction
   - Explore: `get_mood_categories()`, `get_mood_playlists()`, `get_charts()`, `get_playlist_tracks()` — mood/genre browsing and chart data
   - `get_mood_playlists()`: Has fallback parsing (`_get_mood_playlists_fallback()`) for when ytmusicapi crashes with KeyError on `musicTwoRowItemRenderer`. Some mood/genre categories return mixed content: some sections contain playlist items (`musicTwoRowItemRenderer`) while others contain song items (`musicResponsiveListItemRenderer`). The fallback manually parses the raw YouTube Music API response, skipping incompatible sections and handling individual item parse failures gracefully.
+  - `get_mood_playlists()` normalizes playlist `author` payloads from ytmusicapi/fallback to a stable `str | None` (`_normalize_mood_playlist_author`) to avoid API response validation errors.
   - `get_charts()`: ytmusicapi returns `videos` as a list of playlist references (not individual tracks) and `artists` as a flat list. The function fetches tracks from the first working video playlist via `get_playlist()`, with fallback to subsequent playlists if one fails (e.g. album-style IDs like `OLAK5uy_...` are not fetchable via `get_playlist`).
   - `ChartTrack` includes `view_count` (str|None) and `duration_seconds` (int) with a `duration_display` property (MM:SS format), extracted from playlist data in `get_charts()`
   - Metadata: `get_song_metadata()` — fetches clean title/artist/album/duration from `YTMusic().get_song()` and `get_watch_playlist()` for lyrics lookup enhancement
@@ -153,7 +146,7 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
 - `kikusan/hooks.py`: Generic hook system for running commands on events
   - Supports `playlist_updated` and `sync_completed` events
   - Configured via `hooks` section in `cron.yaml`
-  - Passes context data via environment variables (KIKUSAN_*)
+  - Passes context data via environment variables (KIKUSAN\_\*)
   - Supports timeout and run_on_error options
 - `kikusan/cron/scheduler.py`: Orchestrates sync jobs (playlists, plugins, explore) and triggers hooks after completion
   - `_schedule_explore()` / `_explore_sync_job()`: Schedule and execute explore sync jobs
@@ -181,6 +174,7 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
   - Functions: `is_unavailable_error()`, `record_unavailable()`, `is_on_cooldown()`, `clear_expired()`
 
 ### CI/CD
+
 - `.github/workflows/publish.yml`: Single workflow handles all release automation
   - Triggers: tag push (`v*`), release event (`published`), workflow_dispatch
   - `build` job: Builds Python package (sdist + wheel) using `python -m build`, uploads as artifact
@@ -193,24 +187,29 @@ See `todo.md` for a comprehensive list of identified bugs and technical debt. Th
 - Renovate (`renovate.json`) manages dependency updates
 
 ### CLI Flags
+
 All major configuration variables have corresponding CLI flags:
 
 **Global flags (apply to all subcommands):**
+
 - `--cookie-mode`: Cookie usage mode (auto, always, never)
 - `--cookie-retry-delay`: Delay before retrying with cookies
 - `--no-log-cookie-usage`: Disable cookie usage logging
 - `--unavailable-cooldown`: Hours to wait before retrying unavailable videos (0 = disabled, default: 168)
 
 **download command:**
+
 - `--organization-mode`: File organization (flat, album)
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
 
 **web command:**
+
 - `--cors-origins`: CORS allowed origins
 - `--web-playlist`: M3U playlist name for web downloads
 - `--multi-user / --no-multi-user`: Enable per-user M3U playlists via Remote-User header (env: `KIKUSAN_MULTI_USER`)
 
 **cron command:**
+
 - `--format`: Audio format
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
@@ -223,11 +222,13 @@ All major configuration variables have corresponding CLI flags:
   - State stored in `.kikusan/state/` using same format as playlist state
 
 **plugins run command:**
+
 - `--format`: Audio format
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
 
 **explore command group:**
+
 - `explore moods` — list available mood & genre categories
 - `explore mood-playlists <PARAMS>` — list playlists for a category (PARAMS from `explore moods`)
   - `--download/-d`: Download all tracks from all playlists in the category
@@ -242,51 +243,3 @@ All major configuration variables have corresponding CLI flags:
   - `--add-to-playlist/-p`: Add to M3U playlist
 
 CLI flags take precedence over environment variables. Options with `envvar` attribute automatically read from the corresponding environment variable if not specified on the command line.
-
-## Recent Bug Fixes (2026-02-04)
-
-The following critical and high-priority bugs were identified and fixed:
-
-1. **QueueManager Thread Safety** (`kikusan/queue.py`)
-   - Added `asyncio.Lock` to protect concurrent access to `self.jobs` dict
-   - Made all access methods async to properly use the lock
-   - Prevents race conditions in job tracking
-
-2. **Cross-Platform Atomic File Writes** (`kikusan/cron/state.py`, `kikusan/plugins/state.py`, `kikusan/unavailable.py`)
-   - Replaced `Path.rename()` with `Path.replace()` for atomic file operations
-   - Fixes Windows compatibility (rename fails if target exists)
-   - Prevents TOCTOU vulnerabilities in state file writes
-
-3. **Duration Parsing Exception Handling** (`kikusan/search.py`)
-   - Added try-except block in `_parse_duration()` to handle invalid time formats
-   - Returns 0 for malformed durations (e.g., "NaN:30", "--:--") instead of crashing
-
-4. **Cookie File Validation** (`kikusan/web/app.py`)
-   - Strict UTF-8 decoding (no `errors='ignore'`)
-   - Validates Netscape cookie format (7 tab-separated fields)
-   - Prevents arbitrary .txt file uploads as cookies
-
-5. **Country Code Validation** (`kikusan/web/app.py`)
-   - Added regex validation (`^[A-Z]{2}$`) to `/api/explore/charts` endpoint
-   - Consistent with cron config validation logic
-
-6. **QueueManager Memory Leak** (`kikusan/queue.py`)
-   - Implemented automatic cleanup of old completed/failed jobs
-   - Keeps maximum 100 most recent jobs (configurable via `max_history`)
-   - Cleanup runs after each job completion to prevent unbounded memory growth
-
-## Recent Updates (2026-02-12)
-
-1. **Queue cancel now means full removal** (`kikusan/queue.py`)
-   - Removing a `QUEUED` job now deletes it immediately from `jobs`
-   - Worker skips stale queue entries for removed job IDs
-   - This guarantees canceled queued jobs are never downloaded
-
-2. **Queue tests stabilized** (`tests/test_queue.py`)
-   - Default queue fixture no longer starts background worker
-   - Worker is started only in tests that explicitly validate worker behavior
-   - Prevents hangs from accidental real download execution in queue unit tests
-
-3. **Web download endpoint status**
-   - `/api/download` is considered legacy/not used by current frontend flow
-   - Active frontend download path is queue-based (`/api/queue/*`)
