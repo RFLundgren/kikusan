@@ -200,7 +200,7 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Non-fatal: logs warnings on failure (timeout, missing binary, exit code), returns False
   - 300-second timeout on subprocess
   - Opt-in via `KIKUSAN_REPLAYGAIN=true` env var or `--replaygain` CLI flag
-  - Requires external `rsgain` binary (installed in Docker image from GitHub releases)
+  - Requires external `rsgain` binary (installed in Docker image via Debian package `rsgain`)
   - Called as post-processing step after lyrics in all download paths (`download()`, `_download_single()`, `_download_playlist()`)
   - `apply_replaygain` parameter threaded through: `download.py`, `queue.py`, `cron/sync.py`, `plugins/sync.py`, `cli.py`
 

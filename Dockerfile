@@ -2,12 +2,7 @@ FROM python:3.14-slim@sha256:486b8092bfb12997e10d4920897213a06563449c951c5506c2a
 
 # Install ffmpeg for audio processing and rsgain for ReplayGain tagging
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg jq curl && \
-    RSGAIN_VERSION="3.5.2" && \
-    ARCH=$(dpkg --print-architecture) && \
-    curl -fsSL "https://github.com/complexlogic/rsgain/releases/download/v${RSGAIN_VERSION}/rsgain_${RSGAIN_VERSION}_${ARCH}.deb" -o /tmp/rsgain.deb && \
-    apt-get install -y --no-install-recommends /tmp/rsgain.deb && \
-    rm -f /tmp/rsgain.deb && \
+    apt-get install -y --no-install-recommends ffmpeg jq curl rsgain && \
     rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast package management
