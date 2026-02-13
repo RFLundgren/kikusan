@@ -72,7 +72,7 @@ def cron(
     \b
     playlists:
       playlist_name:
-        url: <YouTube, YouTube Music, or Spotify playlist URL>
+        url: <YouTube, YouTube Music, Spotify, or Deezer playlist URL>
         sync: <true to delete removed tracks, false to keep them>
         schedule: <cron expression, e.g., "5 4 * * *">
 

@@ -19,6 +19,9 @@ Kikusan is a tool to search and download music from youtube music. It must use y
       - Protection implemented in both `parse_youtube_url()` and `get_playlist_tracks()`
   - Backend auto-detects URL vs text query using `parse_youtube_url()` in `search.py`
   - URL metadata fetched via ytmusicapi: `get_track_from_video_id()` for singles, `get_playlist_tracks()` for playlists
+  - **Deezer playlist URL support**: `https://www.deezer.com/playlist/{id}` (also localized paths like `/us/playlist/{id}`)
+    - Deezer tracks are resolved to YouTube Music via search (`"{title} {artist}"`) so the UI can queue/download them through existing `video_id` flow
+    - Implemented in `api_search()` using `kikusan/deezer.py`
 - View counts displayed for each song (e.g., "1.9B views", "47M views")
   - View counts are retrieved from ytmusicapi search results (no additional API calls needed)
   - Displayed alongside duration in the track metadata section
@@ -118,6 +121,19 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - `_get_metadata_from_watch_playlist()`: Full fallback when `get_song()` returns incomplete videoDetails
   - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`, `SongMetadata`
 - `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
+  - `/api/search` supports Deezer playlist URLs in addition to YouTube URLs and text queries
+- `kikusan/deezer.py`: Native Deezer playlist integration
+  - URL detection: `is_deezer_url()`
+  - Playlist track fetch: `get_tracks_from_url()` / `get_playlist_tracks()`
+  - Uses Deezer REST playlist pagination (`/playlist/{id}/tracks?index=&limit=`) to avoid per-track API calls
+  - `DeezerQuotaError` maps Deezer API code `4` ("Quota limit exceeded") to explicit temporary failure handling
+  - Maps Deezer track metadata (`title`, `artist`, `contributors`, `album`, `duration`) into `DeezerTrack`
+- `kikusan/cli.py`:
+  - `download --url` supports Deezer playlists (first level) via shared external-source download flow (`_download_external_url`)
+- `kikusan/cron/sync.py`:
+  - `fetch_current_tracks()` now dispatches Deezer URLs to `_fetch_deezer_tracks()` (Deezer -> YouTube Music resolution)
+- `kikusan/cron/config.py`:
+  - `validate_url()` accepts Deezer playlist URLs
   - Explore endpoints: `GET /api/explore/moods`, `GET /api/explore/mood-playlists`, `GET /api/explore/charts`, `GET /api/explore/playlist/{playlist_id}/tracks`
 - `kikusan/web/templates/index.html`: Single-page frontend with embedded JavaScript (Songs, Albums, Explore tabs)
 - `kikusan/web/static/style.css`: Responsive CSS with dark/light themes, explore grid layouts

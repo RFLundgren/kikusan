@@ -14,7 +14,7 @@
 ## Features
 
 - **Search & Download**: Search YouTube Music and download audio in OPUS/MP3/FLAC format
-- **Playlist Support**: Download entire playlists from YouTube Music, YouTube, and Spotify
+- **Playlist Support**: Download entire playlists from YouTube Music, YouTube, Spotify, and Deezer
 - **Quick Download**: Search and download first match with a single command
 - **Automatic Lyrics**: Fetch and embed synchronized lyrics from lrclib.net (LRC format)
 - **Web Interface**: Modern web UI with search, download, theme toggle, and format selection
@@ -107,9 +107,10 @@ kikusan download --url "https://music.youtube.com/watch?v=bSnlKl_PoQU"
 # Search and download first match
 kikusan download --query "Bohemian Rhapsody Queen"
 
-# Download entire playlist (YouTube Music, YouTube, or Spotify)
+# Download entire playlist (YouTube Music, YouTube, Spotify, or Deezer)
 kikusan download --url "https://music.youtube.com/playlist?list=..."
 kikusan download --url "https://open.spotify.com/playlist/..."
+kikusan download --url "https://www.deezer.com/playlist/..."
 
 # Custom filename format
 kikusan download bSnlKl_PoQU --filename "%(title)s"
@@ -150,7 +151,7 @@ kikusan cron --config /path/to/cron.yaml
 
 Create a `cron.yaml` file to configure:
 
-- **Playlists**: YouTube Music, YouTube, or Spotify playlists
+- **Playlists**: YouTube Music, YouTube, Spotify, or Deezer playlists
 - **Plugins**: Listenbrainz, Reddit, Billboard, RSS feeds
 - **Explore**: YouTube Music charts and mood/genre categories
 - **Schedule**: Standard cron expressions (e.g., "0 9 \* \* \*" for daily at 9am)
@@ -529,7 +530,7 @@ kikusan download [VIDEO_ID] [OPTIONS]
 
 | Option                                         | Env Variable                 | Description                                            |
 | ---------------------------------------------- | ---------------------------- | ------------------------------------------------------ |
-| `-u, --url`                                    | -                            | YouTube, YouTube Music, or Spotify URL                 |
+| `-u, --url`                                    | -                            | YouTube, YouTube Music, Spotify, or Deezer URL         |
 | `-q, --query`                                  | -                            | Search query (downloads first match)                   |
 | `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Output directory                                       |
 | `-f, --format`                                 | `KIKUSAN_AUDIO_FORMAT`       | Audio format: `opus`, `mp3`, `flac`. Default: `opus`   |

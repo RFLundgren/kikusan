@@ -96,7 +96,7 @@ main.add_command(search_cmd, name="search")
 
 @main.command()
 @click.argument("video_id", required=False)
-@click.option("--url", "-u", help="YouTube, YouTube Music, or Spotify URL")
+@click.option("--url", "-u", help="YouTube, YouTube Music, Spotify, or Deezer URL")
 @click.option("--query", "-q", help="Search query (downloads first match)")
 @click.option("--output", "-o", type=click.Path(), help="Output directory")
 @click.option(
@@ -157,6 +157,8 @@ def download_cmd(
 
       kikusan download --url "https://open.spotify.com/playlist/..."
 
+      kikusan download --url "https://www.deezer.com/playlist/..."
+
       kikusan download --query "Bohemian Rhapsody Queen"
     """
     if not video_id and not url and not query:
@@ -197,12 +199,15 @@ def download_cmd(
                     click.echo(f"Added to playlist: {playlist_name}.m3u")
             return
 
-        # Handle URL (YouTube, YouTube Music, or Spotify)
+        # Handle URL (YouTube, YouTube Music, Spotify, or Deezer)
         if url:
+            from kikusan.deezer import get_tracks_from_url as get_deezer_tracks_from_url
+            from kikusan.deezer import is_deezer_url
+            from kikusan.spotify import get_tracks_from_url as get_spotify_tracks_from_url
             from kikusan.spotify import is_spotify_url
 
             if is_spotify_url(url):
-                _download_spotify_url(
+                _download_external_url(
                     url=url,
                     output_dir=output_dir,
                     audio_format=fmt,
@@ -211,6 +216,21 @@ def download_cmd(
                     playlist_name=playlist_name,
                     organization_mode=org_mode,
                     use_primary_artist=primary_artist,
+                    source_name="Spotify playlist/album",
+                    get_tracks_from_url=get_spotify_tracks_from_url,
+                )
+            elif is_deezer_url(url):
+                _download_external_url(
+                    url=url,
+                    output_dir=output_dir,
+                    audio_format=fmt,
+                    filename_template=template,
+                    fetch_lyrics=not no_lyrics,
+                    playlist_name=playlist_name,
+                    organization_mode=org_mode,
+                    use_primary_artist=primary_artist,
+                    source_name="Deezer playlist",
+                    get_tracks_from_url=get_deezer_tracks_from_url,
                 )
             else:
                 result = download_url(
@@ -269,7 +289,7 @@ def download_cmd(
         raise click.ClickException(str(e))
 
 
-def _download_spotify_url(
+def _download_external_url(
     url: str,
     output_dir: Path,
     audio_format: str,
@@ -278,28 +298,33 @@ def _download_spotify_url(
     playlist_name: str | None = None,
     organization_mode: str = "flat",
     use_primary_artist: bool = False,
+    source_name: str = "External playlist",
+    get_tracks_from_url: callable | None = None,
 ) -> None:
-    """Download tracks from a Spotify playlist/album by searching YouTube Music."""
-    from kikusan.spotify import get_tracks_from_url
+    """Download tracks from an external playlist source by searching YouTube Music."""
+    if get_tracks_from_url is None:
+        raise ValueError("get_tracks_from_url callback is required")
 
-    spotify_tracks = get_tracks_from_url(url)
+    source_tracks = get_tracks_from_url(url)
 
-    if not spotify_tracks:
-        click.echo("No tracks found in Spotify URL.")
+    if not source_tracks:
+        click.echo(f"No tracks found in {source_name.lower()} URL.")
         return
 
-    click.echo(f"Found {len(spotify_tracks)} tracks in Spotify playlist/album")
+    click.echo(f"Found {len(source_tracks)} tracks in {source_name}")
 
     downloaded = 0
     skipped = 0
     failed = 0
     downloaded_paths = []
 
-    for i, sp_track in enumerate(spotify_tracks, 1):
-        click.echo(f"[{i}/{len(spotify_tracks)}] Searching: {sp_track.artist} - {sp_track.name}")
+    for i, source_track in enumerate(source_tracks, 1):
+        click.echo(
+            f"[{i}/{len(source_tracks)}] Searching: {source_track.artist} - {source_track.name}"
+        )
 
         # Search YouTube Music for this track
-        results = search(sp_track.search_query, limit=1)
+        results = search(source_track.search_query, limit=1)
 
         if not results:
             click.echo(f"  Not found on YouTube Music, skipping")

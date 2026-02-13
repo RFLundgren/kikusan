@@ -6,7 +6,7 @@
 playlists:
   # Playlist name - used for state tracking and M3U playlist file
   favorites:
-    # YouTube, YouTube Music, or Spotify playlist URL
+    # YouTube, YouTube Music, Spotify, or Deezer playlist URL
     url: https://open.spotify.com/playlist/4X7NjgnVWsjOLNmZtUfFUK?si=93678213885d4c05
 
     # Sync behavior:
@@ -38,6 +38,12 @@ playlists:
   #   url: https://music.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf
   #   sync: false
   #   schedule: "0 6 * * *"  # Daily at 06:00
+
+  # Deezer playlist example
+  # deezer-favs:
+  #   url: https://www.deezer.com/playlist/908622995
+  #   sync: false
+  #   schedule: "0 7 * * *"  # Daily at 07:00
 
 # Plugin-based syncs (NEW!)
 # Plugins allow fetching music from sources other than playlists

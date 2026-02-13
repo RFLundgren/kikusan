@@ -199,68 +199,112 @@ async def index(request: Request):
 
 
 @app.get("/api/search", response_model=SearchResponse)
-async def api_search(q: str = Query(..., min_length=1, description="Search query or YouTube Music URL")):
-    """Search for music on YouTube Music or fetch tracks from a URL."""
+async def api_search(q: str = Query(..., min_length=1, description="Search query or supported URL (YouTube Music, YouTube, Deezer playlist)")):
+    """Search for music on YouTube Music or fetch tracks from a supported URL."""
     import logging
     logger = logging.getLogger(__name__)
 
+    from kikusan.deezer import DeezerQuotaError
+    from kikusan.deezer import get_tracks_from_url as get_deezer_tracks_from_url
+    from kikusan.deezer import is_deezer_url
     # Import URL handling functions from search module
     from kikusan.search import parse_youtube_url, get_track_from_video_id, get_playlist_tracks
 
-    # Check if query is a URL
-    url_info = parse_youtube_url(q)
-
-    if url_info:
-        # Handle URL input
+    if is_deezer_url(q):
+        # Deezer playlist URL -> resolve each Deezer track to YouTube Music
         try:
-            if url_info['type'] == 'video':
-                # Single track from video_id
-                track = get_track_from_video_id(url_info['id'])
-                results = [track]
-            elif url_info['type'] == 'playlist':
-                # All tracks from playlist (no limit)
-                results = get_playlist_tracks(url_info['id'])
-                if not results:
-                    raise HTTPException(
-                        status_code=404,
-                        detail="Playlist is empty or unavailable"
-                    )
-            elif url_info['type'] == 'unsupported_radio':
-                raise HTTPException(
-                    status_code=400,
-                    detail="Radio playlists are not supported. Please use a regular playlist or single track URL."
-                )
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Unsupported URL type"
-                )
-        except ValueError as e:
-            # Video/playlist not found
-            logger.warning("URL fetch failed for '%s': %s", q, e)
+            deezer_tracks = get_deezer_tracks_from_url(q)
+        except DeezerQuotaError as e:
+            logger.warning("Deezer quota exceeded for '%s': %s", q, e)
+            raise HTTPException(
+                status_code=503,
+                detail=str(e),
+            )
+        except Exception as e:
+            logger.error("Deezer fetch failed for '%s': %s", q, e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch Deezer playlist: {str(e)}",
+            )
+
+        if not deezer_tracks:
             raise HTTPException(
                 status_code=404,
-                detail=f"Video or playlist not found: {str(e)}"
+                detail="Deezer playlist is empty or unavailable",
             )
-        except HTTPException:
-            # Re-raise HTTPException as-is
-            raise
-        except Exception as e:
-            logger.error("URL fetch failed for '%s': %s", q, e)
+
+        results = []
+        for dz_track in deezer_tracks:
+            yt_results = search(dz_track.search_query, limit=1)
+            if yt_results:
+                results.append(yt_results[0])
+            else:
+                logger.warning(
+                    "No YouTube Music match for Deezer track: %s - %s",
+                    dz_track.artist,
+                    dz_track.name,
+                )
+
+        if not results:
             raise HTTPException(
-                status_code=500,
-                detail=f"Failed to fetch from URL: {str(e)}"
+                status_code=404,
+                detail="No Deezer tracks could be matched on YouTube Music",
             )
     else:
-        # Handle regular text search (existing logic)
-        try:
-            results = search(q, limit=20)
-        except Exception as e:
-            logger.error("Search failed for query '%s': %s", q, e)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Search failed: {str(e)}"
-            )
+        # Check if query is a YouTube URL
+        url_info = parse_youtube_url(q)
+
+        if url_info:
+            # Handle URL input
+            try:
+                if url_info['type'] == 'video':
+                    # Single track from video_id
+                    track = get_track_from_video_id(url_info['id'])
+                    results = [track]
+                elif url_info['type'] == 'playlist':
+                    # All tracks from playlist (no limit)
+                    results = get_playlist_tracks(url_info['id'])
+                    if not results:
+                        raise HTTPException(
+                            status_code=404,
+                            detail="Playlist is empty or unavailable"
+                        )
+                elif url_info['type'] == 'unsupported_radio':
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Radio playlists are not supported. Please use a regular playlist or single track URL."
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Unsupported URL type"
+                    )
+            except ValueError as e:
+                # Video/playlist not found
+                logger.warning("URL fetch failed for '%s': %s", q, e)
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Video or playlist not found: {str(e)}"
+                )
+            except HTTPException:
+                # Re-raise HTTPException as-is
+                raise
+            except Exception as e:
+                logger.error("URL fetch failed for '%s': %s", q, e)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to fetch from URL: {str(e)}"
+                )
+        else:
+            # Handle regular text search (existing logic)
+            try:
+                results = search(q, limit=20)
+            except Exception as e:
+                logger.error("Search failed for query '%s': %s", q, e)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Search failed: {str(e)}"
+                )
 
     return SearchResponse(
         query=q,
