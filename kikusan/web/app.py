@@ -105,6 +105,25 @@ class TrackResponse(BaseModel):
     view_count: str | None
 
 
+def _track_to_response(track) -> TrackResponse:
+    """Convert a Track-like object into a TrackResponse."""
+    return TrackResponse(
+        video_id=track.video_id,
+        title=track.title,
+        artist=track.artist,
+        artists=track.artists,
+        album=track.album,
+        duration=track.duration_display,
+        thumbnail_url=track.thumbnail_url,
+        view_count=track.view_count,
+    )
+
+
+def _sse_event(event: str, payload: dict) -> str:
+    """Format a Server-Sent Event message."""
+    return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
+
+
 class SearchResponse(BaseModel):
     """Response body for search endpoint."""
 
@@ -321,6 +340,202 @@ async def api_search(q: str = Query(..., min_length=1, description="Search query
             )
             for track in results
         ],
+    )
+
+
+@app.get("/api/search/playlist/stream")
+async def api_search_playlist_stream(
+    request: Request,
+    q: str = Query(..., min_length=1, description="Playlist URL (YouTube Music, YouTube, Deezer)"),
+):
+    """Stream playlist search progress and results via SSE."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    from kikusan.deezer import DeezerQuotaError
+    from kikusan.deezer import get_tracks_from_url as get_deezer_tracks_from_url
+    from kikusan.deezer import is_deezer_url
+    from kikusan.search import get_playlist_tracks, parse_youtube_url, search as yt_search
+
+    async def event_generator():
+        try:
+            if is_deezer_url(q):
+                yield _sse_event(
+                    "progress",
+                    {
+                        "stage": "fetching",
+                        "message": "Fetching Deezer playlist tracks...",
+                    },
+                )
+
+                try:
+                    deezer_tracks = await asyncio.to_thread(get_deezer_tracks_from_url, q)
+                except DeezerQuotaError as e:
+                    logger.warning("Deezer quota exceeded for '%s': %s", q, e)
+                    yield _sse_event("failure", {"message": str(e)})
+                    return
+                except Exception as e:
+                    logger.error("Deezer fetch failed for '%s': %s", q, e)
+                    yield _sse_event(
+                        "failure",
+                        {"message": f"Failed to fetch Deezer playlist: {str(e)}"},
+                    )
+                    return
+
+                if not deezer_tracks:
+                    yield _sse_event(
+                        "failure",
+                        {"message": "Deezer playlist is empty or unavailable"},
+                    )
+                    return
+
+                total = len(deezer_tracks)
+                processed = 0
+                matched = 0
+                results = []
+
+                yield _sse_event(
+                    "progress",
+                    {
+                        "stage": "matching",
+                        "total": total,
+                        "processed": processed,
+                        "matched": matched,
+                    },
+                )
+
+                for dz_track in deezer_tracks:
+                    if await request.is_disconnected():
+                        return
+
+                    processed += 1
+                    try:
+                        yt_results = await asyncio.to_thread(
+                            yt_search, dz_track.search_query, 1
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Search failed for Deezer track '%s - %s': %s",
+                            dz_track.artist,
+                            dz_track.name,
+                            e,
+                        )
+                        yt_results = []
+
+                    if yt_results:
+                        results.append(yt_results[0])
+                        matched += 1
+
+                    yield _sse_event(
+                        "progress",
+                        {
+                            "stage": "matching",
+                            "total": total,
+                            "processed": processed,
+                            "matched": matched,
+                        },
+                    )
+
+                if not results:
+                    yield _sse_event(
+                        "failure",
+                        {"message": "No Deezer tracks could be matched on YouTube Music"},
+                    )
+                    return
+
+                payload_results = [_track_to_response(track).dict() for track in results]
+                yield _sse_event(
+                    "complete",
+                    {
+                        "results": payload_results,
+                        "total": len(payload_results),
+                    },
+                )
+                return
+
+            url_info = parse_youtube_url(q)
+            if not url_info:
+                yield _sse_event(
+                    "failure",
+                    {"message": "Only playlist URLs are supported for streaming search"},
+                )
+                return
+
+            if url_info["type"] == "unsupported_radio":
+                yield _sse_event(
+                    "failure",
+                    {
+                        "message": "Radio playlists are not supported. Please use a regular playlist or single track URL.",
+                    },
+                )
+                return
+
+            if url_info["type"] != "playlist":
+                yield _sse_event(
+                    "failure",
+                    {"message": "Only playlist URLs are supported for streaming search"},
+                )
+                return
+
+            yield _sse_event(
+                "progress",
+                {
+                    "stage": "fetching",
+                    "message": "Fetching playlist tracks...",
+                },
+            )
+
+            try:
+                tracks = await asyncio.to_thread(get_playlist_tracks, url_info["id"])
+            except ValueError as e:
+                yield _sse_event("failure", {"message": str(e)})
+                return
+            except Exception as e:
+                logger.error("Playlist fetch failed for '%s': %s", q, e)
+                yield _sse_event(
+                    "failure", {"message": f"Failed to fetch playlist: {str(e)}"}
+                )
+                return
+
+            if not tracks:
+                yield _sse_event(
+                    "failure", {"message": "Playlist is empty or unavailable"}
+                )
+                return
+
+            payload_results = [_track_to_response(track).dict() for track in tracks]
+            yield _sse_event(
+                "progress",
+                {
+                    "stage": "resolved",
+                    "total": len(payload_results),
+                    "processed": len(payload_results),
+                    "matched": len(payload_results),
+                    "message": f"Found {len(payload_results)} tracks",
+                },
+            )
+            yield _sse_event(
+                "complete",
+                {
+                    "results": payload_results,
+                    "total": len(payload_results),
+                },
+            )
+        except Exception as e:
+            logger.error("Playlist streaming search failed for '%s': %s", q, e)
+            yield _sse_event(
+                "failure", {"message": f"Playlist search failed: {str(e)}"}
+            )
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

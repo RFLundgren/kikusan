@@ -22,6 +22,11 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - **Deezer playlist URL support**: `https://www.deezer.com/playlist/{id}` (also localized paths like `/us/playlist/{id}`)
     - Deezer tracks are resolved to YouTube Music via search (`"{title} {artist}"`) so the UI can queue/download them through existing `video_id` flow
     - Implemented in `api_search()` using `kikusan/deezer.py`
+  - **Playlist progress streaming (web UI)**:
+    - Playlist searches use Server-Sent Events to show progress (matching `x/y` tracks for Deezer, resolved count for YouTube playlists)
+    - Endpoint: `GET /api/search/playlist/stream?q=...` in `kikusan/web/app.py`
+    - Frontend uses `EventSource` with `progress`, `complete`, and `failure` events in `kikusan/web/templates/index.html`
+    - Test coverage: `tests/test_web_search_playlist_stream.py`
 - View counts displayed for each song (e.g., "1.9B views", "47M views")
   - View counts are retrieved from ytmusicapi search results (no additional API calls needed)
   - Displayed alongside duration in the track metadata section

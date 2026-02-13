@@ -290,6 +290,7 @@
       const resultsDiv = document.getElementById("songs-results");
       const statusDiv = document.getElementById("status");
       const searchClearBtn = document.getElementById("search-clear-btn");
+      let playlistEventSource = null;
 
       // Toggle clear button visibility based on input content
       function updateClearButtonVisibility() {
@@ -302,6 +303,7 @@
 
       // Clear search input
       function clearSearch() {
+        closePlaylistSearch();
         searchInput.value = "";
         updateClearButtonVisibility();
         searchInput.focus();
@@ -399,6 +401,105 @@
         statusDiv.textContent = message;
         statusDiv.className = "status " + (isError ? "error" : "info");
         statusDiv.style.display = message ? "block" : "none";
+      }
+
+      function closePlaylistSearch() {
+        if (playlistEventSource) {
+          playlistEventSource.close();
+          playlistEventSource = null;
+        }
+      }
+
+      function isPlaylistQuery(query) {
+        const trimmed = query.trim();
+        if (!trimmed) return false;
+        if (!/^https?:\/\//i.test(trimmed)) return false;
+
+        try {
+          const url = new URL(trimmed);
+          const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+          if (host === "deezer.com") {
+            return url.pathname.includes("/playlist/");
+          }
+
+          if (
+            host === "music.youtube.com" ||
+            host === "youtube.com" ||
+            host === "youtu.be"
+          ) {
+            return url.searchParams.has("list");
+          }
+        } catch (error) {
+          return false;
+        }
+
+        return false;
+      }
+
+      function formatPlaylistProgress(progress) {
+        if (progress.message) {
+          return progress.message;
+        }
+
+        if (progress.stage === "matching" && progress.total) {
+          const matched =
+            progress.matched !== undefined
+              ? ` (${progress.matched} matched)`
+              : "";
+          return `Matching ${progress.processed || 0}/${progress.total} tracks${matched}...`;
+        }
+
+        if (progress.stage === "resolved" && progress.total) {
+          return `Found ${progress.total} tracks`;
+        }
+
+        return "Fetching playlist tracks...";
+      }
+
+      async function performPlaylistSearch(query) {
+        closePlaylistSearch();
+        songsResults.innerHTML = "";
+        showStatus("Fetching playlist tracks...");
+
+        return new Promise((resolve) => {
+          const url = `/api/search/playlist/stream?q=${encodeURIComponent(query)}`;
+          playlistEventSource = new EventSource(url);
+
+          playlistEventSource.addEventListener("progress", (event) => {
+            const data = JSON.parse(event.data);
+            showStatus(formatPlaylistProgress(data));
+          });
+
+          playlistEventSource.addEventListener("complete", (event) => {
+            const data = JSON.parse(event.data);
+            closePlaylistSearch();
+
+            if (!data.results || data.results.length === 0) {
+              showStatus("No results found.");
+              resolve();
+              return;
+            }
+
+            showStatus(`Found ${data.results.length} tracks.`);
+            renderResults(data.results);
+            resolve();
+          });
+
+          playlistEventSource.addEventListener("failure", (event) => {
+            const data = JSON.parse(event.data);
+            closePlaylistSearch();
+            showStatus(data.message || "Playlist search failed.", true);
+            resolve();
+          });
+
+          playlistEventSource.onerror = () => {
+            if (!playlistEventSource) return;
+            closePlaylistSearch();
+            showStatus("Playlist search connection failed.", true);
+            resolve();
+          };
+        });
       }
 
       // URL query parameter handling
@@ -644,6 +745,7 @@
 
       // Extract search logic into reusable function
       async function performSearch(query) {
+        closePlaylistSearch();
         showStatus("Searching...");
         if (currentTab === "songs") {
           songsResults.innerHTML = "";
@@ -656,6 +758,11 @@
       }
 
       async function performSongSearch(query) {
+        if (isPlaylistQuery(query)) {
+          await performPlaylistSearch(query);
+          return;
+        }
+
         try {
           const response = await fetch(
             `/api/search?q=${encodeURIComponent(query)}`,
