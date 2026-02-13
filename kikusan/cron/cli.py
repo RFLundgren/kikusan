@@ -52,6 +52,11 @@ logger = logging.getLogger(__name__)
     default=None,
     help="Use only primary artist for folder names in album mode",
 )
+@click.option(
+    "--replaygain/--no-replaygain",
+    default=None,
+    help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
+)
 def cron(
     config: str,
     output: str | None,
@@ -59,6 +64,7 @@ def cron(
     audio_format: str | None,
     organization_mode: str | None,
     use_primary_artist: bool | None,
+    replaygain: bool | None,
 ):
     """
     Run continuous sync based on cron.yaml.
@@ -114,6 +120,8 @@ def cron(
         os.environ["KIKUSAN_ORGANIZATION_MODE"] = organization_mode
     if use_primary_artist is not None:
         os.environ["KIKUSAN_USE_PRIMARY_ARTIST"] = "true" if use_primary_artist else "false"
+    if replaygain is not None:
+        os.environ["KIKUSAN_REPLAYGAIN"] = "true" if replaygain else "false"
 
     config_path = Path(config)
     download_dir = Path(output) if output else None

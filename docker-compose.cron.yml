@@ -38,6 +38,9 @@ services:
       # Optional: Filename template
       # - KIKUSAN_FILENAME_TEMPLATE=%(artist,uploader)s - %(title)s
 
+      # Optional: ReplayGain/R128 loudness normalization tags
+      # - KIKUSAN_REPLAYGAIN=true
+
       # Optional: Gotify notifications
       # - GOTIFY_URL=  # Gotify server URL
       # - GOTIFY_TOKEN=  # Gotify app token

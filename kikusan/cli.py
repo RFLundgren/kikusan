@@ -133,6 +133,11 @@ main.add_command(search_cmd, name="search")
     default=None,
     help="Use only primary artist for folder names in album mode (strips 'feat.', etc.)",
 )
+@click.option(
+    "--replaygain/--no-replaygain",
+    default=None,
+    help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
+)
 def download_cmd(
     video_id: str | None,
     url: str | None,
@@ -144,6 +149,7 @@ def download_cmd(
     playlist_name: str | None,
     organization_mode: str | None,
     use_primary_artist: bool | None,
+    replaygain: bool | None,
 ):
     """Download a track by video ID, URL, or search query.
 
@@ -163,6 +169,9 @@ def download_cmd(
     """
     if not video_id and not url and not query:
         raise click.UsageError("One of VIDEO_ID, --url, or --query is required")
+
+    if replaygain is not None:
+        os.environ["KIKUSAN_REPLAYGAIN"] = "true" if replaygain else "false"
 
     config = get_config()
     output_dir = Path(output) if output else config.download_dir
@@ -189,6 +198,7 @@ def download_cmd(
                 fetch_lyrics=not no_lyrics,
                 organization_mode=org_mode,
                 use_primary_artist=primary_artist,
+                apply_replaygain=config.replaygain,
             )
             if audio_path:
                 click.echo(f"Downloaded: {audio_path}")
@@ -218,6 +228,7 @@ def download_cmd(
                     use_primary_artist=primary_artist,
                     source_name="Spotify playlist/album",
                     get_tracks_from_url=get_spotify_tracks_from_url,
+                    apply_replaygain=config.replaygain,
                 )
             elif is_deezer_url(url):
                 _download_external_url(
@@ -231,6 +242,7 @@ def download_cmd(
                     use_primary_artist=primary_artist,
                     source_name="Deezer playlist",
                     get_tracks_from_url=get_deezer_tracks_from_url,
+                    apply_replaygain=config.replaygain,
                 )
             else:
                 result = download_url(
@@ -241,6 +253,7 @@ def download_cmd(
                     fetch_lyrics=not no_lyrics,
                     organization_mode=org_mode,
                     use_primary_artist=primary_artist,
+                    apply_replaygain=config.replaygain,
                 )
 
                 if isinstance(result, list):
@@ -270,6 +283,7 @@ def download_cmd(
             fetch_lyrics=not no_lyrics,
             organization_mode=org_mode,
             use_primary_artist=primary_artist,
+            apply_replaygain=config.replaygain,
         )
 
         if audio_path:
@@ -300,6 +314,7 @@ def _download_external_url(
     use_primary_artist: bool = False,
     source_name: str = "External playlist",
     get_tracks_from_url: callable | None = None,
+    apply_replaygain: bool = False,
 ) -> None:
     """Download tracks from an external playlist source by searching YouTube Music."""
     if get_tracks_from_url is None:
@@ -343,6 +358,7 @@ def _download_external_url(
                 fetch_lyrics=fetch_lyrics,
                 organization_mode=organization_mode,
                 use_primary_artist=use_primary_artist,
+                apply_replaygain=apply_replaygain,
             )
 
             if audio_path:
@@ -495,6 +511,7 @@ def explore_charts_cmd(country: str, do_download: bool, output: str | None, audi
                     fetch_lyrics=True,
                     organization_mode=config.organization_mode,
                     use_primary_artist=config.use_primary_artist,
+                    apply_replaygain=config.replaygain,
                 )
                 if audio_path:
                     downloaded_paths.append(audio_path)
@@ -537,6 +554,7 @@ def _download_explore_tracks(
                 fetch_lyrics=True,
                 organization_mode=config.organization_mode,
                 use_primary_artist=config.use_primary_artist,
+                apply_replaygain=config.replaygain,
             )
             if audio_path:
                 downloaded_paths.append(audio_path)
@@ -584,6 +602,11 @@ def _download_explore_tracks(
     default=None,
     help="Enable per-user M3U playlists via Remote-User header (for reverse proxy SSO). Default: disabled",
 )
+@click.option(
+    "--replaygain/--no-replaygain",
+    default=None,
+    help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
+)
 def web(
     host: str,
     port: int | None,
@@ -592,6 +615,7 @@ def web(
     organization_mode: str | None,
     use_primary_artist: bool | None,
     multi_user: bool | None,
+    replaygain: bool | None,
 ):
     """Start the web interface."""
     import uvicorn
@@ -609,6 +633,8 @@ def web(
         os.environ["KIKUSAN_USE_PRIMARY_ARTIST"] = "true" if use_primary_artist else "false"
     if multi_user is not None:
         os.environ["KIKUSAN_MULTI_USER"] = "true" if multi_user else "false"
+    if replaygain is not None:
+        os.environ["KIKUSAN_REPLAYGAIN"] = "true" if replaygain else "false"
 
     config = get_config()
     server_port = port or config.web_port

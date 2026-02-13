@@ -321,6 +321,7 @@ def download(
     use_primary_artist: bool = False,
     cookie_file: str | None = None,
     artists: list[str] | None = None,
+    apply_replaygain: bool = False,
 ) -> Path:
     """
     Download a track from YouTube Music.
@@ -437,6 +438,12 @@ def download(
             if lyrics:
                 save_lyrics(lyrics, audio_path)
 
+        # Apply ReplayGain/R128 tags
+        if apply_replaygain:
+            from kikusan.replaygain import apply_replaygain as rsgain_apply
+
+            rsgain_apply(audio_path, audio_format)
+
     return audio_path
 
 
@@ -461,6 +468,7 @@ def download_url(
     organization_mode: str = "flat",
     use_primary_artist: bool = False,
     cookie_file: str | None = None,
+    apply_replaygain: bool = False,
 ) -> Path | list[Path]:
     """
     Download a track or playlist from a YouTube/YouTube Music URL.
@@ -507,6 +515,7 @@ def download_url(
             organization_mode,
             use_primary_artist,
             cookie_file,
+            apply_replaygain=apply_replaygain,
         )
 
     # Single track
@@ -520,6 +529,7 @@ def download_url(
         organization_mode,
         use_primary_artist,
         cookie_file,
+        apply_replaygain=apply_replaygain,
     )
 
 
@@ -533,6 +543,7 @@ def _download_single(
     organization_mode: str,
     use_primary_artist: bool = False,
     cookie_file: str | None = None,
+    apply_replaygain: bool = False,
 ) -> Path:
     """Download a single track.
 
@@ -595,6 +606,11 @@ def _download_single(
         if lyrics:
             save_lyrics(lyrics, audio_path)
 
+    if audio_path and apply_replaygain:
+        from kikusan.replaygain import apply_replaygain as rsgain_apply
+
+        rsgain_apply(audio_path, audio_format)
+
     return audio_path
 
 
@@ -607,6 +623,7 @@ def _download_playlist(
     organization_mode: str,
     use_primary_artist: bool = False,
     cookie_file: str | None = None,
+    apply_replaygain: bool = False,
 ) -> list[Path]:
     """Download all tracks from a playlist."""
     entries = info.get("entries", [])
@@ -695,6 +712,10 @@ def _download_playlist(
                     lyrics = get_lyrics_for_video(video_id, title, artist, duration)
                     if lyrics:
                         save_lyrics(lyrics, audio_path)
+                if apply_replaygain:
+                    from kikusan.replaygain import apply_replaygain as rsgain_apply
+
+                    rsgain_apply(audio_path, audio_format)
 
         except Exception as e:
             logger.warning("Failed to download %s: %s", title, e)

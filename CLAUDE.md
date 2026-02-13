@@ -193,6 +193,16 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Configurable cooldown period (default: 168 hours / 7 days)
   - Pattern matching for unavailable-specific errors (distinct from auth/network errors)
   - Functions: `is_unavailable_error()`, `record_unavailable()`, `is_on_cooldown()`, `clear_expired()`
+- `kikusan/replaygain.py`: ReplayGain/R128 loudness normalization tagging via `rsgain`
+  - `is_rsgain_available() -> bool`: Checks `shutil.which("rsgain")`, result cached via `@lru_cache`
+  - `apply_replaygain(audio_path, audio_format) -> bool`: Runs `rsgain custom -q -s i [-o r] <file>`
+  - For Opus files, uses `-o r` flag for RFC 7845 R128 output gain tags
+  - Non-fatal: logs warnings on failure (timeout, missing binary, exit code), returns False
+  - 300-second timeout on subprocess
+  - Opt-in via `KIKUSAN_REPLAYGAIN=true` env var or `--replaygain` CLI flag
+  - Requires external `rsgain` binary (installed in Docker image from GitHub releases)
+  - Called as post-processing step after lyrics in all download paths (`download()`, `_download_single()`, `_download_playlist()`)
+  - `apply_replaygain` parameter threaded through: `download.py`, `queue.py`, `cron/sync.py`, `plugins/sync.py`, `cli.py`
 
 ### CI/CD
 
@@ -222,18 +232,21 @@ All major configuration variables have corresponding CLI flags:
 
 - `--organization-mode`: File organization (flat, album)
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
+- `--replaygain / --no-replaygain`: Apply ReplayGain/R128 loudness normalization tags (env: `KIKUSAN_REPLAYGAIN`)
 
 **web command:**
 
 - `--cors-origins`: CORS allowed origins
 - `--web-playlist`: M3U playlist name for web downloads
 - `--multi-user / --no-multi-user`: Enable per-user M3U playlists via Remote-User header (env: `KIKUSAN_MULTI_USER`)
+- `--replaygain / --no-replaygain`: Apply ReplayGain/R128 loudness normalization tags (env: `KIKUSAN_REPLAYGAIN`)
 
 **cron command:**
 
 - `--format`: Audio format
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
+- `--replaygain / --no-replaygain`: Apply ReplayGain/R128 loudness normalization tags (env: `KIKUSAN_REPLAYGAIN`)
 - Supports `explore` section in `cron.yaml` for syncing charts and moods/genres:
   - `type: charts` with optional `country` (ISO 3166-1 Alpha-2, default ZZ)
   - `type: mood` with required `params` (from `explore moods` command)
@@ -247,6 +260,7 @@ All major configuration variables have corresponding CLI flags:
 - `--format`: Audio format
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
+- `--replaygain / --no-replaygain`: Apply ReplayGain/R128 loudness normalization tags (env: `KIKUSAN_REPLAYGAIN`)
 
 **explore command group:**
 

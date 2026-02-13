@@ -38,6 +38,7 @@ class Config:
     cors_origins: list[str] = field(default_factory=lambda: ["*"])
     unavailable_cooldown_hours: int = 168  # 7 days
     multi_user: bool = False
+    replaygain: bool = False
 
     def effective_playlist_name(self, remote_user: str | None) -> str | None:
         """Return the playlist name, optionally prefixed with the remote user."""
@@ -103,6 +104,9 @@ class Config:
         # Parse multi-user mode flag
         multi_user = os.getenv("KIKUSAN_MULTI_USER", "false").lower() in ("true", "1", "yes")
 
+        # Parse replaygain flag
+        replaygain = os.getenv("KIKUSAN_REPLAYGAIN", "false").lower() in ("true", "1", "yes")
+
         # Parse web port
         web_port = int(os.getenv("KIKUSAN_WEB_PORT", "8000"))
         if not (1 <= web_port <= 65535):
@@ -129,6 +133,7 @@ class Config:
             cors_origins=cors_origins,
             unavailable_cooldown_hours=unavailable_cooldown_hours,
             multi_user=multi_user,
+            replaygain=replaygain,
         )
 
     @property

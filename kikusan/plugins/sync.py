@@ -195,6 +195,7 @@ def _download_songs(
                 fetch_lyrics=True,
                 organization_mode=config.organization_mode,
                 use_primary_artist=config.use_primary_artist,
+                apply_replaygain=app_config.replaygain,
             )
 
             if audio_path:

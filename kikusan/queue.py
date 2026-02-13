@@ -216,6 +216,7 @@ class QueueManager:
                     use_primary_artist=config.use_primary_artist,
                     cookie_file=config.cookie_file_path,
                     artists=job.artists,
+                    apply_replaygain=config.replaygain,
                 ),
             )
 

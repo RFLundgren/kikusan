@@ -346,6 +346,7 @@ def download_new_tracks(
                 organization_mode=organization_mode,
                 use_primary_artist=use_primary_artist,
                 cookie_file=config.cookie_file_path,
+                apply_replaygain=config.replaygain,
             )
 
             if audio_path:

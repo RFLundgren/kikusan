@@ -71,6 +71,11 @@ def list_available_plugins():
     default=None,
     help="Use only primary artist for folder names in album mode",
 )
+@click.option(
+    "--replaygain/--no-replaygain",
+    default=None,
+    help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
+)
 def sync_once(
     plugin_name: str,
     config: str,
@@ -78,6 +83,7 @@ def sync_once(
     audio_format: str | None,
     organization_mode: str | None,
     use_primary_artist: bool | None,
+    replaygain: bool | None,
 ):
     """Run a plugin sync once (without cron.yaml).
 
@@ -88,6 +94,9 @@ def sync_once(
       kikusan plugins run rss --config '{"url": "https://..."}'
     """
     discover_plugins()
+
+    if replaygain is not None:
+        os.environ["KIKUSAN_REPLAYGAIN"] = "true" if replaygain else "false"
 
     main_config = get_config()
     download_dir = Path(output) if output else main_config.download_dir
