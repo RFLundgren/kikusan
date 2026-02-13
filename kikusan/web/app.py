@@ -1111,6 +1111,9 @@ async def api_explore_playlist_tracks(playlist_id: str):
                 for track in tracks
             ],
         }
+    except ValueError as e:
+        logger.warning("Playlist unavailable: %s", e)
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error("Failed to get playlist tracks: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to get playlist tracks: {str(e)}")

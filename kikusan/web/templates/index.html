@@ -1901,7 +1901,10 @@
               const res = await fetch(
                 `/api/explore/playlist/${encodeURIComponent(btn.dataset.playlistId)}/tracks`,
               );
-              if (!res.ok) throw new Error("Failed to load tracks");
+              if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.detail || "Failed to load tracks");
+              }
               const data = await res.json();
               await queueMultipleTracks(data.tracks, btn);
             } catch (error) {
@@ -1938,7 +1941,10 @@
           const res = await fetch(
             `/api/explore/playlist/${encodeURIComponent(playlistId)}/tracks`,
           );
-          if (!res.ok) throw new Error("Failed to load tracks");
+          if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.detail || "Failed to load tracks");
+          }
           const data = await res.json();
           showStatus("");
           renderPlaylistTracks(data.tracks, playlistTitle, playlistId);

@@ -632,7 +632,9 @@ def get_playlist_tracks(playlist_id: str) -> list[Track]:
         raw = yt.get_playlist(playlist_id)
     except Exception as e:
         logger.error("YouTube Music get_playlist failed for playlist_id '%s': %s", playlist_id, e)
-        raise
+        raise ValueError(
+            f"Playlist '{playlist_id}' is unavailable or could not be loaded"
+        ) from e
 
     tracks = []
     for item in raw.get("tracks", []):

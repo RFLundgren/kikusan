@@ -633,6 +633,16 @@ class TestGetPlaylistTracks:
         assert tracks == []
 
     @patch("kikusan.search.YTMusic")
+    def test_get_playlist_api_error_raises_value_error(self, mock_ytmusic_cls):
+        """When ytmusicapi cannot parse the playlist response, a ValueError is raised."""
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_playlist.side_effect = Exception("Unable to find 'contents'")
+
+        with pytest.raises(ValueError, match="unavailable or could not be loaded"):
+            get_playlist_tracks("REb_GRi2dMZvne0")
+
+    @patch("kikusan.search.YTMusic")
     def test_duration_fallback(self, mock_ytmusic_cls):
         """Test that duration_text is parsed when duration_seconds is missing."""
         mock_yt = MagicMock()
