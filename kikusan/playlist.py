@@ -30,7 +30,7 @@ def add_to_m3u(
     # Read existing entries
     existing_entries = set()
     if m3u_path.exists():
-        content = m3u_path.read_text().strip()
+        content = m3u_path.read_text(encoding="utf-8").strip()
         if content:
             existing_entries = set(content.split("\n"))
             existing_entries.discard("")  # Remove empty lines
@@ -55,7 +55,7 @@ def add_to_m3u(
     if new_entries or not m3u_path.exists():
         # Preserve original order, append new entries
         if m3u_path.exists():
-            original_content = m3u_path.read_text().strip()
+            original_content = m3u_path.read_text(encoding="utf-8").strip()
             original_entries = [line for line in original_content.split("\n") if line and line not in new_entries]
             all_entries = original_entries + new_entries
         else:
@@ -63,7 +63,7 @@ def add_to_m3u(
 
         # Write to temp file then rename (atomic on POSIX)
         temp_path = m3u_path.with_suffix(".m3u.tmp")
-        temp_path.write_text("\n".join(all_entries) + "\n")
+        temp_path.write_text("\n".join(all_entries) + "\n", encoding="utf-8")
         temp_path.rename(m3u_path)
 
         if added_count > 0:
@@ -97,7 +97,7 @@ def read_m3u(playlist_name: str, download_dir: Path) -> list[str]:
     if not m3u_path.exists():
         return []
 
-    content = m3u_path.read_text().strip()
+    content = m3u_path.read_text(encoding="utf-8").strip()
     if not content:
         return []
 
@@ -123,7 +123,7 @@ def remove_from_m3u(entry_path: str, playlist_name: str, download_dir: Path) -> 
     if not m3u_path.exists():
         return False
 
-    content = m3u_path.read_text().strip()
+    content = m3u_path.read_text(encoding="utf-8").strip()
     if not content:
         return False
 
@@ -136,9 +136,9 @@ def remove_from_m3u(entry_path: str, playlist_name: str, download_dir: Path) -> 
     # Write atomically
     temp_path = m3u_path.with_suffix(".m3u.tmp")
     if entries:
-        temp_path.write_text("\n".join(entries) + "\n")
+        temp_path.write_text("\n".join(entries) + "\n", encoding="utf-8")
     else:
-        temp_path.write_text("")
+        temp_path.write_text("", encoding="utf-8")
     temp_path.replace(m3u_path)
 
     logger.info("Removed entry from playlist %s: %s", m3u_path.name, entry_path)
@@ -177,9 +177,9 @@ def rebuild_m3u(
     # Write atomically
     temp_path = m3u_path.with_suffix(".m3u.tmp")
     if entries:
-        temp_path.write_text("\n".join(entries) + "\n")
+        temp_path.write_text("\n".join(entries) + "\n", encoding="utf-8")
     else:
-        temp_path.write_text("")
+        temp_path.write_text("", encoding="utf-8")
     temp_path.replace(m3u_path)
 
     logger.debug("Rebuilt M3U playlist: %s (%d tracks)", m3u_path.name, len(entries))
