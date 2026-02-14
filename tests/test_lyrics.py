@@ -13,9 +13,12 @@ import httpx
 import pytest
 
 from kikusan.lyrics import (
+    _clean_artist,
+    _clean_title,
     _extract_lyrics_from_response,
     _get_lyrics_exact,
     _search_lyrics,
+    _try_cleaned_lookup,
     get_lyrics,
     get_lyrics_for_video,
 )
@@ -85,7 +88,8 @@ class TestGetLyricsForVideo:
             album="A Night at the Opera",
             duration_seconds=354,
         )
-        # First call (ytmusicapi metadata) returns None, second call (yt-dlp fallback) returns lyrics
+        # Calls: ytmusicapi exact (None), ytmusicapi cleaned exact (skipped - no change),
+        # yt-dlp exact (found)
         mock_exact.side_effect = [None, "[00:00.00] Is this the real life?"]
         mock_search.return_value = None
 
@@ -97,7 +101,8 @@ class TestGetLyricsForVideo:
         )
 
         assert result == "[00:00.00] Is this the real life?"
-        # Should have been called twice: once with ytmusicapi data, once with fallback
+        # Called twice: ytmusicapi exact + yt-dlp fallback exact
+        # (cleaned ytmusicapi is skipped because title/artist don't change)
         assert mock_exact.call_count == 2
         mock_exact.assert_called_with(
             "Queen - Bohemian Rhapsody (Official Video)", "QueenVEVO", 355
@@ -145,6 +150,52 @@ class TestGetLyricsForVideo:
         )
 
         assert result is None
+
+    @patch("kikusan.search.get_song_metadata")
+    @patch("kikusan.lyrics._search_lyrics")
+    @patch("kikusan.lyrics._get_lyrics_exact")
+    def test_tries_cleaned_ytmusicapi_metadata(self, mock_exact, mock_search, mock_metadata):
+        """When ytmusicapi metadata has parentheticals, cleaned version should be tried."""
+        mock_metadata.return_value = SongMetadata(
+            title="Force (Radio Edit)",
+            artist="8181 Enzo, Michael Ekow",
+            album="Force (Radio Edit)",
+            duration_seconds=164,
+        )
+        # ytmusicapi exact (None), cleaned exact (found)
+        mock_exact.side_effect = [None, "[00:00.00] Force lyrics"]
+        mock_search.return_value = None
+
+        result = get_lyrics_for_video(
+            video_id="test123",
+            fallback_title="Force (Radio Edit)",
+            fallback_artist="8181 Enzo, Michael Ekow",
+            fallback_duration=164,
+        )
+
+        assert result == "[00:00.00] Force lyrics"
+        # Second exact call should use cleaned metadata
+        mock_exact.assert_called_with("Force", "8181 Enzo", 164)
+
+    @patch("kikusan.search.get_song_metadata")
+    @patch("kikusan.lyrics._search_lyrics")
+    @patch("kikusan.lyrics._get_lyrics_exact")
+    def test_tries_cleaned_ytdlp_fallback(self, mock_exact, mock_search, mock_metadata):
+        """When ytmusicapi fails, cleaned yt-dlp metadata should be tried."""
+        mock_metadata.return_value = None
+        # yt-dlp exact (None), cleaned yt-dlp exact (found)
+        mock_exact.side_effect = [None, "[00:00.00] lyrics"]
+        mock_search.return_value = None
+
+        result = get_lyrics_for_video(
+            video_id="test123",
+            fallback_title="Song (Official Video)",
+            fallback_artist="Artist",
+            fallback_duration=200,
+        )
+
+        assert result == "[00:00.00] lyrics"
+        mock_exact.assert_called_with("Song", "Artist", 200)
 
 
 class TestGetLyricsExact:
@@ -410,3 +461,100 @@ class TestExtractLyricsFromResponse:
         data = {"syncedLyrics": "", "plainLyrics": ""}
         result = _extract_lyrics_from_response(data, "Artist", "Track")
         assert result is None
+
+
+class TestCleanTitle:
+    """Tests for _clean_title helper."""
+
+    def test_strips_radio_edit(self):
+        assert _clean_title("Force (Radio Edit)") == "Force"
+
+    def test_strips_official_video(self):
+        assert _clean_title("Song (Official Video)") == "Song"
+
+    def test_strips_brackets(self):
+        assert _clean_title("Song [Official Music Video]") == "Song"
+
+    def test_strips_multiple_suffixes(self):
+        assert _clean_title("Song (feat. Artist) (Radio Edit)") == "Song"
+
+    def test_preserves_clean_title(self):
+        assert _clean_title("Bohemian Rhapsody") == "Bohemian Rhapsody"
+
+    def test_preserves_mid_parens(self):
+        assert _clean_title("Song (Part 1) Extra") == "Song (Part 1) Extra"
+
+    def test_returns_original_if_cleaning_empties(self):
+        assert _clean_title("(Radio Edit)") == "(Radio Edit)"
+
+    def test_strips_remastered(self):
+        assert _clean_title("Song (Remastered 2011)") == "Song"
+
+    def test_strips_live(self):
+        assert _clean_title("Song (Live at Wembley)") == "Song"
+
+
+class TestCleanArtist:
+    """Tests for _clean_artist helper."""
+
+    def test_splits_on_comma(self):
+        assert _clean_artist("8181 Enzo, Michael Ekow") == "8181 Enzo"
+
+    def test_splits_on_semicolon(self):
+        assert _clean_artist("Artist1; Artist2") == "Artist1"
+
+    def test_splits_on_feat(self):
+        assert _clean_artist("Main Artist feat. Other") == "Main Artist"
+
+    def test_splits_on_ft(self):
+        assert _clean_artist("Main Artist ft. Other") == "Main Artist"
+
+    def test_splits_on_featuring(self):
+        assert _clean_artist("Main Artist featuring Other") == "Main Artist"
+
+    def test_preserves_single_artist(self):
+        assert _clean_artist("Queen") == "Queen"
+
+    def test_returns_original_if_cleaning_empties(self):
+        assert _clean_artist(", Artist") == ", Artist"
+
+    def test_case_insensitive_feat(self):
+        assert _clean_artist("Main FEAT. Other") == "Main"
+
+
+class TestTryCleanedLookup:
+    """Tests for _try_cleaned_lookup helper."""
+
+    @patch("kikusan.lyrics._search_lyrics")
+    @patch("kikusan.lyrics._get_lyrics_exact")
+    def test_skips_when_nothing_changes(self, mock_exact, mock_search):
+        """Should return None without API calls if cleaning doesn't change anything."""
+        result = _try_cleaned_lookup("Song", "Artist", None, 200)
+
+        assert result is None
+        mock_exact.assert_not_called()
+        mock_search.assert_not_called()
+
+    @patch("kikusan.lyrics._search_lyrics")
+    @patch("kikusan.lyrics._get_lyrics_exact")
+    def test_tries_exact_with_cleaned(self, mock_exact, mock_search):
+        """Should try exact match with cleaned title/artist."""
+        mock_exact.return_value = "[00:00.00] lyrics"
+
+        result = _try_cleaned_lookup("Force (Radio Edit)", "8181 Enzo, Michael Ekow", None, 164)
+
+        assert result == "[00:00.00] lyrics"
+        mock_exact.assert_called_once_with("Force", "8181 Enzo", 164)
+        mock_search.assert_not_called()
+
+    @patch("kikusan.lyrics._search_lyrics")
+    @patch("kikusan.lyrics._get_lyrics_exact")
+    def test_falls_back_to_search(self, mock_exact, mock_search):
+        """Should try search if exact match fails."""
+        mock_exact.return_value = None
+        mock_search.return_value = "[00:00.00] found via search"
+
+        result = _try_cleaned_lookup("Song (Radio Edit)", "Artist", "Album", 200)
+
+        assert result == "[00:00.00] found via search"
+        mock_search.assert_called_once_with("Song", "Artist", "Album", 200)

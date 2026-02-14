@@ -11,6 +11,7 @@ The basic strategy is the original get_lyrics() behavior, preserved as fallback.
 """
 
 import logging
+import re
 from pathlib import Path
 
 import httpx
@@ -18,6 +19,72 @@ import httpx
 logger = logging.getLogger(__name__)
 
 LRCLIB_BASE_URL = "https://lrclib.net/api"
+
+# Matches trailing (content) or [content] at end of string
+_TRAILING_PARENS_RE = re.compile(r"\s*(?:\([^)]+\)|\[[^\]]+\])\s*$")
+
+# Splits multi-artist strings on comma, semicolon, feat., ft., featuring
+_ARTIST_SPLIT_RE = re.compile(
+    r"\s*[,;]\s*|\s+(?:feat\.?|ft\.?|featuring)\s+", re.IGNORECASE
+)
+
+
+def _clean_title(title: str) -> str:
+    """Strip trailing parenthetical/bracketed suffixes from a track title.
+
+    Iteratively removes patterns like (Radio Edit), [Official Video], (feat. X).
+    Returns the original title if cleaning would produce an empty string.
+    """
+    cleaned = title
+    while True:
+        new = _TRAILING_PARENS_RE.sub("", cleaned).strip()
+        if new == cleaned or not new:
+            break
+        cleaned = new
+    return cleaned if cleaned else title
+
+
+def _clean_artist(artist: str) -> str:
+    """Extract primary artist name from a multi-artist string.
+
+    Splits on commas, semicolons, and feat/ft/featuring markers.
+    Returns the original artist if cleaning would produce an empty string.
+    """
+    parts = _ARTIST_SPLIT_RE.split(artist, maxsplit=1)
+    primary = parts[0].strip()
+    return primary if primary else artist
+
+
+def _try_cleaned_lookup(
+    title: str,
+    artist: str,
+    album: str | None,
+    duration_seconds: int,
+) -> str | None:
+    """Try lyrics lookup with cleaned title and artist as fallback.
+
+    Only makes API calls if cleaning actually changed the title or artist.
+    Tries exact match first, then search.
+    """
+    cleaned_title = _clean_title(title)
+    cleaned_artist = _clean_artist(artist)
+
+    if cleaned_title == title and cleaned_artist == artist:
+        return None  # Nothing changed, skip
+
+    logger.info(
+        "Retrying lyrics with cleaned metadata: '%s' by '%s' (was: '%s' by '%s')",
+        cleaned_title,
+        cleaned_artist,
+        title,
+        artist,
+    )
+
+    lyrics = _get_lyrics_exact(cleaned_title, cleaned_artist, duration_seconds)
+    if lyrics:
+        return lyrics
+
+    return _search_lyrics(cleaned_title, cleaned_artist, album, duration_seconds)
 
 
 def get_lyrics_for_video(
@@ -71,6 +138,13 @@ def get_lyrics_for_video(
         if lyrics:
             return lyrics
 
+        # Step 4: Try with cleaned ytmusicapi metadata (strip parentheticals, secondary artists)
+        lyrics = _try_cleaned_lookup(
+            metadata.title, metadata.artist, metadata.album, metadata.duration_seconds
+        )
+        if lyrics:
+            return lyrics
+
         logger.info(
             "Lyrics not found with ytmusicapi metadata, trying yt-dlp fallback for: %s - %s",
             metadata.artist, metadata.title,
@@ -82,8 +156,13 @@ def get_lyrics_for_video(
             video_id,
         )
 
-    # Step 4: Fall back to yt-dlp metadata with exact match (original behavior)
-    return _get_lyrics_exact(fallback_title, fallback_artist, fallback_duration)
+    # Step 5: Fall back to yt-dlp metadata with exact match (original behavior)
+    lyrics = _get_lyrics_exact(fallback_title, fallback_artist, fallback_duration)
+    if lyrics:
+        return lyrics
+
+    # Step 6: Try with cleaned yt-dlp fallback metadata
+    return _try_cleaned_lookup(fallback_title, fallback_artist, None, fallback_duration)
 
 
 def get_lyrics(track_name: str, artist_name: str, duration_seconds: int) -> str | None:

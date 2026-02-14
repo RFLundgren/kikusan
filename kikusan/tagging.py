@@ -31,6 +31,7 @@ class TagStats:
     lyrics_not_found: int = 0
     lyrics_failed: int = 0
     replaygain_applied: int = 0
+    replaygain_skipped: int = 0
     replaygain_failed: int = 0
     errors: int = 0
 
@@ -156,7 +157,7 @@ def _tag_lyrics(
     stats: TagStats,
 ) -> None:
     """Fetch and save lyrics for a single file."""
-    from kikusan.lyrics import _search_lyrics, get_lyrics, save_lyrics
+    from kikusan.lyrics import _search_lyrics, _try_cleaned_lookup, get_lyrics, save_lyrics
 
     lrc_path = file_path.with_suffix(".lrc")
     if lrc_path.exists():
@@ -185,6 +186,15 @@ def _tag_lyrics(
                 metadata.duration_seconds,
             )
 
+        # Strategy 3: retry with cleaned title/artist (strip parentheticals, secondary artists)
+        if not lyrics:
+            lyrics = _try_cleaned_lookup(
+                metadata.title,
+                metadata.artist,
+                metadata.album,
+                metadata.duration_seconds,
+            )
+
         if lyrics:
             save_lyrics(lyrics, file_path)
             stats.lyrics_added += 1
@@ -195,6 +205,54 @@ def _tag_lyrics(
     except Exception as e:
         logger.warning("Failed to fetch lyrics for %s: %s", file_path.name, e)
         stats.lyrics_failed += 1
+
+
+def _has_replaygain_tags(file_path: Path, audio_format: str) -> bool:
+    """Check if a file already has ReplayGain tags.
+
+    Args:
+        file_path: Path to the audio file
+        audio_format: Audio format (opus, mp3, flac)
+
+    Returns:
+        True if ReplayGain tags exist, False otherwise
+    """
+    try:
+        from mutagen import File
+
+        audio = File(file_path)
+        if audio is None:
+            return False
+
+        # Check for ReplayGain tags based on format
+        if audio_format == "opus":
+            # Opus uses R128_TRACK_GAIN and R128_ALBUM_GAIN (RFC 7845)
+            # or REPLAYGAIN_TRACK_GAIN for older files
+            return (
+                "R128_TRACK_GAIN" in audio
+                or "REPLAYGAIN_TRACK_GAIN" in audio
+            )
+        elif audio_format == "mp3":
+            # MP3 ID3v2 uses RVA2 frames or TXXX:replaygain_* tags
+            # Common tag names from rsgain
+            replaygain_keys = [
+                "REPLAYGAIN_TRACK_GAIN",
+                "replaygain_track_gain",
+            ]
+            return any(key in audio for key in replaygain_keys)
+        elif audio_format == "flac":
+            # FLAC uses Vorbis comments
+            replaygain_keys = [
+                "REPLAYGAIN_TRACK_GAIN",
+                "replaygain_track_gain",
+            ]
+            return any(key in audio for key in replaygain_keys)
+
+        return False
+
+    except Exception as e:
+        logger.debug("Failed to check ReplayGain tags for %s: %s", file_path.name, e)
+        return False
 
 
 def _tag_replaygain(
@@ -210,6 +268,12 @@ def _tag_replaygain(
     if not audio_format:
         logger.warning("Unknown format for ReplayGain: %s", file_path.suffix)
         stats.replaygain_failed += 1
+        return
+
+    # Check if ReplayGain tags already exist
+    if _has_replaygain_tags(file_path, audio_format):
+        logger.info("ReplayGain tags already exist: %s", file_path.name)
+        stats.replaygain_skipped += 1
         return
 
     if dry_run:

@@ -9,6 +9,7 @@ from kikusan.tagging import (
     SUPPORTED_EXTENSIONS,
     FileMetadata,
     TagStats,
+    _has_replaygain_tags,
     collect_audio_files,
     extract_metadata,
     tag_directory,
@@ -192,6 +193,53 @@ class TestCollectAudioFiles:
         assert files == []
 
 
+class TestHasReplaygainTags:
+    """Tests for ReplayGain tag detection."""
+
+    def test_opus_r128_track_gain(self):
+        mock_file = MagicMock()
+        mock_file.__contains__ = lambda self, key: key == "R128_TRACK_GAIN"
+
+        with patch("mutagen.File", return_value=mock_file):
+            assert _has_replaygain_tags(Path("/fake/song.opus"), "opus") is True
+
+    def test_opus_replaygain_track_gain(self):
+        mock_file = MagicMock()
+        mock_file.__contains__ = lambda self, key: key == "REPLAYGAIN_TRACK_GAIN"
+
+        with patch("mutagen.File", return_value=mock_file):
+            assert _has_replaygain_tags(Path("/fake/song.opus"), "opus") is True
+
+    def test_mp3_replaygain_track_gain(self):
+        mock_file = MagicMock()
+        mock_file.__contains__ = lambda self, key: key == "REPLAYGAIN_TRACK_GAIN"
+
+        with patch("mutagen.File", return_value=mock_file):
+            assert _has_replaygain_tags(Path("/fake/song.mp3"), "mp3") is True
+
+    def test_flac_replaygain_track_gain(self):
+        mock_file = MagicMock()
+        mock_file.__contains__ = lambda self, key: key == "REPLAYGAIN_TRACK_GAIN"
+
+        with patch("mutagen.File", return_value=mock_file):
+            assert _has_replaygain_tags(Path("/fake/song.flac"), "flac") is True
+
+    def test_no_tags(self):
+        mock_file = MagicMock()
+        mock_file.__contains__ = lambda self, key: False
+
+        with patch("mutagen.File", return_value=mock_file):
+            assert _has_replaygain_tags(Path("/fake/song.opus"), "opus") is False
+
+    def test_mutagen_cant_open(self):
+        with patch("mutagen.File", return_value=None):
+            assert _has_replaygain_tags(Path("/fake/bad.opus"), "opus") is False
+
+    def test_exception_returns_false(self):
+        with patch("mutagen.File", side_effect=Exception("corrupt")):
+            assert _has_replaygain_tags(Path("/fake/bad.opus"), "opus") is False
+
+
 class TestTagFile:
     """Tests for per-file tagging logic."""
 
@@ -270,6 +318,7 @@ class TestTagFile:
             patch("kikusan.tagging.extract_metadata", return_value=self._make_metadata()),
             patch("kikusan.lyrics.get_lyrics", return_value=None),
             patch("kikusan.lyrics._search_lyrics", return_value=None),
+            patch("kikusan.lyrics._try_cleaned_lookup", return_value=None),
         ):
             tag_file(audio, do_replaygain=False, stats=stats)
 
@@ -297,11 +346,28 @@ class TestTagFile:
 
         with (
             patch("kikusan.tagging.extract_metadata", return_value=self._make_metadata()),
+            patch("kikusan.tagging._has_replaygain_tags", return_value=False),
             patch("kikusan.replaygain.apply_replaygain", return_value=True),
         ):
             tag_file(audio, do_lyrics=False, stats=stats)
 
         assert stats.replaygain_applied == 1
+
+    def test_replaygain_skipped_when_tags_exist(self, tmp_path):
+        audio = tmp_path / "song.opus"
+        audio.touch()
+
+        stats = TagStats()
+
+        with (
+            patch("kikusan.tagging.extract_metadata", return_value=self._make_metadata()),
+            patch("kikusan.tagging._has_replaygain_tags", return_value=True),
+            patch("kikusan.replaygain.apply_replaygain") as mock_rg,
+        ):
+            tag_file(audio, do_lyrics=False, stats=stats)
+
+        assert stats.replaygain_skipped == 1
+        mock_rg.assert_not_called()
 
     def test_replaygain_failure_counted(self, tmp_path):
         audio = tmp_path / "song.opus"
@@ -311,6 +377,7 @@ class TestTagFile:
 
         with (
             patch("kikusan.tagging.extract_metadata", return_value=self._make_metadata()),
+            patch("kikusan.tagging._has_replaygain_tags", return_value=False),
             patch("kikusan.replaygain.apply_replaygain", return_value=False),
         ):
             tag_file(audio, do_lyrics=False, stats=stats)
@@ -357,6 +424,7 @@ class TestTagFile:
             patch("kikusan.tagging.extract_metadata", return_value=self._make_metadata()),
             patch("kikusan.lyrics.get_lyrics", return_value="[00:00.00] lyrics"),
             patch("kikusan.lyrics.save_lyrics"),
+            patch("kikusan.tagging._has_replaygain_tags", return_value=False),
             patch("kikusan.replaygain.apply_replaygain", return_value=True),
         ):
             tag_file(audio, stats=stats)
@@ -391,6 +459,7 @@ class TestTagDirectory:
             patch("kikusan.tagging.extract_metadata", return_value=metadata),
             patch("kikusan.lyrics.get_lyrics", return_value="[00:00.00] lyrics"),
             patch("kikusan.lyrics.save_lyrics"),
+            patch("kikusan.tagging._has_replaygain_tags", return_value=False),
             patch("kikusan.replaygain.apply_replaygain", return_value=True),
         ):
             stats = tag_directory(tmp_path)
@@ -420,6 +489,8 @@ class TestTagDirectory:
             patch("kikusan.tagging.extract_metadata", side_effect=extract_side_effect),
             patch("kikusan.lyrics.get_lyrics", return_value=None),
             patch("kikusan.lyrics._search_lyrics", return_value=None),
+            patch("kikusan.lyrics._try_cleaned_lookup", return_value=None),
+            patch("kikusan.tagging._has_replaygain_tags", return_value=False),
             patch("kikusan.replaygain.apply_replaygain", return_value=True),
         ):
             stats = tag_directory(tmp_path)
@@ -481,6 +552,7 @@ class TestTagDirectory:
         with (
             patch("kikusan.tagging.extract_metadata", return_value=metadata),
             patch("kikusan.lyrics.get_lyrics") as mock_lyrics,
+            patch("kikusan.tagging._has_replaygain_tags", return_value=False),
             patch("kikusan.replaygain.apply_replaygain", return_value=True),
         ):
             stats = tag_directory(tmp_path, do_lyrics=False)

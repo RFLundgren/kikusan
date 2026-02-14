@@ -176,7 +176,12 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - `get_lyrics_for_video()`: Primary function — fetches clean metadata from ytmusicapi, then tries multiple lrclib.net strategies:
     1. Exact match (`/api/get`) with ytmusicapi metadata (clean title/artist/duration)
     2. Search (`/api/search`) with ytmusicapi metadata (fuzzy match, includes album)
-    3. Exact match (`/api/get`) with yt-dlp fallback metadata (original behavior)
+    3. Cleaned metadata retry (strips parentheticals from title, secondary artists from artist)
+    4. Exact match (`/api/get`) with yt-dlp fallback metadata (original behavior)
+    5. Cleaned yt-dlp metadata retry
+  - `_clean_title()`: Strips trailing parenthetical/bracketed suffixes (e.g., "(Radio Edit)", "[Official Video]") iteratively
+  - `_clean_artist()`: Extracts primary artist from multi-artist strings by splitting on comma, semicolon, feat/ft/featuring
+  - `_try_cleaned_lookup()`: Applies both cleaning functions and retries exact + search (only if cleaning changed something)
   - `get_lyrics()`: Original function preserved for backward compatibility, delegates to `_get_lyrics_exact()`
   - `_search_lyrics()`: Uses `/api/search` endpoint with duration-based filtering (3s tolerance)
   - `save_lyrics()`: Saves LRC file alongside audio file
@@ -206,13 +211,15 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - `kikusan/tagging.py`: Tag existing audio files with lyrics and ReplayGain (no re-download)
   - `extract_metadata(file_path) -> FileMetadata | None`: Extracts title, artist, album, duration via mutagen
   - `collect_audio_files(directory) -> list[Path]`: Recursive walk for `.opus`, `.mp3`, `.flac` files
-  - `tag_file()`: Per-file processing — lyrics lookup (exact + search fallback) and ReplayGain application
+  - `tag_file()`: Per-file processing — lyrics lookup (exact + search + cleaned fallback) and ReplayGain application
   - `tag_directory()`: Main entry point — processes all files with stats tracking
-  - Lyrics: reuses `get_lyrics()` and `_search_lyrics()` from `lyrics.py` (no video_id needed)
+  - `_has_replaygain_tags()`: Checks for existing ReplayGain tags (format-specific: R128_TRACK_GAIN for Opus, REPLAYGAIN_TRACK_GAIN for MP3/FLAC)
+  - Lyrics: reuses `get_lyrics()`, `_search_lyrics()`, and `_try_cleaned_lookup()` from `lyrics.py` (no video_id needed)
   - ReplayGain: reuses `apply_replaygain()` from `replaygain.py` as-is
-  - Skips files that already have `.lrc` sidecar files
+  - Skips files that already have `.lrc` sidecar files (for lyrics)
+  - Skips files that already have ReplayGain tags (for ReplayGain)
   - Non-fatal per-file errors with `TagStats` summary at end
-  - Data classes: `FileMetadata`, `TagStats`
+  - Data classes: `FileMetadata`, `TagStats` (includes skipped counters for both lyrics and ReplayGain)
 
 ### CI/CD
 

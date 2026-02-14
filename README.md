@@ -142,9 +142,10 @@ kikusan tag --no-lyrics /path/to/music
 
 - Recursively processes `.opus`, `.mp3`, `.flac` files
 - Extracts metadata via mutagen (title, artist, album, duration)
-- Fetches lyrics from lrclib.net using exact match and fuzzy search
+- Fetches lyrics from lrclib.net using exact match, fuzzy search, and cleaned metadata retries
 - Applies ReplayGain/R128 loudness normalization tags via rsgain
-- Skips files that already have `.lrc` sidecar files
+- Skips files that already have `.lrc` sidecar files (for lyrics)
+- Skips files that already have ReplayGain tags (for ReplayGain)
 - Non-fatal per-file errors with summary statistics
 - Both lyrics and ReplayGain are enabled by default
 

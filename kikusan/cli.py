@@ -427,7 +427,7 @@ def tag(directory: str, lyrics: bool, replaygain: bool, dry_run: bool):
     if lyrics:
         click.echo(f"  Lyrics: {stats.lyrics_added} added, {stats.lyrics_skipped} skipped (already exist), {stats.lyrics_not_found} not found, {stats.lyrics_failed} failed")
     if replaygain:
-        click.echo(f"  ReplayGain: {stats.replaygain_applied} applied, {stats.replaygain_failed} failed")
+        click.echo(f"  ReplayGain: {stats.replaygain_applied} applied, {stats.replaygain_skipped} skipped (already exist), {stats.replaygain_failed} failed")
     if stats.errors:
         click.echo(f"  Errors: {stats.errors}")
 
