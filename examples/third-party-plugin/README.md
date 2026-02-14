@@ -108,7 +108,7 @@ Use this as a template:
 
 ### Common Use Cases
 
-- **Music Discovery APIs**: Last.fm, Spotify, Apple Music, etc.
+- **Music Discovery APIs**: Last.fm, Apple Music, etc.
 - **RSS/Atom Feeds**: Specialized podcast feeds, music blogs
 - **Social Media**: Liked tracks from SoundCloud, Bandcamp, etc.
 - **Local Sources**: Read from databases, CSV files, etc.

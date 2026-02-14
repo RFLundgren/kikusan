@@ -26,8 +26,6 @@ class Config:
     organization_mode: str
     use_primary_artist: bool
     web_port: int
-    spotify_client_id: str | None
-    spotify_client_secret: str | None
     web_playlist_name: str | None = None
     gotify_url: str | None = None
     gotify_token: str | None = None
@@ -121,8 +119,6 @@ class Config:
             organization_mode=os.getenv("KIKUSAN_ORGANIZATION_MODE", "flat"),
             use_primary_artist=os.getenv("KIKUSAN_USE_PRIMARY_ARTIST", "false").lower() in ("true", "1", "yes"),
             web_port=web_port,
-            spotify_client_id=os.getenv("SPOTIFY_CLIENT_ID"),
-            spotify_client_secret=os.getenv("SPOTIFY_CLIENT_SECRET"),
             web_playlist_name=os.getenv("KIKUSAN_WEB_PLAYLIST"),
             gotify_url=os.getenv("GOTIFY_URL"),
             gotify_token=os.getenv("GOTIFY_TOKEN"),
@@ -135,11 +131,6 @@ class Config:
             multi_user=multi_user,
             replaygain=replaygain,
         )
-
-    @property
-    def spotify_configured(self) -> bool:
-        """Check if Spotify credentials are configured."""
-        return bool(self.spotify_client_id and self.spotify_client_secret)
 
     @property
     def gotify_configured(self) -> bool:

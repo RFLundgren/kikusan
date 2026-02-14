@@ -14,7 +14,7 @@
 ## Features
 
 - **Search & Download**: Search YouTube Music and download audio in OPUS/MP3/FLAC format
-- **Playlist Support**: Download entire playlists from YouTube Music, YouTube, Spotify, and Deezer
+- **Playlist Support**: Download entire playlists from YouTube Music, YouTube, and Deezer
 - **Quick Download**: Search and download first match with a single command
 - **Automatic Lyrics**: Fetch and embed synchronized lyrics from lrclib.net (LRC format)
 - **Web Interface**: Modern web UI with search, download, theme toggle, and format selection
@@ -28,7 +28,7 @@
 ## Usecase
 
 I use navidrome as my music server. My music is stored on a NAS and mounted in the navidrome container as read-only.
-Kikusan syncs my youtube music and spotify playlists on this shared mount and creates local m3u playlists. If kikusan has a discovery playlist configured (sync=True), songs that hav been removed from the upstream playlist are also removed from navidrome. There are some exceptions: They won't be removed if the songs are referenced by another playlist or starred in navidrome or in the `keep` playlist. Navidrome imports these playlist daily. Then I use [symfonium](https://play.google.com/store/apps/details?id=app.symfonik.music.player) to access my music via subsonic api.
+Kikusan syncs my youtube music playlists on this shared mount and creates local m3u playlists. If kikusan has a discovery playlist configured (sync=True), songs that hav been removed from the upstream playlist are also removed from navidrome. There are some exceptions: They won't be removed if the songs are referenced by another playlist or starred in navidrome or in the `keep` playlist. Navidrome imports these playlist daily. Then I use [symfonium](https://play.google.com/store/apps/details?id=app.symfonik.music.player) to access my music via subsonic api.
 
 ## Plugin System
 
@@ -108,9 +108,8 @@ kikusan download --url "https://music.youtube.com/watch?v=bSnlKl_PoQU"
 # Search and download first match
 kikusan download --query "Bohemian Rhapsody Queen"
 
-# Download entire playlist (YouTube Music, YouTube, Spotify, or Deezer)
+# Download entire playlist (YouTube Music, YouTube, or Deezer)
 kikusan download --url "https://music.youtube.com/playlist?list=..."
-kikusan download --url "https://open.spotify.com/playlist/..."
 kikusan download --url "https://www.deezer.com/playlist/..."
 
 # Custom filename format
@@ -185,7 +184,7 @@ kikusan cron --config /path/to/cron.yaml
 
 Create a `cron.yaml` file to configure:
 
-- **Playlists**: YouTube Music, YouTube, Spotify, or Deezer playlists
+- **Playlists**: YouTube Music, YouTube, or Deezer playlists
 - **Plugins**: Listenbrainz, Reddit, Billboard, RSS feeds
 - **Explore**: YouTube Music charts and mood/genre categories
 - **Schedule**: Standard cron expressions (e.g., "0 9 \* \* \*" for daily at 9am)
@@ -393,8 +392,6 @@ docker compose up -d
 | `KIKUSAN_COOKIE_MODE`                | `auto`                            | Cookie usage: auto, always, or never                            |
 | `KIKUSAN_COOKIE_RETRY_DELAY`         | `1.0`                             | Delay in seconds before retrying with cookies                   |
 | `KIKUSAN_LOG_COOKIE_USAGE`           | `true`                            | Log cookie usage statistics (true, false)                       |
-| `SPOTIFY_CLIENT_ID`                  | `None`                            | Spotify API client ID (for Spotify playlists)                   |
-| `SPOTIFY_CLIENT_SECRET`              | `None`                            | Spotify API client secret (optional)                            |
 | `GOTIFY_URL`                         | `None`                            | Gotify server URL for notifications (optional)                  |
 | `GOTIFY_TOKEN`                       | `None`                            | Gotify application token (optional)                             |
 | `NAVIDROME_URL`                      | `None`                            | Navidrome server URL for protection (optional)                  |
@@ -562,17 +559,17 @@ Download a track by video ID, URL, or search query.
 kikusan download [VIDEO_ID] [OPTIONS]
 ```
 
-| Option                                         | Env Variable                 | Description                                            |
-| ---------------------------------------------- | ---------------------------- | ------------------------------------------------------ |
-| `-u, --url`                                    | -                            | YouTube, YouTube Music, Spotify, or Deezer URL         |
-| `-q, --query`                                  | -                            | Search query (downloads first match)                   |
-| `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Output directory                                       |
-| `-f, --format`                                 | `KIKUSAN_AUDIO_FORMAT`       | Audio format: `opus`, `mp3`, `flac`. Default: `opus`   |
-| `-n, --filename`                               | `KIKUSAN_FILENAME_TEMPLATE`  | Filename template (yt-dlp format)                      |
-| `--no-lyrics`                                  | -                            | Skip fetching lyrics                                   |
-| `-p, --add-to-playlist`                        | -                            | Add downloaded track(s) to M3U playlist                |
-| `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`  |
-| `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode |
+| Option                                         | Env Variable                 | Description                                                           |
+| ---------------------------------------------- | ---------------------------- | --------------------------------------------------------------------- |
+| `-u, --url`                                    | -                            | YouTube, YouTube Music, or Deezer URL                                 |
+| `-q, --query`                                  | -                            | Search query (downloads first match)                                  |
+| `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Output directory                                                      |
+| `-f, --format`                                 | `KIKUSAN_AUDIO_FORMAT`       | Audio format: `opus`, `mp3`, `flac`. Default: `opus`                  |
+| `-n, --filename`                               | `KIKUSAN_FILENAME_TEMPLATE`  | Filename template (yt-dlp format)                                     |
+| `--no-lyrics`                                  | -                            | Skip fetching lyrics                                                  |
+| `-p, --add-to-playlist`                        | -                            | Add downloaded track(s) to M3U playlist                               |
+| `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`                 |
+| `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode                |
 | `--replaygain/--no-replaygain`                 | `KIKUSAN_REPLAYGAIN`         | Apply ReplayGain/R128 tags via rsgain. Default: enabled when flag set |
 
 ### kikusan tag
@@ -583,11 +580,11 @@ Tag existing audio files with lyrics and ReplayGain (no re-download).
 kikusan tag DIRECTORY [OPTIONS]
 ```
 
-| Option                            | Description                                                   |
-| --------------------------------- | ------------------------------------------------------------- |
-| `--lyrics/--no-lyrics`            | Fetch and save lyrics from lrclib.net. Default: enabled      |
-| `--replaygain/--no-replaygain`    | Apply ReplayGain/R128 tags via rsgain. Default: enabled      |
-| `--dry-run`                       | Preview what would be done without making changes            |
+| Option                         | Description                                             |
+| ------------------------------ | ------------------------------------------------------- |
+| `--lyrics/--no-lyrics`         | Fetch and save lyrics from lrclib.net. Default: enabled |
+| `--replaygain/--no-replaygain` | Apply ReplayGain/R128 tags via rsgain. Default: enabled |
+| `--dry-run`                    | Preview what would be done without making changes       |
 
 **Notes:**
 

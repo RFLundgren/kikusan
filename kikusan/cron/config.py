@@ -322,7 +322,7 @@ def validate_url(url: str, playlist_name: str) -> None:
     """
     Validate playlist URL.
 
-    Ensures URL is a valid YouTube, YouTube Music, Spotify, or Deezer URL.
+    Ensures URL is a valid YouTube, YouTube Music, or Deezer URL.
 
     Args:
         url: Playlist URL
@@ -338,19 +338,13 @@ def validate_url(url: str, playlist_name: str) -> None:
         r"^https?://youtu\.be/",
     ]
 
-    # Spotify patterns
-    spotify_patterns = [
-        r"^https?://(open\.)?spotify\.com/playlist/",
-        r"^https?://(open\.)?spotify\.com/album/",
-    ]
-
     # Deezer patterns
     deezer_patterns = [
         r"^https?://(www\.)?deezer\.com/(?:[a-z]{2}/)?playlist/",
     ]
 
     is_valid = False
-    for pattern in youtube_patterns + spotify_patterns + deezer_patterns:
+    for pattern in youtube_patterns + deezer_patterns:
         if re.match(pattern, url):
             is_valid = True
             break
@@ -358,7 +352,7 @@ def validate_url(url: str, playlist_name: str) -> None:
     if not is_valid:
         raise ValueError(
             f"Playlist '{playlist_name}' has invalid URL: {url}. "
-            "Must be a YouTube, YouTube Music, Spotify, or Deezer URL"
+            "Must be a YouTube, YouTube Music, or Deezer URL"
         )
 
 

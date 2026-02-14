@@ -136,7 +136,7 @@ def fetch_current_tracks(url: str) -> list[tuple[str, str, str]]:
     """
     Fetch current tracks from a playlist URL.
 
-    Handles YouTube/YouTube Music, Spotify, and Deezer URLs.
+    Handles YouTube/YouTube Music and Deezer URLs.
 
     Args:
         url: Playlist URL
@@ -144,12 +144,9 @@ def fetch_current_tracks(url: str) -> list[tuple[str, str, str]]:
     Returns:
         List of tuples: (video_id, title, artist)
     """
-    # Check if Spotify URL
+    # Check if Deezer URL
     from kikusan.deezer import is_deezer_url
-    from kikusan.spotify import is_spotify_url
 
-    if is_spotify_url(url):
-        return _fetch_spotify_tracks(url)
     if is_deezer_url(url):
         return _fetch_deezer_tracks(url)
     else:
@@ -194,41 +191,6 @@ def _fetch_youtube_tracks(url: str) -> list[tuple[str, str, str]]:
 
     except Exception as e:
         logger.error("Failed to fetch YouTube playlist: %s", e)
-        return []
-
-
-def _fetch_spotify_tracks(url: str) -> list[tuple[str, str, str]]:
-    """
-    Fetch tracks from Spotify playlist and search YouTube Music.
-
-    Returns video IDs from YouTube Music search results.
-    """
-    try:
-        from kikusan.search import search
-        from kikusan.spotify import get_tracks_from_url
-
-        spotify_tracks = get_tracks_from_url(url)
-        if not spotify_tracks:
-            return []
-
-        youtube_tracks = []
-        for sp_track in spotify_tracks:
-            # Search YouTube Music for this track
-            results = search(sp_track.search_query, limit=1)
-            if results:
-                yt_track = results[0]
-                youtube_tracks.append((yt_track.video_id, yt_track.title, yt_track.artist))
-            else:
-                logger.warning(
-                    "Could not find on YouTube Music: %s - %s",
-                    sp_track.artist,
-                    sp_track.name,
-                )
-
-        return youtube_tracks
-
-    except Exception as e:
-        logger.error("Failed to fetch Spotify playlist: %s", e)
         return []
 
 

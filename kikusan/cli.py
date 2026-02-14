@@ -96,7 +96,7 @@ main.add_command(search_cmd, name="search")
 
 @main.command()
 @click.argument("video_id", required=False)
-@click.option("--url", "-u", help="YouTube, YouTube Music, Spotify, or Deezer URL")
+@click.option("--url", "-u", help="YouTube, YouTube Music, or Deezer URL")
 @click.option("--query", "-q", help="Search query (downloads first match)")
 @click.option("--output", "-o", type=click.Path(), help="Output directory")
 @click.option(
@@ -161,8 +161,6 @@ def download_cmd(
 
       kikusan download --url "https://music.youtube.com/playlist?list=..."
 
-      kikusan download --url "https://open.spotify.com/playlist/..."
-
       kikusan download --url "https://www.deezer.com/playlist/..."
 
       kikusan download --query "Bohemian Rhapsody Queen"
@@ -209,28 +207,12 @@ def download_cmd(
                     click.echo(f"Added to playlist: {playlist_name}.m3u")
             return
 
-        # Handle URL (YouTube, YouTube Music, Spotify, or Deezer)
+        # Handle URL (YouTube, YouTube Music, or Deezer)
         if url:
             from kikusan.deezer import get_tracks_from_url as get_deezer_tracks_from_url
             from kikusan.deezer import is_deezer_url
-            from kikusan.spotify import get_tracks_from_url as get_spotify_tracks_from_url
-            from kikusan.spotify import is_spotify_url
 
-            if is_spotify_url(url):
-                _download_external_url(
-                    url=url,
-                    output_dir=output_dir,
-                    audio_format=fmt,
-                    filename_template=template,
-                    fetch_lyrics=not no_lyrics,
-                    playlist_name=playlist_name,
-                    organization_mode=org_mode,
-                    use_primary_artist=primary_artist,
-                    source_name="Spotify playlist/album",
-                    get_tracks_from_url=get_spotify_tracks_from_url,
-                    apply_replaygain=config.replaygain,
-                )
-            elif is_deezer_url(url):
+            if is_deezer_url(url):
                 _download_external_url(
                     url=url,
                     output_dir=output_dir,

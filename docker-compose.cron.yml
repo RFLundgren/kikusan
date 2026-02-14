@@ -30,11 +30,6 @@ services:
       # Audio format (opus, mp3, or flac)
       - KIKUSAN_AUDIO_FORMAT=opus
 
-      # Spotify credentials (required only for Spotify playlists)
-      # Create an app at https://developer.spotify.com/dashboard
-      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
-      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
-
       # Optional: Filename template
       # - KIKUSAN_FILENAME_TEMPLATE=%(artist,uploader)s - %(title)s
 
@@ -94,8 +89,7 @@ services:
 
 # Usage:
 #   1. Create cron.yaml with your playlist configurations
-#   2. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in .env file
-#   3. Run: docker-compose -f docker-compose.cron.yml up -d
+#   2. Run: docker-compose -f docker-compose.cron.yml up -d
 #   4. View logs: docker-compose -f docker-compose.cron.yml logs -f kikusan-cron
 #   5. Stop: docker-compose -f docker-compose.cron.yml down
 #
