@@ -23,6 +23,7 @@
 - **Scheduled Sync**: Automated playlist monitoring with cron scheduling
 - **M3U Playlists**: Automatic playlist file generation for downloads
 - **Hooks**: Run custom commands when events occur (e.g., import playlists to Navidrome)
+- **Retroactive Tagging**: Add lyrics and ReplayGain tags to existing audio files without re-downloading
 
 ## Usecase
 
@@ -118,6 +119,38 @@ kikusan download bSnlKl_PoQU --filename "%(title)s"
 # Options
 kikusan download bSnlKl_PoQU --output ~/Music --format mp3
 ```
+
+### Tag Existing Files
+
+Add lyrics and ReplayGain tags to audio files you already have, without re-downloading:
+
+```bash
+# Tag all files in a directory (recursively)
+kikusan tag /path/to/music
+
+# Preview what would be done without making changes
+kikusan tag --dry-run /path/to/music
+
+# Only add lyrics (skip ReplayGain)
+kikusan tag --no-replaygain /path/to/music
+
+# Only add ReplayGain (skip lyrics)
+kikusan tag --no-lyrics /path/to/music
+```
+
+**Features:**
+
+- Recursively processes `.opus`, `.mp3`, `.flac` files
+- Extracts metadata via mutagen (title, artist, album, duration)
+- Fetches lyrics from lrclib.net using exact match and fuzzy search
+- Applies ReplayGain/R128 loudness normalization tags via rsgain
+- Skips files that already have `.lrc` sidecar files
+- Non-fatal per-file errors with summary statistics
+- Both lyrics and ReplayGain are enabled by default
+
+**Requirements:**
+
+- For ReplayGain: `rsgain` binary must be installed (included in Docker image)
 
 ### Web Interface
 
@@ -539,6 +572,28 @@ kikusan download [VIDEO_ID] [OPTIONS]
 | `-p, --add-to-playlist`                        | -                            | Add downloaded track(s) to M3U playlist                |
 | `--organization-mode`                          | `KIKUSAN_ORGANIZATION_MODE`  | File organization: `flat` or `album`. Default: `flat`  |
 | `--use-primary-artist/--no-use-primary-artist` | `KIKUSAN_USE_PRIMARY_ARTIST` | Use only primary artist for folder names in album mode |
+| `--replaygain/--no-replaygain`                 | `KIKUSAN_REPLAYGAIN`         | Apply ReplayGain/R128 tags via rsgain. Default: enabled when flag set |
+
+### kikusan tag
+
+Tag existing audio files with lyrics and ReplayGain (no re-download).
+
+```bash
+kikusan tag DIRECTORY [OPTIONS]
+```
+
+| Option                            | Description                                                   |
+| --------------------------------- | ------------------------------------------------------------- |
+| `--lyrics/--no-lyrics`            | Fetch and save lyrics from lrclib.net. Default: enabled      |
+| `--replaygain/--no-replaygain`    | Apply ReplayGain/R128 tags via rsgain. Default: enabled      |
+| `--dry-run`                       | Preview what would be done without making changes            |
+
+**Notes:**
+
+- Recursively processes `.opus`, `.mp3`, `.flac` files in the specified directory
+- Skips files that already have `.lrc` sidecar files (for lyrics)
+- Non-fatal errors: continues processing remaining files and reports summary statistics
+- Requires `rsgain` binary for ReplayGain support (included in Docker image)
 
 ### kikusan web
 

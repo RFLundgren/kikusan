@@ -391,6 +391,47 @@ main.add_command(cron, name="cron")
 main.add_command(plugins, name="plugins")
 
 
+@main.command()
+@click.argument("directory", type=click.Path(exists=True, file_okay=False))
+@click.option("--lyrics/--no-lyrics", default=True, help="Fetch and save lyrics from lrclib.net (default: enabled)")
+@click.option("--replaygain/--no-replaygain", default=True, help="Apply ReplayGain/R128 tags via rsgain (default: enabled)")
+@click.option("--dry-run", is_flag=True, help="Preview what would be done without making changes")
+def tag(directory: str, lyrics: bool, replaygain: bool, dry_run: bool):
+    """Tag existing audio files with lyrics and ReplayGain.
+
+    Recursively processes .opus, .mp3, .flac files in DIRECTORY.
+
+    Examples:
+
+      kikusan tag /path/to/music
+
+      kikusan tag --no-replaygain /path/to/music
+
+      kikusan tag --dry-run /path/to/music
+    """
+    from kikusan.tagging import tag_directory
+
+    target = Path(directory)
+
+    if dry_run:
+        click.echo("[dry-run] Previewing changes only")
+
+    stats = tag_directory(
+        target,
+        do_lyrics=lyrics,
+        do_replaygain=replaygain,
+        dry_run=dry_run,
+    )
+
+    click.echo(f"\nProcessed {stats.files_found} files:")
+    if lyrics:
+        click.echo(f"  Lyrics: {stats.lyrics_added} added, {stats.lyrics_skipped} skipped (already exist), {stats.lyrics_not_found} not found, {stats.lyrics_failed} failed")
+    if replaygain:
+        click.echo(f"  ReplayGain: {stats.replaygain_applied} applied, {stats.replaygain_failed} failed")
+    if stats.errors:
+        click.echo(f"  Errors: {stats.errors}")
+
+
 # --- Explore command group ---
 
 

@@ -203,6 +203,16 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Requires external `rsgain` binary (installed in Docker image via Debian package `rsgain`)
   - Called as post-processing step after lyrics in all download paths (`download()`, `_download_single()`, `_download_playlist()`)
   - `apply_replaygain` parameter threaded through: `download.py`, `queue.py`, `cron/sync.py`, `plugins/sync.py`, `cli.py`
+- `kikusan/tagging.py`: Tag existing audio files with lyrics and ReplayGain (no re-download)
+  - `extract_metadata(file_path) -> FileMetadata | None`: Extracts title, artist, album, duration via mutagen
+  - `collect_audio_files(directory) -> list[Path]`: Recursive walk for `.opus`, `.mp3`, `.flac` files
+  - `tag_file()`: Per-file processing — lyrics lookup (exact + search fallback) and ReplayGain application
+  - `tag_directory()`: Main entry point — processes all files with stats tracking
+  - Lyrics: reuses `get_lyrics()` and `_search_lyrics()` from `lyrics.py` (no video_id needed)
+  - ReplayGain: reuses `apply_replaygain()` from `replaygain.py` as-is
+  - Skips files that already have `.lrc` sidecar files
+  - Non-fatal per-file errors with `TagStats` summary at end
+  - Data classes: `FileMetadata`, `TagStats`
 
 ### CI/CD
 
@@ -261,6 +271,13 @@ All major configuration variables have corresponding CLI flags:
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
 - `--replaygain / --no-replaygain`: Apply ReplayGain/R128 loudness normalization tags (env: `KIKUSAN_REPLAYGAIN`)
+
+**tag command:**
+
+- `<directory>`: Directory to recursively process (required argument)
+- `--lyrics/--no-lyrics`: Fetch and save lyrics from lrclib.net (default: enabled)
+- `--replaygain/--no-replaygain`: Apply ReplayGain/R128 tags via rsgain (default: enabled)
+- `--dry-run`: Preview what would be done without making changes
 
 **explore command group:**
 
