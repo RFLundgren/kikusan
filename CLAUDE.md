@@ -145,6 +145,16 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - `_get_album_from_watch_playlist()`: Extracts album name from watch playlist (not available in `get_song()` videoDetails)
   - `_get_metadata_from_watch_playlist()`: Full fallback when `get_song()` returns incomplete videoDetails
   - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`, `SongMetadata`
+- `kikusan/metadata_cache.py`: SQLite-backed metadata cache for YouTube Music API results
+  - Caches `get_song_metadata()` and `get_track_from_video_id()` results by video_id
+  - Storage: `{download_dir}/.kikusan/metadata_cache.db` with WAL journal mode
+  - Pydantic models (`CachedSongMetadata`, `CachedTrack`) for JSON serialization in SQLite key-value tables
+  - `MetadataCache` class with context manager — per-call open/close pattern
+  - Always-on (no opt-in flag) — pure performance optimization
+  - No TTL — track metadata is stable per video_id
+  - Only successful results are cached; None/exceptions are not cached (retried on next call)
+  - All errors logged and swallowed — cache failures never crash downloads
+  - Test coverage: `tests/test_metadata_cache.py`
 - `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
   - `/api/search` supports Deezer playlist URLs in addition to YouTube URLs and text queries
 - `kikusan/deezer.py`: Native Deezer playlist integration

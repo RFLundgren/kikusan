@@ -6,7 +6,29 @@ YouTube Music API for lyrics lookup enhancement.
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from kikusan.search import SongMetadata, get_song_metadata
+
+
+def _noop_cache():
+    """Return a mock MetadataCache that always misses (no-op)."""
+    mock_cache = MagicMock()
+    mock_cache.get_song_metadata.return_value = None
+    mock_cache.get_track.return_value = None
+    mock_cache.__enter__ = MagicMock(return_value=mock_cache)
+    mock_cache.__exit__ = MagicMock(return_value=False)
+    return mock_cache
+
+
+@pytest.fixture(autouse=True)
+def _bypass_cache():
+    """Bypass MetadataCache for all tests in this module."""
+    with patch("kikusan.search.MetadataCache", return_value=_noop_cache()), \
+         patch("kikusan.search.get_config") as mock_cfg:
+        mock_cfg.return_value.download_dir = MagicMock()
+        mock_cfg.return_value.download_dir.__truediv__ = MagicMock(return_value=MagicMock())
+        yield
 
 
 class TestGetSongMetadata:

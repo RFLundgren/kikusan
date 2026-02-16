@@ -22,6 +22,21 @@ from kikusan.search import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _bypass_metadata_cache():
+    """Bypass MetadataCache for tests that call get_track_from_video_id."""
+    mock_cache = MagicMock()
+    mock_cache.get_song_metadata.return_value = None
+    mock_cache.get_track.return_value = None
+    mock_cache.__enter__ = MagicMock(return_value=mock_cache)
+    mock_cache.__exit__ = MagicMock(return_value=False)
+    with patch("kikusan.search.MetadataCache", return_value=mock_cache), \
+         patch("kikusan.search.get_config") as mock_cfg:
+        mock_cfg.return_value.download_dir = MagicMock()
+        mock_cfg.return_value.download_dir.__truediv__ = MagicMock(return_value=MagicMock())
+        yield
+
+
 class TestIsAllowedVideoType:
     """Test is_allowed_video_type() helper."""
 

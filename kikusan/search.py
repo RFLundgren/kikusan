@@ -2,8 +2,12 @@
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from ytmusicapi import YTMusic
+
+from kikusan.config import get_config
+from kikusan.metadata_cache import CachedSongMetadata, CachedTrack, MetadataCache
 
 logger = logging.getLogger(__name__)
 
@@ -759,6 +763,8 @@ def get_song_metadata(video_id: str) -> SongMetadata | None:
     The clean metadata significantly improves lyrics lookup success rates
     on lrclib.net.
 
+    Results are cached in SQLite (per video_id) to avoid redundant API calls.
+
     Error Handling Strategy:
         This function is used for optional metadata enhancement. Errors are
         caught and logged, returning None to allow the caller to continue with
@@ -770,6 +776,21 @@ def get_song_metadata(video_id: str) -> SongMetadata | None:
     Returns:
         SongMetadata with clean title/artist/album/duration, or None if fetch fails.
     """
+    config = get_config()
+    cache_dir = config.download_dir / ".kikusan"
+
+    # Check cache first
+    with MetadataCache(cache_dir) as cache:
+        cached = cache.get_song_metadata(video_id)
+        if cached is not None:
+            logger.debug("Cache hit for song metadata: %s", video_id)
+            return SongMetadata(
+                title=cached.title,
+                artist=cached.artist,
+                album=cached.album,
+                duration_seconds=cached.duration_seconds,
+            )
+
     yt = YTMusic()
     try:
         song_data = yt.get_song(video_id)
@@ -784,7 +805,10 @@ def get_song_metadata(video_id: str) -> SongMetadata | None:
 
     if not title or not author:
         logger.debug("Incomplete videoDetails for video_id '%s', trying watch playlist", video_id)
-        return _get_metadata_from_watch_playlist(yt, video_id)
+        result = _get_metadata_from_watch_playlist(yt, video_id)
+        if result is not None:
+            _cache_song_metadata(cache_dir, video_id, result)
+        return result
 
     if not length_seconds_str or not length_seconds_str.isdigit():
         logger.warning("Invalid duration for video %s", video_id)
@@ -799,12 +823,28 @@ def get_song_metadata(video_id: str) -> SongMetadata | None:
         video_id, title, author, album, duration_seconds,
     )
 
-    return SongMetadata(
+    result = SongMetadata(
         title=title,
         artist=author,
         album=album,
         duration_seconds=duration_seconds,
     )
+    _cache_song_metadata(cache_dir, video_id, result)
+    return result
+
+
+def _cache_song_metadata(cache_dir: Path, video_id: str, metadata: SongMetadata) -> None:
+    """Store song metadata in the cache (errors swallowed)."""
+    with MetadataCache(cache_dir) as cache:
+        cache.add_song_metadata(
+            CachedSongMetadata(
+                video_id=video_id,
+                title=metadata.title,
+                artist=metadata.artist,
+                album=metadata.album,
+                duration_seconds=metadata.duration_seconds,
+            )
+        )
 
 
 def _get_album_from_watch_playlist(yt: YTMusic, video_id: str) -> str | None:
@@ -993,6 +1033,8 @@ def get_track_from_video_id(video_id: str) -> Track:
     Uses ytmusicapi's get_song() to retrieve structured metadata including
     title, artist, thumbnail, view count, and duration.
 
+    Results are cached in SQLite (per video_id) to avoid redundant API calls.
+
     Args:
         video_id: YouTube video ID (11 characters)
 
@@ -1002,6 +1044,26 @@ def get_track_from_video_id(video_id: str) -> Track:
     Raises:
         Exception: If video is unavailable or API fails
     """
+    config = get_config()
+    cache_dir = config.download_dir / ".kikusan"
+
+    # Check cache first
+    with MetadataCache(cache_dir) as cache:
+        cached = cache.get_track(video_id)
+        if cached is not None:
+            logger.debug("Cache hit for track: %s", video_id)
+            return Track(
+                video_id=cached.video_id,
+                title=cached.title,
+                artist=cached.artist,
+                artists=cached.artists,
+                album=cached.album,
+                duration_seconds=cached.duration_seconds,
+                thumbnail_url=cached.thumbnail_url,
+                view_count=cached.view_count,
+                video_type=cached.video_type,
+            )
+
     yt = YTMusic()
     try:
         song_data = yt.get_song(video_id)
@@ -1031,7 +1093,7 @@ def get_track_from_video_id(video_id: str) -> Track:
 
     logger.info("Fetched track from URL: %s - %s", artist, title)
 
-    return Track(
+    track = Track(
         video_id=video_id,
         title=title,
         artist=artist,
@@ -1042,3 +1104,21 @@ def get_track_from_video_id(video_id: str) -> Track:
         view_count=view_count,
         video_type=video_type,
     )
+
+    # Cache the result
+    with MetadataCache(cache_dir) as cache:
+        cache.add_track(
+            CachedTrack(
+                video_id=track.video_id,
+                title=track.title,
+                artist=track.artist,
+                artists=track.artists,
+                album=track.album,
+                duration_seconds=track.duration_seconds,
+                thumbnail_url=track.thumbnail_url,
+                view_count=track.view_count,
+                video_type=track.video_type,
+            )
+        )
+
+    return track
