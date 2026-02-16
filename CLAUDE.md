@@ -155,6 +155,19 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Only successful results are cached; None/exceptions are not cached (retried on next call)
   - All errors logged and swallowed — cache failures never crash downloads
   - Test coverage: `tests/test_metadata_cache.py`
+- `kikusan/web/api_cache.py`: Generic in-memory TTL cache for web API responses
+  - `TtlCache` class: LRU eviction via `OrderedDict`, TTL via `time.monotonic()`
+  - Methods: `get(key)`, `put(key, value)`, `cached_call(key, fn)`
+  - No external dependencies (stdlib only)
+  - Cached endpoints in `app.py` (URL-based lookups and playlist streams bypass cache):
+    - `GET /api/search` (text only): 5 min TTL
+    - `GET /api/search/albums`: 5 min TTL
+    - `GET /api/album/{id}/tracks`: 15 min TTL
+    - `GET /api/explore/moods`: 1 hour TTL
+    - `GET /api/explore/mood-playlists`: 30 min TTL
+    - `GET /api/explore/charts`: 30 min TTL
+    - `GET /api/explore/playlist/{id}/tracks`: 15 min TTL
+  - Test coverage: `tests/test_api_cache.py`
 - `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
   - `/api/search` supports Deezer playlist URLs in addition to YouTube URLs and text queries
 - `kikusan/deezer.py`: Native Deezer playlist integration

@@ -20,6 +20,7 @@ from kikusan.download import download
 from kikusan.playlist import add_to_m3u, read_m3u, remove_from_m3u
 from kikusan.queue import QueueManager
 from kikusan.search import search
+from kikusan.web.api_cache import TtlCache
 from kikusan.web.image_proxy import ImageProxyService, validate_image_url
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
 
@@ -40,6 +41,15 @@ queue_manager: QueueManager | None = None
 
 # Global image proxy service
 _image_proxy: ImageProxyService | None = None
+
+# API response caches (TTL in seconds)
+_search_cache = TtlCache(max_entries=200, ttl_seconds=300)        # 5 min
+_album_search_cache = TtlCache(max_entries=200, ttl_seconds=300)  # 5 min
+_album_tracks_cache = TtlCache(max_entries=100, ttl_seconds=900)  # 15 min
+_moods_cache = TtlCache(max_entries=1, ttl_seconds=3600)          # 1 hour
+_mood_playlists_cache = TtlCache(max_entries=50, ttl_seconds=1800)  # 30 min
+_charts_cache = TtlCache(max_entries=20, ttl_seconds=1800)        # 30 min
+_playlist_tracks_cache = TtlCache(max_entries=50, ttl_seconds=900)  # 15 min
 
 # Setup templates and static files
 templates_dir = Path(__file__).parent / "templates"
@@ -326,15 +336,20 @@ async def api_search(q: str = Query(..., min_length=1, description="Search query
                     detail=f"Failed to fetch from URL: {str(e)}"
                 )
         else:
-            # Handle regular text search (existing logic)
-            try:
-                results = search(q, limit=20)
-            except Exception as e:
-                logger.error("Search failed for query '%s': %s", q, e)
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Search failed: {str(e)}"
-                )
+            # Handle regular text search (existing logic) — cached
+            cached = _search_cache.get(f"search:{q}")
+            if cached is not None:
+                results = cached
+            else:
+                try:
+                    results = search(q, limit=20)
+                except Exception as e:
+                    logger.error("Search failed for query '%s': %s", q, e)
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Search failed: {str(e)}"
+                    )
+                _search_cache.put(f"search:{q}", results)
 
     return SearchResponse(
         query=q,
@@ -547,14 +562,19 @@ async def api_search_albums(q: str = Query(..., min_length=1)):
 
     logger = logging.getLogger(__name__)
 
-    try:
-        results = search_albums(q, limit=20)
-    except Exception as e:
-        logger.error("Album search failed for query '%s': %s", q, e)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Album search failed: {str(e)}"
-        )
+    cached = _album_search_cache.get(f"album_search:{q}")
+    if cached is not None:
+        results = cached
+    else:
+        try:
+            results = search_albums(q, limit=20)
+        except Exception as e:
+            logger.error("Album search failed for query '%s': %s", q, e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Album search failed: {str(e)}"
+            )
+        _album_search_cache.put(f"album_search:{q}", results)
 
     return AlbumSearchResponse(
         query=q,
@@ -570,16 +590,23 @@ async def api_get_album_tracks(browse_id: str):
 
     logger = logging.getLogger(__name__)
 
+    cache_key = f"album_tracks:{browse_id}"
+    cached = _album_tracks_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     try:
         tracks = get_album_tracks(browse_id)
         if not tracks:
             raise HTTPException(status_code=404, detail="No tracks found for this album")
 
-        return AlbumTracksResponse(
+        response = AlbumTracksResponse(
             browse_id=browse_id,
             album_title=tracks[0].album if tracks else "Unknown Album",
             tracks=[_track_to_response(track) for track in tracks],
         )
+        _album_tracks_cache.put(cache_key, response)
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -988,15 +1015,21 @@ async def api_explore_moods():
     import logging
     logger = logging.getLogger(__name__)
 
+    cached = _moods_cache.get("moods")
+    if cached is not None:
+        return cached
+
     try:
         sections = get_mood_categories()
-        return [
+        result = [
             MoodSectionResponse(
                 title=s.title,
                 categories=[MoodCategoryResponse(title=c.title, params=c.params) for c in s.categories],
             )
             for s in sections
         ]
+        _moods_cache.put("moods", result)
+        return result
     except Exception as e:
         logger.error("Failed to get mood categories: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to get mood categories: {str(e)}")
@@ -1009,9 +1042,14 @@ async def api_explore_mood_playlists(params: str = Query(..., description="Categ
     import logging
     logger = logging.getLogger(__name__)
 
+    cache_key = f"mood_playlists:{params}"
+    cached = _mood_playlists_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     try:
         playlists = get_mood_playlists(params)
-        return [
+        result = [
             MoodPlaylistResponse(
                 playlist_id=p.playlist_id,
                 title=p.title,
@@ -1020,6 +1058,8 @@ async def api_explore_mood_playlists(params: str = Query(..., description="Categ
             )
             for p in playlists
         ]
+        _mood_playlists_cache.put(cache_key, result)
+        return result
     except Exception as e:
         logger.error("Failed to get mood playlists: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to get mood playlists: {str(e)}")
@@ -1039,10 +1079,15 @@ async def api_explore_charts(country: str = Query("ZZ", description="ISO 3166-1 
             detail=f"Invalid country code '{country}': must be a 2-letter uppercase ISO 3166-1 Alpha-2 code (e.g., 'US', 'GB', 'ZZ')"
         )
 
+    cache_key = f"charts:{country}"
+    cached = _charts_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     try:
         # Pass allow_ugc=True so web UI can show all tracks with UGC badge
         charts = get_charts(country, allow_ugc=True)
-        return ChartsResponse(
+        response = ChartsResponse(
             country=charts.country,
             tracks=[
                 ChartTrackResponse(
@@ -1071,6 +1116,8 @@ async def api_explore_charts(country: str = Query("ZZ", description="ISO 3166-1 
                 for a in charts.artists
             ],
         )
+        _charts_cache.put(cache_key, response)
+        return response
     except Exception as e:
         logger.error("Failed to get charts: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to get charts: {str(e)}")
@@ -1083,13 +1130,20 @@ async def api_explore_playlist_tracks(playlist_id: str):
     import logging
     logger = logging.getLogger(__name__)
 
+    cache_key = f"playlist_tracks:{playlist_id}"
+    cached = _playlist_tracks_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     try:
         # Pass allow_ugc=True so web UI can show all tracks with UGC badge
         tracks = get_playlist_tracks(playlist_id, allow_ugc=True)
-        return {
+        result = {
             "playlist_id": playlist_id,
             "tracks": [_track_to_response(track) for track in tracks],
         }
+        _playlist_tracks_cache.put(cache_key, result)
+        return result
     except ValueError as e:
         logger.warning("Playlist unavailable: %s", e)
         raise HTTPException(status_code=404, detail=str(e))
