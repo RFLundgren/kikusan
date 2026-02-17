@@ -10,6 +10,7 @@ https://github.com/guillevc/yubal/blob/master/packages/yubal/src/yubal/services/
 
 import logging
 import sqlite3
+import time
 from pathlib import Path
 from types import TracebackType
 
@@ -42,12 +43,28 @@ class CachedTrack(BaseModel):
     video_type: str | None = None
 
 
+class CachedLyrics(BaseModel):
+    """Cached lyrics lookup result.
+
+    Stores both positive results (lyrics text) and negative results (no lyrics found).
+    Negative results use a TTL to allow re-lookup after lyrics may have been added.
+    """
+
+    video_id: str
+    lyrics: str | None  # None = negative cache (no lyrics found)
+    cached_at: float  # time.time() for TTL check on negatives
+
+
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS song_metadata (
     video_id TEXT PRIMARY KEY,
     data TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS track (
+    video_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lyrics (
     video_id TEXT PRIMARY KEY,
     data TEXT NOT NULL
 );
@@ -161,3 +178,52 @@ class MetadataCache:
             self._conn.commit()
         except Exception:
             logger.debug("Cache write error for track/%s", track.video_id, exc_info=True)
+
+    # -- lyrics table --
+
+    def get_lyrics(self, video_id: str, negative_ttl_hours: int = 168) -> CachedLyrics | None:
+        """Look up cached lyrics by video_id.
+
+        Returns CachedLyrics if found and valid, None if not cached or expired.
+        Positive results never expire. Negative results (lyrics=None) expire
+        after negative_ttl_hours.
+        """
+        if self._conn is None:
+            return None
+        try:
+            row = self._conn.execute(
+                "SELECT data FROM lyrics WHERE video_id = ?", (video_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            cached = CachedLyrics.model_validate_json(row[0])
+            # Positive results never expire
+            if cached.lyrics is not None:
+                return cached
+            # Negative results expire after TTL
+            if negative_ttl_hours <= 0:
+                # TTL disabled — negatives never expire
+                return cached
+            age_hours = (time.time() - cached.cached_at) / 3600
+            if age_hours < negative_ttl_hours:
+                return cached
+            # Expired negative — delete and return None
+            self._conn.execute("DELETE FROM lyrics WHERE video_id = ?", (video_id,))
+            self._conn.commit()
+            return None
+        except Exception:
+            logger.debug("Cache read error for lyrics/%s", video_id, exc_info=True)
+            return None
+
+    def add_lyrics(self, entry: CachedLyrics) -> None:
+        """Store lyrics result (INSERT OR REPLACE)."""
+        if self._conn is None:
+            return
+        try:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO lyrics (video_id, data) VALUES (?, ?)",
+                (entry.video_id, entry.model_dump_json()),
+            )
+            self._conn.commit()
+        except Exception:
+            logger.debug("Cache write error for lyrics/%s", entry.video_id, exc_info=True)

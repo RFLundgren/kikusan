@@ -1,9 +1,10 @@
 """Tests for the SQLite metadata cache module."""
 
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from kikusan.metadata_cache import CachedSongMetadata, CachedTrack, MetadataCache
+from kikusan.metadata_cache import CachedLyrics, CachedSongMetadata, CachedTrack, MetadataCache
 
 
 class TestMetadataCacheSongMetadata:
@@ -262,3 +263,123 @@ class TestGetTrackFromVideoIdCacheIntegration:
         assert track2.artist == "Test Artist"
         assert track2.video_type == "MUSIC_VIDEO_TYPE_ATV"
         assert mock_yt.get_song.call_count == 1
+
+
+class TestMetadataCacheLyrics:
+    """Tests for lyrics table operations."""
+
+    def test_miss_returns_none(self, tmp_path: Path):
+        with MetadataCache(tmp_path) as cache:
+            assert cache.get_lyrics("nonexistent") is None
+
+    def test_positive_round_trip(self, tmp_path: Path):
+        entry = CachedLyrics(
+            video_id="abc123",
+            lyrics="[00:00.00] Hello world",
+            cached_at=time.time(),
+        )
+        with MetadataCache(tmp_path) as cache:
+            cache.add_lyrics(entry)
+            result = cache.get_lyrics("abc123")
+
+        assert result is not None
+        assert result.lyrics == "[00:00.00] Hello world"
+
+    def test_negative_round_trip(self, tmp_path: Path):
+        entry = CachedLyrics(
+            video_id="abc123",
+            lyrics=None,
+            cached_at=time.time(),
+        )
+        with MetadataCache(tmp_path) as cache:
+            cache.add_lyrics(entry)
+            result = cache.get_lyrics("abc123")
+
+        assert result is not None
+        assert result.lyrics is None
+
+    def test_positive_never_expires(self, tmp_path: Path):
+        """Positive cache entries should never expire regardless of TTL."""
+        entry = CachedLyrics(
+            video_id="abc123",
+            lyrics="[00:00.00] Lyrics here",
+            cached_at=time.time() - 999999,  # Very old
+        )
+        with MetadataCache(tmp_path) as cache:
+            cache.add_lyrics(entry)
+            result = cache.get_lyrics("abc123", negative_ttl_hours=1)
+
+        assert result is not None
+        assert result.lyrics == "[00:00.00] Lyrics here"
+
+    def test_negative_expires_after_ttl(self, tmp_path: Path):
+        """Negative cache entries should expire after TTL."""
+        entry = CachedLyrics(
+            video_id="abc123",
+            lyrics=None,
+            cached_at=time.time() - 8 * 3600,  # 8 hours ago
+        )
+        with MetadataCache(tmp_path) as cache:
+            cache.add_lyrics(entry)
+            # TTL of 7 hours — entry is 8 hours old, should be expired
+            result = cache.get_lyrics("abc123", negative_ttl_hours=7)
+
+        assert result is None
+
+    def test_negative_fresh_within_ttl(self, tmp_path: Path):
+        """Negative cache entries within TTL should be returned."""
+        entry = CachedLyrics(
+            video_id="abc123",
+            lyrics=None,
+            cached_at=time.time() - 3600,  # 1 hour ago
+        )
+        with MetadataCache(tmp_path) as cache:
+            cache.add_lyrics(entry)
+            # TTL of 168 hours — entry is 1 hour old, still fresh
+            result = cache.get_lyrics("abc123", negative_ttl_hours=168)
+
+        assert result is not None
+        assert result.lyrics is None
+
+    def test_negative_ttl_zero_never_expires(self, tmp_path: Path):
+        """When negative_ttl_hours=0, negatives never expire."""
+        entry = CachedLyrics(
+            video_id="abc123",
+            lyrics=None,
+            cached_at=time.time() - 999999,  # Very old
+        )
+        with MetadataCache(tmp_path) as cache:
+            cache.add_lyrics(entry)
+            result = cache.get_lyrics("abc123", negative_ttl_hours=0)
+
+        assert result is not None
+        assert result.lyrics is None
+
+    def test_overwrite_existing(self, tmp_path: Path):
+        """Overwriting a negative with positive should work."""
+        negative = CachedLyrics(video_id="abc123", lyrics=None, cached_at=time.time())
+        positive = CachedLyrics(video_id="abc123", lyrics="[00:00.00] Found!", cached_at=time.time())
+        with MetadataCache(tmp_path) as cache:
+            cache.add_lyrics(negative)
+            cache.add_lyrics(positive)
+            result = cache.get_lyrics("abc123")
+
+        assert result is not None
+        assert result.lyrics == "[00:00.00] Found!"
+
+    def test_corrupt_json_returns_none(self, tmp_path: Path):
+        with MetadataCache(tmp_path) as cache:
+            cache._conn.execute(
+                "INSERT INTO lyrics (video_id, data) VALUES (?, ?)",
+                ("bad", "{not valid json!!!"),
+            )
+            cache._conn.commit()
+            result = cache.get_lyrics("bad")
+
+        assert result is None
+
+    def test_operations_noop_when_no_connection(self, tmp_path: Path):
+        """If DB open fails, reads return None and writes are no-ops."""
+        cache = MetadataCache(tmp_path)
+        assert cache.get_lyrics("v1") is None
+        cache.add_lyrics(CachedLyrics(video_id="v1", lyrics=None, cached_at=time.time()))

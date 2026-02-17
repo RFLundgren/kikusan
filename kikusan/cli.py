@@ -53,8 +53,15 @@ logging.basicConfig(
     envvar="KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS",
     help="Hours to wait before retrying unavailable videos (0 = disabled). Default: 168 (7 days)",
 )
+@click.option(
+    "--lyrics-cache-hours",
+    type=int,
+    default=None,
+    envvar="KIKUSAN_LYRICS_CACHE_HOURS",
+    help="Hours to cache negative lyrics lookups (0 = no expiry). Default: 168 (7 days)",
+)
 @click.pass_context
-def main(ctx, cookie_mode: str | None, cookie_retry_delay: float | None, no_log_cookie_usage: bool, unavailable_cooldown: int | None):
+def main(ctx, cookie_mode: str | None, cookie_retry_delay: float | None, no_log_cookie_usage: bool, unavailable_cooldown: int | None, lyrics_cache_hours: int | None):
     """Kikusan - Search and download music from YouTube Music."""
     # Store global options in context for subcommands to use
     ctx.ensure_object(dict)
@@ -68,6 +75,8 @@ def main(ctx, cookie_mode: str | None, cookie_retry_delay: float | None, no_log_
         os.environ["KIKUSAN_LOG_COOKIE_USAGE"] = "false"
     if unavailable_cooldown is not None:
         os.environ["KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS"] = str(unavailable_cooldown)
+    if lyrics_cache_hours is not None:
+        os.environ["KIKUSAN_LYRICS_CACHE_HOURS"] = str(lyrics_cache_hours)
 
 
 @main.command()

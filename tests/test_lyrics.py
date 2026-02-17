@@ -17,6 +17,7 @@ from kikusan.lyrics import (
     _clean_title,
     _extract_lyrics_from_response,
     _get_lyrics_exact,
+    _lookup_lyrics_for_video,
     _search_lyrics,
     _try_cleaned_lookup,
     get_lyrics,
@@ -25,8 +26,8 @@ from kikusan.lyrics import (
 from kikusan.search import SongMetadata
 
 
-class TestGetLyricsForVideo:
-    """Tests for the primary lyrics lookup function with ytmusicapi metadata."""
+class TestLookupLyricsForVideo:
+    """Tests for the internal lyrics lookup logic (_lookup_lyrics_for_video)."""
 
     @patch("kikusan.search.get_song_metadata")
     @patch("kikusan.lyrics._get_lyrics_exact")
@@ -40,7 +41,7 @@ class TestGetLyricsForVideo:
         )
         mock_exact.return_value = "[00:00.00] Is this the real life?"
 
-        result = get_lyrics_for_video(
+        result = _lookup_lyrics_for_video(
             video_id="fJ9rUzIMcZQ",
             fallback_title="Queen - Bohemian Rhapsody (Official Video)",
             fallback_artist="QueenVEVO",
@@ -48,7 +49,6 @@ class TestGetLyricsForVideo:
         )
 
         assert result == "[00:00.00] Is this the real life?"
-        # Verify exact match was called with ytmusicapi metadata, not fallback
         mock_exact.assert_called_once_with("Bohemian Rhapsody", "Queen", 354)
 
     @patch("kikusan.search.get_song_metadata")
@@ -65,7 +65,7 @@ class TestGetLyricsForVideo:
         mock_exact.return_value = None
         mock_search.return_value = "[00:00.00] Is this the real life?"
 
-        result = get_lyrics_for_video(
+        result = _lookup_lyrics_for_video(
             video_id="fJ9rUzIMcZQ",
             fallback_title="Queen - Bohemian Rhapsody (Official Video)",
             fallback_artist="QueenVEVO",
@@ -88,12 +88,10 @@ class TestGetLyricsForVideo:
             album="A Night at the Opera",
             duration_seconds=354,
         )
-        # Calls: ytmusicapi exact (None), ytmusicapi cleaned exact (skipped - no change),
-        # yt-dlp exact (found)
         mock_exact.side_effect = [None, "[00:00.00] Is this the real life?"]
         mock_search.return_value = None
 
-        result = get_lyrics_for_video(
+        result = _lookup_lyrics_for_video(
             video_id="fJ9rUzIMcZQ",
             fallback_title="Queen - Bohemian Rhapsody (Official Video)",
             fallback_artist="QueenVEVO",
@@ -101,8 +99,6 @@ class TestGetLyricsForVideo:
         )
 
         assert result == "[00:00.00] Is this the real life?"
-        # Called twice: ytmusicapi exact + yt-dlp fallback exact
-        # (cleaned ytmusicapi is skipped because title/artist don't change)
         assert mock_exact.call_count == 2
         mock_exact.assert_called_with(
             "Queen - Bohemian Rhapsody (Official Video)", "QueenVEVO", 355
@@ -115,7 +111,7 @@ class TestGetLyricsForVideo:
         mock_metadata.return_value = None
         mock_exact.return_value = "[00:00.00] Is this the real life?"
 
-        result = get_lyrics_for_video(
+        result = _lookup_lyrics_for_video(
             video_id="fJ9rUzIMcZQ",
             fallback_title="Queen - Bohemian Rhapsody (Official Video)",
             fallback_artist="QueenVEVO",
@@ -123,7 +119,6 @@ class TestGetLyricsForVideo:
         )
 
         assert result == "[00:00.00] Is this the real life?"
-        # Should be called once with fallback data
         mock_exact.assert_called_once_with(
             "Queen - Bohemian Rhapsody (Official Video)", "QueenVEVO", 355
         )
@@ -142,7 +137,7 @@ class TestGetLyricsForVideo:
         mock_exact.return_value = None
         mock_search.return_value = None
 
-        result = get_lyrics_for_video(
+        result = _lookup_lyrics_for_video(
             video_id="test123",
             fallback_title="Some Song",
             fallback_artist="Some Artist",
@@ -162,11 +157,10 @@ class TestGetLyricsForVideo:
             album="Force (Radio Edit)",
             duration_seconds=164,
         )
-        # ytmusicapi exact (None), cleaned exact (found)
         mock_exact.side_effect = [None, "[00:00.00] Force lyrics"]
         mock_search.return_value = None
 
-        result = get_lyrics_for_video(
+        result = _lookup_lyrics_for_video(
             video_id="test123",
             fallback_title="Force (Radio Edit)",
             fallback_artist="8181 Enzo, Michael Ekow",
@@ -174,7 +168,6 @@ class TestGetLyricsForVideo:
         )
 
         assert result == "[00:00.00] Force lyrics"
-        # Second exact call should use cleaned metadata
         mock_exact.assert_called_with("Force", "8181 Enzo", 164)
 
     @patch("kikusan.search.get_song_metadata")
@@ -183,11 +176,10 @@ class TestGetLyricsForVideo:
     def test_tries_cleaned_ytdlp_fallback(self, mock_exact, mock_search, mock_metadata):
         """When ytmusicapi fails, cleaned yt-dlp metadata should be tried."""
         mock_metadata.return_value = None
-        # yt-dlp exact (None), cleaned yt-dlp exact (found)
         mock_exact.side_effect = [None, "[00:00.00] lyrics"]
         mock_search.return_value = None
 
-        result = get_lyrics_for_video(
+        result = _lookup_lyrics_for_video(
             video_id="test123",
             fallback_title="Song (Official Video)",
             fallback_artist="Artist",
@@ -196,6 +188,137 @@ class TestGetLyricsForVideo:
 
         assert result == "[00:00.00] lyrics"
         mock_exact.assert_called_with("Song", "Artist", 200)
+
+
+class TestGetLyricsForVideoCache:
+    """Tests for the cache wrapper in get_lyrics_for_video()."""
+
+    @patch("kikusan.lyrics._lookup_lyrics_for_video")
+    @patch("kikusan.config.get_config")
+    def test_cache_hit_positive_skips_lookup(self, mock_config, mock_lookup, tmp_path):
+        """When lyrics are cached (positive), skip API lookup entirely."""
+        import time
+        from kikusan.metadata_cache import CachedLyrics, MetadataCache
+
+        mock_cfg = MagicMock()
+        mock_cfg.download_dir = tmp_path
+        mock_cfg.lyrics_cache_hours = 168
+        mock_config.return_value = mock_cfg
+
+        # Pre-populate cache with positive result
+        cache_dir = tmp_path / ".kikusan"
+        with MetadataCache(cache_dir) as cache:
+            cache.add_lyrics(CachedLyrics(
+                video_id="abc123",
+                lyrics="[00:00.00] Cached lyrics",
+                cached_at=time.time(),
+            ))
+
+        result = get_lyrics_for_video("abc123", "Title", "Artist", 200)
+
+        assert result == "[00:00.00] Cached lyrics"
+        mock_lookup.assert_not_called()
+
+    @patch("kikusan.lyrics._lookup_lyrics_for_video")
+    @patch("kikusan.config.get_config")
+    def test_cache_hit_negative_skips_lookup(self, mock_config, mock_lookup, tmp_path):
+        """When lyrics are cached (negative), skip API lookup and return None."""
+        import time
+        from kikusan.metadata_cache import CachedLyrics, MetadataCache
+
+        mock_cfg = MagicMock()
+        mock_cfg.download_dir = tmp_path
+        mock_cfg.lyrics_cache_hours = 168
+        mock_config.return_value = mock_cfg
+
+        cache_dir = tmp_path / ".kikusan"
+        with MetadataCache(cache_dir) as cache:
+            cache.add_lyrics(CachedLyrics(
+                video_id="abc123",
+                lyrics=None,
+                cached_at=time.time(),
+            ))
+
+        result = get_lyrics_for_video("abc123", "Title", "Artist", 200)
+
+        assert result is None
+        mock_lookup.assert_not_called()
+
+    @patch("kikusan.lyrics._lookup_lyrics_for_video")
+    @patch("kikusan.config.get_config")
+    def test_cache_miss_does_lookup_and_stores(self, mock_config, mock_lookup, tmp_path):
+        """On cache miss, perform lookup and store result."""
+        from kikusan.metadata_cache import MetadataCache
+
+        mock_cfg = MagicMock()
+        mock_cfg.download_dir = tmp_path
+        mock_cfg.lyrics_cache_hours = 168
+        mock_config.return_value = mock_cfg
+
+        mock_lookup.return_value = "[00:00.00] Fresh lyrics"
+
+        result = get_lyrics_for_video("abc123", "Title", "Artist", 200)
+
+        assert result == "[00:00.00] Fresh lyrics"
+        mock_lookup.assert_called_once_with("abc123", "Title", "Artist", 200)
+
+        # Verify it was stored in cache
+        cache_dir = tmp_path / ".kikusan"
+        with MetadataCache(cache_dir) as cache:
+            cached = cache.get_lyrics("abc123")
+        assert cached is not None
+        assert cached.lyrics == "[00:00.00] Fresh lyrics"
+
+    @patch("kikusan.lyrics._lookup_lyrics_for_video")
+    @patch("kikusan.config.get_config")
+    def test_cache_stores_negative_result(self, mock_config, mock_lookup, tmp_path):
+        """Negative lookup results should be stored in cache."""
+        from kikusan.metadata_cache import MetadataCache
+
+        mock_cfg = MagicMock()
+        mock_cfg.download_dir = tmp_path
+        mock_cfg.lyrics_cache_hours = 168
+        mock_config.return_value = mock_cfg
+
+        mock_lookup.return_value = None
+
+        result = get_lyrics_for_video("abc123", "Title", "Artist", 200)
+
+        assert result is None
+
+        cache_dir = tmp_path / ".kikusan"
+        with MetadataCache(cache_dir) as cache:
+            cached = cache.get_lyrics("abc123")
+        assert cached is not None
+        assert cached.lyrics is None
+
+    @patch("kikusan.lyrics._lookup_lyrics_for_video")
+    @patch("kikusan.config.get_config")
+    def test_expired_negative_triggers_relookup(self, mock_config, mock_lookup, tmp_path):
+        """Expired negative cache should trigger a fresh lookup."""
+        import time
+        from kikusan.metadata_cache import CachedLyrics, MetadataCache
+
+        mock_cfg = MagicMock()
+        mock_cfg.download_dir = tmp_path
+        mock_cfg.lyrics_cache_hours = 1  # 1 hour TTL
+        mock_config.return_value = mock_cfg
+
+        # Pre-populate with expired negative
+        cache_dir = tmp_path / ".kikusan"
+        with MetadataCache(cache_dir) as cache:
+            cache.add_lyrics(CachedLyrics(
+                video_id="abc123",
+                lyrics=None,
+                cached_at=time.time() - 7200,  # 2 hours ago
+            ))
+
+        mock_lookup.return_value = "[00:00.00] Now available!"
+
+        result = get_lyrics_for_video("abc123", "Title", "Artist", 200)
+
+        assert result == "[00:00.00] Now available!"
+        mock_lookup.assert_called_once()
 
 
 class TestGetLyricsExact:

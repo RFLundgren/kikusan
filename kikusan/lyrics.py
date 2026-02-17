@@ -12,6 +12,7 @@ The basic strategy is the original get_lyrics() behavior, preserved as fallback.
 
 import logging
 import re
+import time
 from pathlib import Path
 
 import httpx
@@ -103,6 +104,9 @@ def get_lyrics_for_video(
     2. Search (/api/search) with ytmusicapi metadata (if exact match fails)
     3. Exact match (/api/get) with yt-dlp fallback metadata (if ytmusicapi fails)
 
+    Results are cached in SQLite (both positive and negative) to avoid redundant
+    lrclib.net API calls on subsequent syncs.
+
     Args:
         video_id: YouTube video ID for fetching clean metadata
         fallback_title: Track title from yt-dlp (used as last resort)
@@ -113,6 +117,47 @@ def get_lyrics_for_video(
         LRC formatted lyrics string, or None if not found
     """
     # Import here to avoid circular dependency
+    from kikusan.config import get_config
+    from kikusan.metadata_cache import CachedLyrics, MetadataCache
+    from kikusan.search import get_song_metadata
+
+    config = get_config()
+    cache_dir = config.download_dir / ".kikusan"
+
+    # Check cache first
+    with MetadataCache(cache_dir) as cache:
+        cached = cache.get_lyrics(video_id, config.lyrics_cache_hours)
+        if cached is not None:
+            if cached.lyrics is not None:
+                logger.info("Lyrics cache hit (positive) for video_id '%s'", video_id)
+            else:
+                logger.info("Lyrics cache hit (negative) for video_id '%s'", video_id)
+            return cached.lyrics
+
+    # Cache miss — do the full lookup
+    lyrics = _lookup_lyrics_for_video(video_id, fallback_title, fallback_artist, fallback_duration)
+
+    # Store result in cache (positive or negative)
+    with MetadataCache(cache_dir) as cache:
+        cache.add_lyrics(CachedLyrics(
+            video_id=video_id,
+            lyrics=lyrics,
+            cached_at=time.time(),
+        ))
+
+    return lyrics
+
+
+def _lookup_lyrics_for_video(
+    video_id: str,
+    fallback_title: str,
+    fallback_artist: str,
+    fallback_duration: int,
+) -> str | None:
+    """Internal lyrics lookup logic (uncached).
+
+    Extracted from get_lyrics_for_video() so the cache wrapper is clean.
+    """
     from kikusan.search import get_song_metadata
 
     # Step 1: Try to get clean metadata from ytmusicapi

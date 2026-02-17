@@ -35,6 +35,7 @@ class Config:
     log_cookie_usage: bool = True
     cors_origins: list[str] = field(default_factory=lambda: ["*"])
     unavailable_cooldown_hours: int = 168  # 7 days
+    lyrics_cache_hours: int = 168  # 7 days negative TTL
     multi_user: bool = False
     replaygain: bool = False
     allow_ugc: bool = False
@@ -100,6 +101,15 @@ class Config:
             )
             unavailable_cooldown_hours = 0
 
+        # Parse lyrics cache TTL hours (0 = negatives never expire)
+        lyrics_cache_hours = int(os.getenv("KIKUSAN_LYRICS_CACHE_HOURS", "168"))
+        if lyrics_cache_hours < 0:
+            logger.warning(
+                "KIKUSAN_LYRICS_CACHE_HOURS is negative (%d), using 0 (no expiry)",
+                lyrics_cache_hours
+            )
+            lyrics_cache_hours = 0
+
         # Parse multi-user mode flag
         multi_user = os.getenv("KIKUSAN_MULTI_USER", "false").lower() in ("true", "1", "yes")
 
@@ -132,6 +142,7 @@ class Config:
             log_cookie_usage=log_cookie_usage,
             cors_origins=cors_origins,
             unavailable_cooldown_hours=unavailable_cooldown_hours,
+            lyrics_cache_hours=lyrics_cache_hours,
             multi_user=multi_user,
             replaygain=replaygain,
             allow_ugc=allow_ugc,

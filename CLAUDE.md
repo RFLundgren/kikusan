@@ -167,13 +167,15 @@ All domain models that cross serialization boundaries (JSON persistence, API res
   - `_get_album_from_watch_playlist()`: Extracts album name from watch playlist (not available in `get_song()` videoDetails)
   - `_get_metadata_from_watch_playlist()`: Full fallback when `get_song()` returns incomplete videoDetails
   - Data classes: `Track`, `Album`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `ChartTrack`, `ChartArtist`, `Charts`, `SongMetadata`
-- `kikusan/metadata_cache.py`: SQLite-backed metadata cache for YouTube Music API results
+- `kikusan/metadata_cache.py`: SQLite-backed metadata cache for YouTube Music API results and lyrics lookups
   - Caches `get_song_metadata()` and `get_track_from_video_id()` results by video_id
+  - Caches lyrics lookup results (both positive and negative) by video_id in `lyrics` table
   - Storage: `{download_dir}/.kikusan/metadata_cache.db` with WAL journal mode
-  - Pydantic models (`CachedSongMetadata`, `CachedTrack`) for JSON serialization in SQLite key-value tables
+  - Pydantic models (`CachedSongMetadata`, `CachedTrack`, `CachedLyrics`) for JSON serialization in SQLite key-value tables
   - `MetadataCache` class with context manager — per-call open/close pattern
   - Always-on (no opt-in flag) — pure performance optimization
-  - No TTL — track metadata is stable per video_id
+  - Track metadata: No TTL — stable per video_id
+  - Lyrics: Positive results never expire; negative results expire after configurable TTL (default: 168 hours / 7 days)
   - Only successful results are cached; None/exceptions are not cached (retried on next call)
   - All errors logged and swallowed — cache failures never crash downloads
   - Test coverage: `tests/test_metadata_cache.py`
@@ -237,8 +239,9 @@ All domain models that cross serialization boundaries (JSON persistence, API res
 - `kikusan/cron/scheduler.py`: Orchestrates sync jobs (playlists, plugins, explore) and triggers hooks after completion
   - `_schedule_explore()` / `_explore_sync_job()`: Schedule and execute explore sync jobs
   - `sync_all_once()`: Runs all playlists, plugins, and explore sources once immediately
-- `kikusan/lyrics.py`: Lyrics fetching from lrclib.net with multi-strategy lookup
-  - `get_lyrics_for_video()`: Primary function — fetches clean metadata from ytmusicapi, then tries multiple lrclib.net strategies:
+- `kikusan/lyrics.py`: Lyrics fetching from lrclib.net with multi-strategy lookup and SQLite caching
+  - `get_lyrics_for_video()`: Primary function — checks lyrics cache first, then fetches clean metadata from ytmusicapi and tries multiple lrclib.net strategies. Caches both positive and negative results in `metadata_cache.db` to avoid redundant API calls on subsequent syncs.
+  - `_lookup_lyrics_for_video()`: Internal uncached lookup logic, tries multiple lrclib.net strategies:
     1. Exact match (`/api/get`) with ytmusicapi metadata (clean title/artist/duration)
     2. Search (`/api/search`) with ytmusicapi metadata (fuzzy match, includes album)
     3. Cleaned metadata retry (strips parentheticals from title, secondary artists from artist)
@@ -309,6 +312,7 @@ All major configuration variables have corresponding CLI flags:
 - `--cookie-retry-delay`: Delay before retrying with cookies
 - `--no-log-cookie-usage`: Disable cookie usage logging
 - `--unavailable-cooldown`: Hours to wait before retrying unavailable videos (0 = disabled, default: 168)
+- `--lyrics-cache-hours`: Hours to cache negative lyrics lookups (0 = no expiry, default: 168)
 
 **download command:**
 
