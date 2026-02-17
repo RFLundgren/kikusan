@@ -276,18 +276,37 @@ All domain models that cross serialization boundaries (JSON persistence, API res
   - Requires external `rsgain` binary (installed in Docker image via Debian package `rsgain`)
   - Called as post-processing step after lyrics in all download paths (`download()`, `_download_single()`, `_download_playlist()`)
   - `apply_replaygain` parameter threaded through: `download.py`, `queue.py`, `cron/sync.py`, `plugins/sync.py`, `cli.py`
-- `kikusan/tagging.py`: Tag existing audio files with lyrics and ReplayGain (no re-download)
+- `kikusan/tagging.py`: Tag existing audio files with metadata enrichment, lyrics, and ReplayGain (no re-download)
   - `extract_metadata(file_path) -> FileMetadata | None`: Extracts title, artist, album, duration via mutagen
+  - `_extract_partial_metadata(file_path) -> PartialMetadata | None`: Like `extract_metadata()` but returns partial results even when title/artist is missing, plus `has_cover` flag
   - `collect_audio_files(directory) -> list[Path]`: Recursive walk for `.opus`, `.mp3`, `.flac` files
-  - `tag_file()`: Per-file processing — lyrics lookup (exact + search + cleaned fallback) and ReplayGain application
-  - `tag_directory()`: Main entry point — processes all files with stats tracking
+  - `tag_file()`: Per-file processing — metadata enrichment, then lyrics lookup, then ReplayGain application
+  - `tag_directory()`: Main entry point — processes all files with stats tracking, initializes `EnrichmentCache`
+  - **Metadata enrichment** (enabled by default via `--metadata` flag):
+    - `_parse_metadata_from_path()`: Parses title/artist/album from filename (flat mode: `Artist - Title.ext`, album mode: `Artist/Album/Title.ext`)
+    - `_search_metadata()`: Searches YouTube Music via `kikusan.search.search()` with parsed title+artist, returns top `Track` result
+    - `_write_metadata_tags()`: Writes missing tags (title, artist, album) via mutagen — Vorbis comments for Opus/FLAC, ID3 frames for MP3. Only writes tags that are currently missing (doesn't overwrite).
+    - `_has_cover_art()`: Checks for embedded cover art (FLAC pictures, Opus `metadata_block_picture`, MP3 `APIC` frames)
+    - `_embed_cover_art()`: Downloads thumbnail from YouTube Music and embeds as cover art (FLAC `Picture`, Opus base64 `metadata_block_picture`, MP3 `APIC`)
+    - Multi-artist tags written via `kikusan.tags.write_multi_artist_tags()` when track has multiple artists
+    - After enrichment, metadata is re-extracted so lyrics/replaygain can proceed on previously-untagged files
+  - **Enrichment cache** (`NegativeResultCache`): JSON-backed cache for failed YouTube Music searches
+    - Storage: `{directory}/.kikusan_enrichment_cache.json`
+    - TTL: reuses `lyrics_cache_hours` config value (default 168h / 7 days)
+    - Key format: `"{artist} - {title}"` lowercased
+    - Corrupted cache files backed up and reset (same pattern as `unavailable.json`)
+  - **Lyrics cache**: Reuses `MetadataCache` from `metadata_cache.py` (same SQLite cache as cron/download)
+    - Storage: `{directory}/.kikusan/metadata_cache.db` — `lyrics` table
+    - Synthetic key format: `"tag:{artist_lower}|{title_lower}"` (prefixed to avoid collision with real video IDs)
+    - Caches both positive (lyrics text) and negative (not found) results with TTL on negatives
+    - `_make_lyrics_cache_key()` helper creates the synthetic key
   - `_has_replaygain_tags()`: Checks for existing ReplayGain tags (format-specific: R128_TRACK_GAIN for Opus, REPLAYGAIN_TRACK_GAIN for MP3/FLAC)
   - Lyrics: reuses `get_lyrics()`, `_search_lyrics()`, and `_try_cleaned_lookup()` from `lyrics.py` (no video_id needed)
   - ReplayGain: reuses `apply_replaygain()` from `replaygain.py` as-is
   - Skips files that already have `.lrc` sidecar files (for lyrics)
   - Skips files that already have ReplayGain tags (for ReplayGain)
   - Non-fatal per-file errors with `TagStats` summary at end
-  - Data classes: `FileMetadata`, `TagStats` (includes skipped counters for both lyrics and ReplayGain)
+  - Data classes: `FileMetadata`, `PartialMetadata`, `TagStats` (includes counters for metadata, lyrics, and ReplayGain)
 
 ### CI/CD
 
@@ -353,6 +372,7 @@ All major configuration variables have corresponding CLI flags:
 **tag command:**
 
 - `<directory>`: Directory to recursively process (required argument)
+- `--metadata/--no-metadata`: Enrich missing metadata (title, artist, album, cover art) from YouTube Music (default: enabled)
 - `--lyrics/--no-lyrics`: Fetch and save lyrics from lrclib.net (default: enabled)
 - `--replaygain/--no-replaygain`: Apply ReplayGain/R128 tags via rsgain (default: enabled)
 - `--dry-run`: Preview what would be done without making changes

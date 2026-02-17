@@ -394,9 +394,10 @@ main.add_command(plugins, name="plugins")
 @click.argument("directory", type=click.Path(exists=True, file_okay=False))
 @click.option("--lyrics/--no-lyrics", default=True, help="Fetch and save lyrics from lrclib.net (default: enabled)")
 @click.option("--replaygain/--no-replaygain", default=True, help="Apply ReplayGain/R128 tags via rsgain (default: enabled)")
+@click.option("--metadata/--no-metadata", default=True, help="Enrich missing metadata from YouTube Music (default: enabled)")
 @click.option("--dry-run", is_flag=True, help="Preview what would be done without making changes")
-def tag(directory: str, lyrics: bool, replaygain: bool, dry_run: bool):
-    """Tag existing audio files with lyrics and ReplayGain.
+def tag(directory: str, lyrics: bool, replaygain: bool, metadata: bool, dry_run: bool):
+    """Tag existing audio files with metadata, lyrics, and ReplayGain.
 
     Recursively processes .opus, .mp3, .flac files in DIRECTORY.
 
@@ -404,7 +405,7 @@ def tag(directory: str, lyrics: bool, replaygain: bool, dry_run: bool):
 
       kikusan tag /path/to/music
 
-      kikusan tag --no-replaygain /path/to/music
+      kikusan tag --no-metadata /path/to/music
 
       kikusan tag --dry-run /path/to/music
     """
@@ -419,10 +420,13 @@ def tag(directory: str, lyrics: bool, replaygain: bool, dry_run: bool):
         target,
         do_lyrics=lyrics,
         do_replaygain=replaygain,
+        do_metadata=metadata,
         dry_run=dry_run,
     )
 
     click.echo(f"\nProcessed {stats.files_found} files:")
+    if metadata:
+        click.echo(f"  Metadata: {stats.metadata_enriched} enriched, {stats.metadata_skipped} skipped (complete), {stats.metadata_failed} failed")
     if lyrics:
         click.echo(f"  Lyrics: {stats.lyrics_added} added, {stats.lyrics_skipped} skipped (already exist), {stats.lyrics_not_found} not found, {stats.lyrics_failed} failed")
     if replaygain:
