@@ -1614,6 +1614,7 @@
       }
 
       function renderExploreHome(moods, charts, skipUrlUpdate = false) {
+        if (!skipUrlUpdate) chartPage = 0;
         exploreBreadcrumb = [];
         // Cache moods so country selector changes skip re-fetching them
         if (moods) {
@@ -1660,13 +1661,15 @@
             `;
 
         if (chartTracks.length > 0) {
+          const start = chartPage * TRACKS_PER_PAGE;
+          const pageTracks = chartTracks.slice(start, start + TRACKS_PER_PAGE);
           html += `
                     <div class="chart-tracks-list">
-                        ${chartTracks
+                        ${pageTracks
                           .map(
                             (track, idx) => `
                             <div class="track chart-track">
-                                <span class="chart-rank">${track.rank || idx + 1}</span>
+                                <span class="chart-rank">${track.rank || start + idx + 1}</span>
                                 <div class="track-main">
                                     <img class="track-cover" src="${proxyImageUrl(track.thumbnail_url)}" alt="" loading="lazy" onerror="this.style.display='none'">
                                     <div class="track-info">
@@ -1689,6 +1692,7 @@
                           )
                           .join("")}
                     </div>
+                    ${renderPaginationControls(chartPage, chartTracks.length, "chart-page")}
                 `;
         } else {
           html +=
@@ -1729,6 +1733,30 @@
       // Cache moods data so country selector changes do not re-fetch moods
       let cachedMoods = null;
 
+      // Pagination state
+      const TRACKS_PER_PAGE = 10;
+      let chartPage = 0;
+      let playlistPage = 0;
+
+      function renderPaginationControls(page, totalTracks, idPrefix) {
+        const totalPages = Math.ceil(totalTracks / TRACKS_PER_PAGE);
+        if (totalPages <= 1) return "";
+        return `
+          <div class="pagination-controls">
+            <button class="pagination-btn" id="${idPrefix}-prev" ${page === 0 ? "disabled" : ""}>&#8592; Prev</button>
+            <span class="pagination-info">${page + 1} / ${totalPages}</span>
+            <button class="pagination-btn" id="${idPrefix}-next" ${page >= totalPages - 1 ? "disabled" : ""}>Next &#8594;</button>
+          </div>
+        `;
+      }
+
+      function attachPaginationHandlers(idPrefix, onPageChange) {
+        const prevBtn = document.getElementById(`${idPrefix}-prev`);
+        const nextBtn = document.getElementById(`${idPrefix}-next`);
+        if (prevBtn) prevBtn.addEventListener("click", () => onPageChange(-1));
+        if (nextBtn) nextBtn.addEventListener("click", () => onPageChange(1));
+      }
+
       function attachExploreHandlers(charts) {
         // Country selector
         const countrySelector = document.getElementById(
@@ -1737,6 +1765,7 @@
         if (countrySelector) {
           countrySelector.addEventListener("change", async (e) => {
             const country = e.target.value;
+            chartPage = 0;
             showStatus("Loading charts...");
             try {
               const res = await fetch(
@@ -1751,6 +1780,12 @@
             }
           });
         }
+
+        // Chart pagination
+        attachPaginationHandlers("chart-page", (delta) => {
+          chartPage += delta;
+          renderExploreHome(cachedMoods, charts, true);
+        });
 
         // Cron config button for charts
         const cronChartsBtn = document.getElementById("cron-charts-btn");
@@ -1947,6 +1982,7 @@
           }
           const data = await res.json();
           showStatus("");
+          playlistPage = 0;
           renderPlaylistTracks(data.tracks, playlistTitle, playlistId);
         } catch (error) {
           showStatus("Failed to load tracks: " + error.message, true);
@@ -1994,7 +2030,9 @@
                 <div class="explore-tracks-list">
             `;
 
-        html += tracks
+        const plStart = playlistPage * TRACKS_PER_PAGE;
+        const pageTracks = tracks.slice(plStart, plStart + TRACKS_PER_PAGE);
+        html += pageTracks
           .map(
             (track) => `
                 <div class="track">
@@ -2020,6 +2058,7 @@
           .join("");
 
         html += "</div>";
+        html += renderPaginationControls(playlistPage, tracks.length, "playlist-page");
         exploreResults.innerHTML = html;
 
         // Breadcrumb navigation
@@ -2087,6 +2126,12 @@
         // Individual download buttons
         exploreResults.querySelectorAll(".download-btn").forEach((btn) => {
           btn.addEventListener("click", handleDownload);
+        });
+
+        // Playlist pagination
+        attachPaginationHandlers("playlist-page", (delta) => {
+          playlistPage += delta;
+          renderPlaylistTracks(tracks, playlistTitle, playlistId);
         });
       }
 
