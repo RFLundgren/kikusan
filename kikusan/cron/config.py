@@ -2,70 +2,20 @@
 
 import logging
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 from croniter import croniter
 
 from kikusan.hooks import HookConfig, parse_hooks_config
+from kikusan.models.cron import (
+    CronConfig,
+    ExploreConfig,
+    PlaylistConfig,
+    PluginInstanceConfig,
+)
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class PlaylistConfig:
-    """Configuration for a single playlist."""
-
-    name: str
-    url: str
-    sync: bool
-    schedule: str
-
-
-@dataclass
-class PluginInstanceConfig:
-    """Configuration for a single plugin instance."""
-
-    name: str
-    type: str  # Plugin type name
-    sync: bool
-    schedule: str
-    config: dict  # Plugin-specific config
-
-
-@dataclass
-class ExploreConfig:
-    """Configuration for a single explore sync entry (charts or mood).
-
-    type: "charts" or "mood"
-    country: ISO 3166-1 Alpha-2 code (only for type="charts", default "ZZ")
-    params: Mood/genre params string (only for type="mood")
-    playlist_id: Specific playlist ID to sync (only for type="mood", optional)
-    sync: If True, delete tracks removed from the source
-    schedule: Cron expression
-    name: Internal name for state/playlist files
-    limit: Maximum number of tracks to sync (0 = no limit)
-    """
-
-    name: str
-    type: str  # "charts" or "mood"
-    sync: bool
-    schedule: str
-    country: str = "ZZ"
-    params: str = ""
-    playlist_id: str = ""
-    limit: int = 0
-
-
-@dataclass
-class CronConfig:
-    """Root configuration for cron playlists, plugins, and explore entries."""
-
-    playlists: dict[str, PlaylistConfig]
-    plugins: dict[str, PluginInstanceConfig]
-    explore: dict[str, ExploreConfig] = field(default_factory=dict)
-    hooks: list[HookConfig] = field(default_factory=list)
 
 
 def load_config(path: Path) -> CronConfig:

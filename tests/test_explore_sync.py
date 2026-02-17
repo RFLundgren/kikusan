@@ -247,14 +247,13 @@ class TestFetchExploreTracks:
         assert tracks == [("vid1", "Song", "Artist")]
         mock_fetch_mood.assert_called_once_with("ggMPOg1uX1J", "RDCLAK5uy_test123", allow_ugc=False)
 
-    def test_unknown_type_returns_empty(self):
-        config = ExploreConfig(
-            name="unknown", type="invalid", sync=True,
-            schedule="0 6 * * *",
-        )
-
-        tracks = fetch_explore_tracks(config)
-        assert tracks == []
+    def test_unknown_type_raises_validation_error(self):
+        import pydantic
+        with pytest.raises(pydantic.ValidationError, match="type must be 'charts' or 'mood'"):
+            ExploreConfig(
+                name="unknown", type="invalid", sync=True,
+                schedule="0 6 * * *",
+            )
 
 
 class TestBuildExploreUrl:

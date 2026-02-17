@@ -2,32 +2,12 @@
 
 import json
 import logging
-from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from kikusan.models.state import PlaylistState, TrackState
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class TrackState:
-    """State for a single track."""
-
-    video_id: str
-    title: str
-    artist: str
-    file_path: str
-    downloaded_at: str
-
-
-@dataclass
-class PlaylistState:
-    """State for an entire playlist."""
-
-    playlist_name: str
-    url: str
-    last_check: str
-    tracks: list[TrackState]
 
 
 def get_state_dir(download_dir: Path) -> Path:
@@ -67,18 +47,9 @@ def load_state(state_dir: Path, playlist_name: str) -> PlaylistState | None:
     try:
         content = state_file.read_text(encoding="utf-8")
         data = json.loads(content)
+        return PlaylistState.model_validate(data)
 
-        # Parse tracks
-        tracks = [TrackState(**track) for track in data.get("tracks", [])]
-
-        return PlaylistState(
-            playlist_name=data["playlist_name"],
-            url=data["url"],
-            last_check=data["last_check"],
-            tracks=tracks,
-        )
-
-    except (json.JSONDecodeError, KeyError) as e:
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
         logger.error("Corrupted state file: %s - %s", state_file, e)
         # Backup corrupted file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -105,7 +76,7 @@ def save_state(state_dir: Path, state: PlaylistState) -> None:
 
     try:
         # Serialize to JSON
-        data = asdict(state)
+        data = state.model_dump()
         json_str = json.dumps(data, indent=2, ensure_ascii=False)
 
         # Write to temp file

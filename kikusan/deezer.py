@@ -2,9 +2,10 @@
 
 import logging
 import re
-from dataclasses import dataclass
 
 import httpx
+
+from kikusan.models.deezer import DeezerTrack
 
 logger = logging.getLogger(__name__)
 
@@ -21,22 +22,6 @@ class DeezerAPIError(ValueError):
 
 class DeezerQuotaError(DeezerAPIError):
     """Raised when Deezer API quota is exceeded."""
-
-
-@dataclass
-class DeezerTrack:
-    """Represents a track from Deezer."""
-
-    name: str
-    artist: str
-    artists: list[str]
-    album: str | None
-    duration_ms: int
-
-    @property
-    def search_query(self) -> str:
-        """Generate a search query for YouTube Music."""
-        return f"{self.name} {self.artist}"
 
 
 def is_deezer_url(url: str) -> bool:

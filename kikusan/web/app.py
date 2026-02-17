@@ -458,7 +458,7 @@ async def api_search_playlist_stream(
                     )
                     return
 
-                payload_results = [_track_to_response(track).dict() for track in results]
+                payload_results = [_track_to_response(track).model_dump() for track in results]
                 yield _sse_event(
                     "complete",
                     {
@@ -519,7 +519,7 @@ async def api_search_playlist_stream(
                 )
                 return
 
-            payload_results = [_track_to_response(track).dict() for track in tracks]
+            payload_results = [_track_to_response(track).model_dump() for track in tracks]
             yield _sse_event(
                 "progress",
                 {

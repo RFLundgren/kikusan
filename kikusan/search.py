@@ -1,13 +1,23 @@
 """YouTube Music search and explore functionality using ytmusicapi."""
 
 import logging
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from ytmusicapi import YTMusic
 
 from kikusan.config import get_config
 from kikusan.metadata_cache import CachedSongMetadata, CachedTrack, MetadataCache
+from kikusan.models.search import (
+    Album,
+    ChartArtist,
+    Charts,
+    ChartTrack,
+    MoodCategory,
+    MoodPlaylist,
+    MoodSection,
+    SongMetadata,
+    Track,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,108 +48,13 @@ def is_allowed_video_type(video_type: str | None, allow_ugc: bool = False) -> bo
     return False
 
 
-@dataclass
-class Track:
-    """Represents a music track from YouTube Music."""
-
-    video_id: str
-    title: str
-    artist: str
-    artists: list[str]
-    album: str | None
-    duration_seconds: int
-    thumbnail_url: str | None
-    view_count: str | None
-    video_type: str | None = None
-
-    @property
-    def duration_display(self) -> str:
-        """Format duration as MM:SS."""
-        minutes = self.duration_seconds // 60
-        seconds = self.duration_seconds % 60
-        return f"{minutes}:{seconds:02d}"
-
-
-@dataclass
-class Album:
-    """Represents an album from YouTube Music."""
-
-    browse_id: str
-    title: str
-    artist: str
-    year: int | None
-    track_count: int | None
-    thumbnail_url: str | None
-
-
-@dataclass
-class MoodCategory:
-    """A single mood/genre category with a params identifier for fetching playlists."""
-
-    title: str
-    params: str
-
-
-@dataclass
-class MoodSection:
-    """A section of mood/genre categories (e.g., 'Genres', 'Moods & moments')."""
-
-    title: str
-    categories: list[MoodCategory] = field(default_factory=list)
-
-
-@dataclass
-class MoodPlaylist:
-    """A playlist from a mood/genre category."""
-
-    playlist_id: str
-    title: str
-    thumbnail_url: str | None
-    author: str | None
-
-
-@dataclass
-class ChartTrack:
-    """A track from the music charts."""
-
-    video_id: str
-    title: str
-    artist: str
-    artists: list[str]
-    album: str | None
-    thumbnail_url: str | None
-    rank: str | None
-    trend: str | None
-    view_count: str | None = None
-    duration_seconds: int = 0
-    video_type: str | None = None
-
-    @property
-    def duration_display(self) -> str:
-        """Format duration as MM:SS."""
-        minutes = self.duration_seconds // 60
-        seconds = self.duration_seconds % 60
-        return f"{minutes}:{seconds:02d}"
-
-
-@dataclass
-class ChartArtist:
-    """An artist from the music charts."""
-
-    browse_id: str
-    title: str
-    thumbnail_url: str | None
-    rank: str | None
-    trend: str | None
-
-
-@dataclass
-class Charts:
-    """Chart data for a country."""
-
-    country: str
-    tracks: list[ChartTrack] = field(default_factory=list)
-    artists: list[ChartArtist] = field(default_factory=list)
+# Models re-exported from kikusan.models.search for backward compatibility:
+# Track, Album, MoodCategory, MoodSection, MoodPlaylist, ChartTrack,
+# ChartArtist, Charts, SongMetadata
+__all__ = [
+    "Track", "Album", "MoodCategory", "MoodSection", "MoodPlaylist",
+    "ChartTrack", "ChartArtist", "Charts", "SongMetadata",
+]
 
 
 def search(query: str, limit: int = 20) -> list[Track]:
@@ -739,20 +654,6 @@ def get_playlist_tracks(playlist_id: str, allow_ugc: bool = False) -> list[Track
         )
     logger.info("Found %d tracks in playlist: %s", len(tracks), raw.get("title", playlist_id))
     return tracks
-
-
-@dataclass
-class SongMetadata:
-    """Clean metadata for a song, fetched from YouTube Music API.
-
-    Used for lyrics lookup where accurate title/artist/album/duration
-    are critical for matching against lrclib.net.
-    """
-
-    title: str
-    artist: str
-    album: str | None
-    duration_seconds: int
 
 
 def get_song_metadata(video_id: str) -> SongMetadata | None:

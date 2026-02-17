@@ -13,6 +13,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from kikusan.models.unavailable import UnavailableRecord
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_COOLDOWN_HOURS = 168  # 7 days
@@ -136,12 +138,13 @@ def record_unavailable(
     """
     data = load_unavailable(download_dir)
 
-    data[video_id] = {
-        "failed_at": datetime.now(timezone.utc).isoformat(),
-        "error": error_message,
-        "title": title,
-        "artist": artist,
-    }
+    record = UnavailableRecord(
+        failed_at=datetime.now(timezone.utc).isoformat(),
+        error=error_message,
+        title=title,
+        artist=artist,
+    )
+    data[video_id] = record.model_dump()
 
     save_unavailable(download_dir, data)
 

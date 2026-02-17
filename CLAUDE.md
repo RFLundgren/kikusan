@@ -131,6 +131,28 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Implementation in `kikusan/unavailable.py`: Pattern matching, JSON persistence with atomic writes, cooldown logic
 - Corrupted unavailable files are backed up and reset (same pattern as state files)
 
+### Domain Models (`kikusan/models/`)
+
+All domain models that cross serialization boundaries (JSON persistence, API responses, config validation) are Pydantic `BaseModel` subclasses in `kikusan/models/`:
+
+- `kikusan/models/search.py`: `Track`, `Album`, `ChartTrack`, `ChartArtist`, `Charts`, `MoodCategory`, `MoodSection`, `MoodPlaylist`, `SongMetadata`
+- `kikusan/models/state.py`: `TrackState`, `PlaylistState`, `PluginTrackState`, `PluginState`
+- `kikusan/models/queue.py`: `JobStatus` (enum), `DownloadJob`
+- `kikusan/models/cron.py`: `PlaylistConfig`, `PluginInstanceConfig`, `ExploreConfig`, `CronConfig`
+- `kikusan/models/deezer.py`: `DeezerTrack`
+- `kikusan/models/unavailable.py`: `UnavailableRecord`
+- `kikusan/models/__init__.py`: Re-exports all models for convenience (`from kikusan.models import Track`)
+
+**Import convention**: Canonical imports from `kikusan.models.*`. Original modules (`kikusan.search`, `kikusan.queue`, etc.) re-export for backward compatibility.
+
+**Key patterns**:
+- `@computed_field` for derived properties like `duration_display` on `Track`/`ChartTrack`
+- `model_dump()` replaces `dataclasses.asdict()` for serialization
+- `model_validate(data)` replaces manual `ClassName(**data)` for deserialization
+- State files use `PlaylistState.model_validate(json_data)` / `state.model_dump()` for JSON persistence
+- `ConfigDict(frozen=True)` on immutable DTOs (search models, config models)
+- Pure internal dataclasses (e.g., `FileMetadata`, `Config`, `HookConfig`) remain as `@dataclass`
+
 ### Architecture Notes
 
 - `kikusan/search.py`: Uses ytmusicapi to search and explore YouTube Music

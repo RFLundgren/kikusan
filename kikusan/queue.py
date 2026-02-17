@@ -4,65 +4,15 @@ import asyncio
 import logging
 import uuid
 from asyncio import Queue, Task
-from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from enum import Enum
-from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from kikusan.config import get_config
 from kikusan.download import download
+from kikusan.models.queue import DownloadJob, JobStatus
 from kikusan.playlist import add_to_m3u
 
 logger = logging.getLogger(__name__)
-
-
-class JobStatus(Enum):
-    """Download job status states."""
-
-    QUEUED = "queued"
-    DOWNLOADING = "downloading"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-@dataclass
-class DownloadJob:
-    """Download job with progress tracking."""
-
-    id: str
-    video_id: str
-    title: str
-    artist: str
-    format: str
-    status: JobStatus
-    artists: Optional[list[str]] = None
-    progress: float = 0.0
-    speed: str = ""
-    eta: str = ""
-    error: Optional[str] = None
-    file_path: Optional[str] = None
-    created_at: datetime = field(default_factory=datetime.now)
-    completed_at: Optional[datetime] = None
-    playlist_name: Optional[str] = None
-
-    def to_dict(self) -> dict:
-        """Convert job to dict for JSON serialization."""
-        return {
-            "id": self.id,
-            "video_id": self.video_id,
-            "title": self.title,
-            "artist": self.artist,
-            "format": self.format,
-            "status": self.status.value,
-            "progress": self.progress,
-            "speed": self.speed,
-            "eta": self.eta,
-            "error": self.error,
-            "file_path": self.file_path,
-            "created_at": self.created_at.isoformat(),
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
-        }
 
 
 class QueueManager:
