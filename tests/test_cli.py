@@ -4,9 +4,9 @@ import os
 from unittest.mock import patch, MagicMock
 
 import pytest
-from click.testing import CliRunner
+from typer.testing import CliRunner
 
-from kikusan.cli import main
+from kikusan.cli import app
 
 
 class TestGlobalOptions:
@@ -21,7 +21,7 @@ class TestGlobalOptions:
     def test_cookie_mode_sets_env_var(self):
         """Test --cookie-mode sets environment variable."""
         runner = CliRunner()
-        result = runner.invoke(main, ["--cookie-mode", "always", "--help"])
+        result = runner.invoke(app, ["--cookie-mode", "always", "--help"])
         assert result.exit_code == 0
         # Note: The env var is set during command execution, not in --help output
 
@@ -29,20 +29,20 @@ class TestGlobalOptions:
         """Test --cookie-mode validates choices."""
         runner = CliRunner()
         # Don't pass --help so click can validate the choice
-        result = runner.invoke(main, ["--cookie-mode", "invalid"])
+        result = runner.invoke(app, ["--cookie-mode", "invalid"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output
 
     def test_cookie_retry_delay_accepts_float(self):
         """Test --cookie-retry-delay accepts float values."""
         runner = CliRunner()
-        result = runner.invoke(main, ["--cookie-retry-delay", "2.5", "--help"])
+        result = runner.invoke(app, ["--cookie-retry-delay", "2.5", "--help"])
         assert result.exit_code == 0
 
     def test_no_log_cookie_usage_flag(self):
         """Test --no-log-cookie-usage is a valid flag."""
         runner = CliRunner()
-        result = runner.invoke(main, ["--no-log-cookie-usage", "--help"])
+        result = runner.invoke(app, ["--no-log-cookie-usage", "--help"])
         assert result.exit_code == 0
 
 
@@ -53,32 +53,32 @@ class TestDownloadOptions:
         """Test --organization-mode validates choices."""
         runner = CliRunner()
         # Don't pass --help so click can validate the choice
-        result = runner.invoke(main, ["download", "--organization-mode", "invalid"])
+        result = runner.invoke(app, ["download", "--organization-mode", "invalid"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output
 
     def test_organization_mode_flat(self):
         """Test --organization-mode accepts 'flat'."""
         runner = CliRunner()
-        result = runner.invoke(main, ["download", "--organization-mode", "flat", "--help"])
+        result = runner.invoke(app, ["download", "--organization-mode", "flat", "--help"])
         assert result.exit_code == 0
 
     def test_organization_mode_album(self):
         """Test --organization-mode accepts 'album'."""
         runner = CliRunner()
-        result = runner.invoke(main, ["download", "--organization-mode", "album", "--help"])
+        result = runner.invoke(app, ["download", "--organization-mode", "album", "--help"])
         assert result.exit_code == 0
 
     def test_use_primary_artist_flag(self):
         """Test --use-primary-artist flag."""
         runner = CliRunner()
-        result = runner.invoke(main, ["download", "--use-primary-artist", "--help"])
+        result = runner.invoke(app, ["download", "--use-primary-artist", "--help"])
         assert result.exit_code == 0
 
     def test_no_use_primary_artist_flag(self):
         """Test --no-use-primary-artist flag."""
         runner = CliRunner()
-        result = runner.invoke(main, ["download", "--no-use-primary-artist", "--help"])
+        result = runner.invoke(app, ["download", "--no-use-primary-artist", "--help"])
         assert result.exit_code == 0
 
 
@@ -88,13 +88,13 @@ class TestWebOptions:
     def test_cors_origins_option(self):
         """Test --cors-origins is accepted."""
         runner = CliRunner()
-        result = runner.invoke(main, ["web", "--cors-origins", "*", "--help"])
+        result = runner.invoke(app, ["web", "--cors-origins", "*", "--help"])
         assert result.exit_code == 0
 
     def test_web_playlist_option(self):
         """Test --web-playlist is accepted."""
         runner = CliRunner()
-        result = runner.invoke(main, ["web", "--web-playlist", "myplaylist", "--help"])
+        result = runner.invoke(app, ["web", "--web-playlist", "myplaylist", "--help"])
         assert result.exit_code == 0
 
 
@@ -104,27 +104,27 @@ class TestCronOptions:
     def test_format_option(self):
         """Test --format option accepts valid values."""
         runner = CliRunner()
-        result = runner.invoke(main, ["cron", "--format", "mp3", "--help"])
+        result = runner.invoke(app, ["cron", "--format", "mp3", "--help"])
         assert result.exit_code == 0
 
     def test_format_option_invalid(self):
         """Test --format option rejects invalid values."""
         runner = CliRunner()
         # Don't pass --help so click can validate the choice
-        result = runner.invoke(main, ["cron", "--format", "wav"])
+        result = runner.invoke(app, ["cron", "--format", "wav"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output
 
     def test_organization_mode_option(self):
         """Test --organization-mode option."""
         runner = CliRunner()
-        result = runner.invoke(main, ["cron", "--organization-mode", "album", "--help"])
+        result = runner.invoke(app, ["cron", "--organization-mode", "album", "--help"])
         assert result.exit_code == 0
 
     def test_use_primary_artist_flag(self):
         """Test --use-primary-artist flag."""
         runner = CliRunner()
-        result = runner.invoke(main, ["cron", "--use-primary-artist", "--help"])
+        result = runner.invoke(app, ["cron", "--use-primary-artist", "--help"])
         assert result.exit_code == 0
 
 
@@ -134,19 +134,19 @@ class TestPluginsRunOptions:
     def test_format_option(self):
         """Test --format option."""
         runner = CliRunner()
-        result = runner.invoke(main, ["plugins", "run", "--format", "flac", "--help"])
+        result = runner.invoke(app, ["plugins", "run", "--format", "flac", "--help"])
         assert result.exit_code == 0
 
     def test_organization_mode_option(self):
         """Test --organization-mode option."""
         runner = CliRunner()
-        result = runner.invoke(main, ["plugins", "run", "--organization-mode", "flat", "--help"])
+        result = runner.invoke(app, ["plugins", "run", "--organization-mode", "flat", "--help"])
         assert result.exit_code == 0
 
     def test_use_primary_artist_flag(self):
         """Test --use-primary-artist flag."""
         runner = CliRunner()
-        result = runner.invoke(main, ["plugins", "run", "--use-primary-artist", "--help"])
+        result = runner.invoke(app, ["plugins", "run", "--use-primary-artist", "--help"])
         assert result.exit_code == 0
 
 
@@ -156,7 +156,7 @@ class TestExploreOptions:
     def test_explore_help(self):
         """Test explore --help exits 0."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "--help"])
+        result = runner.invoke(app, ["explore", "--help"])
         assert result.exit_code == 0
         assert "moods" in result.output.lower()
         assert "charts" in result.output.lower()
@@ -165,46 +165,46 @@ class TestExploreOptions:
     def test_explore_moods_help(self):
         """Test explore moods --help exits 0."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "moods", "--help"])
+        result = runner.invoke(app, ["explore", "moods", "--help"])
         assert result.exit_code == 0
 
     def test_explore_charts_help(self):
         """Test explore charts --help exits 0."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "charts", "--help"])
+        result = runner.invoke(app, ["explore", "charts", "--help"])
         assert result.exit_code == 0
         assert "country" in result.output.lower()
 
     def test_explore_charts_country_option(self):
         """Test explore charts --country is accepted."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "charts", "--country", "US", "--help"])
+        result = runner.invoke(app, ["explore", "charts", "--country", "US", "--help"])
         assert result.exit_code == 0
 
     def test_explore_charts_download_option(self):
         """Test explore charts --download is accepted."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "charts", "--download", "--help"])
+        result = runner.invoke(app, ["explore", "charts", "--download", "--help"])
         assert result.exit_code == 0
 
     def test_explore_mood_playlists_help(self):
         """Test explore mood-playlists --help exits 0."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "mood-playlists", "--help"])
+        result = runner.invoke(app, ["explore", "mood-playlists", "--help"])
         assert result.exit_code == 0
         assert "download" in result.output.lower()
 
     def test_explore_mood_playlists_format_option(self):
         """Test explore mood-playlists --format validates choices."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "mood-playlists", "--format", "wav", "params"])
+        result = runner.invoke(app, ["explore", "mood-playlists", "--format", "wav", "params"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output
 
     def test_explore_charts_format_option(self):
         """Test explore charts --format validates choices."""
         runner = CliRunner()
-        result = runner.invoke(main, ["explore", "charts", "--format", "wav"])
+        result = runner.invoke(app, ["explore", "charts", "--format", "wav"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output
 
@@ -239,7 +239,7 @@ class TestEnvVarIntegration:
 
         runner = CliRunner()
         result = runner.invoke(
-            main,
+            app,
             ["download", "--organization-mode", "album", "--query", "test"],
         )
 
@@ -249,16 +249,16 @@ class TestEnvVarIntegration:
             assert call_kwargs.get("organization_mode") == "album"
 
     def test_envvar_attribute_on_click_options(self):
-        """Test that click options have envvar attribute where expected."""
+        """Test that options have envvar attribute where expected."""
         # This verifies the options are properly configured
         runner = CliRunner()
 
-        # Test --organization-mode has envvar
-        result = runner.invoke(main, ["download", "--help"])
-        assert "organization-mode" in result.output.lower()
+        # Test --organization-mode exists (Rich formatting may wrap long option names)
+        result = runner.invoke(app, ["download", "--help"])
+        assert "organization" in result.output.lower()
 
-        result = runner.invoke(main, ["web", "--help"])
-        assert "cors-origins" in result.output.lower()
+        result = runner.invoke(app, ["web", "--help"])
+        assert "cors" in result.output.lower()
 
-        result = runner.invoke(main, ["cron", "--help"])
+        result = runner.invoke(app, ["cron", "--help"])
         assert "format" in result.output.lower()

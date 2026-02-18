@@ -2,9 +2,11 @@
 
 import logging
 import os
+from enum import Enum
 from pathlib import Path
+from typing import Annotated
 
-import click
+import typer
 
 from kikusan.config import get_config
 from kikusan.cron.scheduler import CronScheduler
@@ -12,59 +14,66 @@ from kikusan.cron.scheduler import CronScheduler
 logger = logging.getLogger(__name__)
 
 
-@click.command()
-@click.option(
-    "--config",
-    "-c",
-    default="cron.yaml",
-    type=click.Path(exists=True),
-    help="Path to cron configuration file (default: cron.yaml)",
-)
-@click.option(
-    "--output",
-    "-o",
-    type=click.Path(),
-    help="Override download directory",
-)
-@click.option(
-    "--once",
-    is_flag=True,
-    help="Run all sync jobs once and exit (skip scheduling)",
-)
-@click.option(
-    "--format",
-    "-f",
-    "audio_format",
-    default=None,
-    type=click.Choice(["opus", "mp3", "flac"]),
-    envvar="KIKUSAN_AUDIO_FORMAT",
-    help="Audio format for downloads. Default: opus",
-)
-@click.option(
-    "--organization-mode",
-    type=click.Choice(["flat", "album"]),
-    default=None,
-    envvar="KIKUSAN_ORGANIZATION_MODE",
-    help="File organization: flat (all in one dir) or album (Artist/Year - Album/Track). Default: flat",
-)
-@click.option(
-    "--use-primary-artist/--no-use-primary-artist",
-    default=None,
-    help="Use only primary artist for folder names in album mode",
-)
-@click.option(
-    "--replaygain/--no-replaygain",
-    default=None,
-    help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
-)
-def cron(
-    config: str,
-    output: str | None,
-    once: bool,
-    audio_format: str | None,
-    organization_mode: str | None,
-    use_primary_artist: bool | None,
-    replaygain: bool | None,
+class AudioFormat(str, Enum):
+    opus = "opus"
+    mp3 = "mp3"
+    flac = "flac"
+
+
+class OrganizationMode(str, Enum):
+    flat = "flat"
+    album = "album"
+
+
+def cron_command(
+    config: Annotated[
+        Path,
+        typer.Option(
+            "--config",
+            "-c",
+            exists=True,
+            help="Path to cron configuration file (default: cron.yaml)",
+        ),
+    ] = Path("cron.yaml"),
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Override download directory"),
+    ] = None,
+    once: Annotated[
+        bool,
+        typer.Option("--once", help="Run all sync jobs once and exit (skip scheduling)"),
+    ] = False,
+    audio_format: Annotated[
+        AudioFormat | None,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Audio format for downloads. Default: opus",
+            envvar="KIKUSAN_AUDIO_FORMAT",
+        ),
+    ] = None,
+    organization_mode: Annotated[
+        OrganizationMode | None,
+        typer.Option(
+            "--organization-mode",
+            help="File organization: flat (all in one dir) or album (Artist/Year - Album/Track). Default: flat",
+            envvar="KIKUSAN_ORGANIZATION_MODE",
+        ),
+    ] = None,
+    use_primary_artist: Annotated[
+        bool | None,
+        typer.Option(
+            "--use-primary-artist/--no-use-primary-artist",
+            help="Use only primary artist for folder names in album mode",
+        ),
+    ] = None,
+    replaygain: Annotated[
+        bool | None,
+        typer.Option(
+            "--replaygain/--no-replaygain",
+            help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
+        ),
+    ] = None,
 ):
     """
     Run continuous sync based on cron.yaml.
@@ -115,16 +124,16 @@ def cron(
     """
     # Set environment variables from CLI flags (they override env vars)
     if audio_format is not None:
-        os.environ["KIKUSAN_AUDIO_FORMAT"] = audio_format
+        os.environ["KIKUSAN_AUDIO_FORMAT"] = audio_format.value
     if organization_mode is not None:
-        os.environ["KIKUSAN_ORGANIZATION_MODE"] = organization_mode
+        os.environ["KIKUSAN_ORGANIZATION_MODE"] = organization_mode.value
     if use_primary_artist is not None:
         os.environ["KIKUSAN_USE_PRIMARY_ARTIST"] = "true" if use_primary_artist else "false"
     if replaygain is not None:
         os.environ["KIKUSAN_REPLAYGAIN"] = "true" if replaygain else "false"
 
     config_path = Path(config)
-    download_dir = Path(output) if output else None
+    download_dir = output
 
     # If download_dir not specified, use config default
     if not download_dir:
@@ -136,20 +145,25 @@ def cron(
 
         if once:
             # Run all sync jobs once and exit
-            click.echo("Running all sync jobs once...")
+            typer.echo("Running all sync jobs once...")
             scheduler.sync_all_once()
-            click.echo("Done.")
+            typer.echo("Done.")
         else:
             # Run continuously
-            click.echo(f"Starting cron scheduler with config: {config_path}")
-            click.echo(f"Download directory: {download_dir}")
+            typer.echo(f"Starting cron scheduler with config: {config_path}")
+            typer.echo(f"Download directory: {download_dir}")
             scheduler.run_forever()
 
     except FileNotFoundError as e:
-        raise click.ClickException(str(e))
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1)
     except ValueError as e:
-        raise click.ClickException(f"Configuration error: {e}")
+        typer.echo(f"Error: Configuration error: {e}", err=True)
+        raise typer.Exit(code=1)
     except KeyboardInterrupt:
-        click.echo("\nStopping...")
+        typer.echo("\nStopping...")
+    except typer.Exit:
+        raise
     except Exception as e:
-        raise click.ClickException(f"Unexpected error: {e}")
+        typer.echo(f"Error: Unexpected error: {e}", err=True)
+        raise typer.Exit(code=1)

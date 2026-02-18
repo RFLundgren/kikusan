@@ -3,9 +3,11 @@
 import json
 import logging
 import os
+from enum import Enum
 from pathlib import Path
+from typing import Annotated
 
-import click
+import typer
 
 from kikusan.config import get_config
 from kikusan.plugins.base import PluginConfig
@@ -15,75 +17,92 @@ from kikusan.plugins.sync import sync_plugin_instance
 logger = logging.getLogger(__name__)
 
 
-@click.group()
-def plugins():
+class AudioFormat(str, Enum):
+    opus = "opus"
+    mp3 = "mp3"
+    flac = "flac"
+
+
+class OrganizationMode(str, Enum):
+    flat = "flat"
+    album = "album"
+
+
+plugins_app = typer.Typer(help="Run plugin-based sync operations.")
+
+
+@plugins_app.callback()
+def plugins_callback():
     """Run plugin-based sync operations."""
-    # Discover plugins on first use
     discover_plugins()
 
 
-@plugins.command(name="list")
+@plugins_app.command(name="list")
 def list_available_plugins():
     """List all available plugins."""
     discover_plugins()
     plugin_names = list_plugins()
 
     if not plugin_names:
-        click.echo("No plugins available.")
+        typer.echo("No plugins available.")
         return
 
-    click.echo("Available plugins:\n")
+    typer.echo("Available plugins:\n")
     for plugin_name in plugin_names:
         plugin_class = get_plugin(plugin_name)
         plugin = plugin_class()
 
-        click.echo(f"  {plugin_name}")
+        typer.echo(f"  {plugin_name}")
         schema = plugin.config_schema
         if schema.get("required"):
-            click.echo(f"    Required: {', '.join(schema['required'])}")
+            typer.echo(f"    Required: {', '.join(schema['required'])}")
         if schema.get("optional"):
-            click.echo(f"    Optional: {', '.join(schema['optional'].keys())}")
-        click.echo()
+            typer.echo(f"    Optional: {', '.join(schema['optional'].keys())}")
+        typer.echo()
 
 
-@plugins.command(name="run")
-@click.argument("plugin_name")
-@click.option("--config", "-c", help="Plugin config as JSON string", required=True)
-@click.option("--output", "-o", type=click.Path(), help="Download directory")
-@click.option(
-    "--format",
-    "-f",
-    "audio_format",
-    default=None,
-    type=click.Choice(["opus", "mp3", "flac"]),
-    envvar="KIKUSAN_AUDIO_FORMAT",
-    help="Audio format for downloads. Default: opus",
-)
-@click.option(
-    "--organization-mode",
-    type=click.Choice(["flat", "album"]),
-    default=None,
-    envvar="KIKUSAN_ORGANIZATION_MODE",
-    help="File organization: flat (all in one dir) or album (Artist/Year - Album/Track). Default: flat",
-)
-@click.option(
-    "--use-primary-artist/--no-use-primary-artist",
-    default=None,
-    help="Use only primary artist for folder names in album mode",
-)
-@click.option(
-    "--replaygain/--no-replaygain",
-    default=None,
-    help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
-)
+@plugins_app.command(name="run")
 def sync_once(
-    plugin_name: str,
-    config: str,
-    output: str | None,
-    audio_format: str | None,
-    organization_mode: str | None,
-    use_primary_artist: bool | None,
-    replaygain: bool | None,
+    plugin_name: Annotated[str, typer.Argument(help="Plugin name to run")],
+    config: Annotated[
+        str,
+        typer.Option("--config", "-c", help="Plugin config as JSON string"),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Download directory"),
+    ] = None,
+    audio_format: Annotated[
+        AudioFormat | None,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Audio format for downloads. Default: opus",
+            envvar="KIKUSAN_AUDIO_FORMAT",
+        ),
+    ] = None,
+    organization_mode: Annotated[
+        OrganizationMode | None,
+        typer.Option(
+            "--organization-mode",
+            help="File organization: flat (all in one dir) or album (Artist/Year - Album/Track). Default: flat",
+            envvar="KIKUSAN_ORGANIZATION_MODE",
+        ),
+    ] = None,
+    use_primary_artist: Annotated[
+        bool | None,
+        typer.Option(
+            "--use-primary-artist/--no-use-primary-artist",
+            help="Use only primary artist for folder names in album mode",
+        ),
+    ] = None,
+    replaygain: Annotated[
+        bool | None,
+        typer.Option(
+            "--replaygain/--no-replaygain",
+            help="Apply ReplayGain/R128 loudness normalization tags (requires rsgain)",
+        ),
+    ] = None,
 ):
     """Run a plugin sync once (without cron.yaml).
 
@@ -99,11 +118,11 @@ def sync_once(
         os.environ["KIKUSAN_REPLAYGAIN"] = "true" if replaygain else "false"
 
     main_config = get_config()
-    download_dir = Path(output) if output else main_config.download_dir
+    download_dir = output if output else main_config.download_dir
 
     # Use CLI parameters if provided, otherwise use config defaults
-    fmt = audio_format if audio_format is not None else main_config.audio_format
-    org_mode = organization_mode if organization_mode is not None else main_config.organization_mode
+    fmt = audio_format.value if audio_format is not None else main_config.audio_format
+    org_mode = organization_mode.value if organization_mode is not None else main_config.organization_mode
     primary_artist = use_primary_artist if use_primary_artist is not None else main_config.use_primary_artist
 
     try:
@@ -129,20 +148,24 @@ def sync_once(
         )
 
         # Run sync
-        click.echo(f"Running {plugin_name} sync...")
+        typer.echo(f"Running {plugin_name} sync...")
         result = sync_plugin_instance(plugin, cfg, sync_mode=False)
 
-        click.echo(
+        typer.echo(
             f"\nCompleted: {result.downloaded} downloaded, "
             f"{result.skipped} skipped, {result.failed} failed"
         )
 
         if result.errors:
-            click.echo("\nErrors:")
+            typer.echo("\nErrors:")
             for error in result.errors:
-                click.echo(f"  - {error}")
+                typer.echo(f"  - {error}")
 
     except json.JSONDecodeError as e:
-        raise click.ClickException(f"Invalid JSON config: {e}")
+        typer.echo(f"Error: Invalid JSON config: {e}", err=True)
+        raise typer.Exit(code=1)
+    except typer.Exit:
+        raise
     except Exception as e:
-        raise click.ClickException(str(e))
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1)
