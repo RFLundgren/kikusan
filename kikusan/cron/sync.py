@@ -53,7 +53,8 @@ def sync_playlist(
     """
     logger.info("Starting sync for playlist: %s", playlist_config.name)
 
-    state_dir = get_state_dir(download_dir)
+    config = get_config()
+    state_dir = get_state_dir(config.data_dir)
 
     try:
         # Fetch current tracks from URL
@@ -99,7 +100,7 @@ def sync_playlist(
         # Remove old tracks if sync=true
         deleted_count = 0
         if playlist_config.sync and removed_tracks:
-            deleted_count = remove_old_tracks(removed_tracks, state, download_dir)
+            deleted_count = remove_old_tracks(removed_tracks, state, download_dir, config.data_dir)
 
         # Update M3U playlist
         update_m3u_playlist(playlist_config.name, state, download_dir)
@@ -288,7 +289,7 @@ def download_new_tracks(
 
     for i, (video_id, title, artist) in enumerate(tracks, 1):
         # Check if video is on unavailable cooldown
-        if is_on_cooldown(download_dir, video_id, cooldown_hours):
+        if is_on_cooldown(config.data_dir, video_id, cooldown_hours):
             logger.info(
                 "[%d/%d] Skipping (unavailable cooldown): %s - %s",
                 i, len(tracks), artist, title,
@@ -331,12 +332,17 @@ def download_new_tracks(
             failed += 1
             # Record unavailable videos for cooldown
             if is_unavailable_error(str(e)):
-                record_unavailable(download_dir, video_id, str(e), title=title, artist=artist)
+                record_unavailable(config.data_dir, video_id, str(e), title=title, artist=artist)
 
     return {"downloaded": downloaded, "skipped": skipped, "failed": failed}
 
 
-def remove_old_tracks(tracks: list[TrackState], state: PlaylistState, download_dir: Path) -> int:
+def remove_old_tracks(
+    tracks: list[TrackState],
+    state: PlaylistState,
+    download_dir: Path,
+    data_dir: Path | None = None,
+) -> int:
     """
     Remove tracks that are no longer in the playlist.
 
@@ -347,10 +353,14 @@ def remove_old_tracks(tracks: list[TrackState], state: PlaylistState, download_d
         tracks: Tracks to remove
         state: Playlist state to update
         download_dir: Download directory (used to check cross-references)
+        data_dir: Data directory for state files (defaults to config.data_dir)
 
     Returns:
         Number of tracks deleted
     """
+    if data_dir is None:
+        from kikusan.config import get_config
+        data_dir = get_config().data_dir
     deleted_count = 0
     skipped_count = 0
 
@@ -366,7 +376,7 @@ def remove_old_tracks(tracks: list[TrackState], state: PlaylistState, download_d
         if file_path.exists():
             if not is_safe_to_delete(
                 file_path,
-                download_dir,
+                data_dir,
                 current_playlist_name=state.playlist_name,
                 navidrome_cache=navidrome_cache,
             ):

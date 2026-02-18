@@ -348,7 +348,7 @@ def download(
     # Check if video is on unavailable cooldown before hitting YouTube
     config = get_config()
     cooldown_hours = config.unavailable_cooldown_hours
-    if is_on_cooldown(output_dir, video_id, cooldown_hours):
+    if is_on_cooldown(config.data_dir, video_id, cooldown_hours):
         logger.info("Skipping (unavailable cooldown): %s", video_id)
         raise UnavailableCooldownError(
             f"Video {video_id} is on unavailable cooldown. "
@@ -370,7 +370,7 @@ def download(
     except Exception as e:
         # Record unavailable videos for cooldown, then re-raise
         if is_unavailable_error(str(e)):
-            record_unavailable(output_dir, video_id, str(e))
+            record_unavailable(config.data_dir, video_id, str(e))
         raise
 
     title = info.get("title", "Unknown")
@@ -414,7 +414,7 @@ def download(
     except Exception as e:
         # Record unavailable videos for cooldown, then re-raise
         if is_unavailable_error(str(e)):
-            record_unavailable(output_dir, video_id, str(e), title=title, artist=artist)
+            record_unavailable(config.data_dir, video_id, str(e), title=title, artist=artist)
         raise
 
     # Find the downloaded file
@@ -501,7 +501,7 @@ def download_url(
         # Record unavailable videos for cooldown, then re-raise
         video_id = _extract_video_id_from_url(url)
         if video_id and is_unavailable_error(str(e)):
-            record_unavailable(output_dir, video_id, str(e))
+            record_unavailable(get_config().data_dir, video_id, str(e))
         raise
 
     # Check if this is a playlist
@@ -585,7 +585,7 @@ def _download_single(
     except Exception as e:
         # Record unavailable videos for cooldown, then re-raise
         if video_id and is_unavailable_error(str(e)):
-            record_unavailable(output_dir, video_id, str(e), title=title, artist=artist)
+            record_unavailable(get_config().data_dir, video_id, str(e), title=title, artist=artist)
         raise
 
     audio_path = _find_downloaded_file(
@@ -647,7 +647,7 @@ def _download_playlist(
         duration = entry.get("duration", 0)
 
         # Check if video is on unavailable cooldown
-        if video_id and is_on_cooldown(output_dir, video_id, cooldown_hours):
+        if video_id and is_on_cooldown(config.data_dir, video_id, cooldown_hours):
             logger.info(
                 "[%d/%d] Skipping (unavailable cooldown): %s - %s",
                 i,
@@ -722,7 +722,7 @@ def _download_playlist(
             # Record unavailable videos for cooldown
             if video_id and is_unavailable_error(str(e)):
                 record_unavailable(
-                    output_dir, video_id, str(e), title=title, artist=artist
+                    config.data_dir, video_id, str(e), title=title, artist=artist
                 )
 
     new_downloads = len(downloaded) - skipped

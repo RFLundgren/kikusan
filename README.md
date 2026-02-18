@@ -605,6 +605,7 @@ kikusan web [OPTIONS]
 | ---------------------------------------------- | ---------------------------- | ----------------------------------------------------------- |
 | `--host`                                       | -                            | Host to bind to. Default: `0.0.0.0`                         |
 | `-p, --port`                                   | `KIKUSAN_WEB_PORT`           | Port to listen on. Default: `8000`                          |
+| `-o, --output`                                 | `KIKUSAN_DOWNLOAD_DIR`       | Override download directory                                  |
 | `--cors-origins`                               | `KIKUSAN_CORS_ORIGINS`       | CORS allowed origins (comma-separated or `*`). Default: `*` |
 | `--web-playlist`                               | `KIKUSAN_WEB_PLAYLIST`       | M3U playlist name for web downloads (optional)              |
 | `--multi-user/--no-multi-user`                 | `KIKUSAN_MULTI_USER`         | Per-user playlists via `Remote-User` header. Default: off   |

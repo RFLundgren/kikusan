@@ -10,7 +10,6 @@ Verifies that get_lyrics_for_video() properly:
 from unittest.mock import MagicMock, patch
 
 import httpx
-import pytest
 
 from kikusan.lyrics import (
     _clean_artist,
@@ -19,6 +18,7 @@ from kikusan.lyrics import (
     _get_lyrics_exact,
     _lookup_lyrics_for_video,
     _search_lyrics,
+    _strip_artist_from_title,
     _try_cleaned_lookup,
     get_lyrics,
     get_lyrics_for_video,
@@ -54,7 +54,9 @@ class TestLookupLyricsForVideo:
     @patch("kikusan.search.get_song_metadata")
     @patch("kikusan.lyrics._search_lyrics")
     @patch("kikusan.lyrics._get_lyrics_exact")
-    def test_falls_back_to_search_when_exact_fails(self, mock_exact, mock_search, mock_metadata):
+    def test_falls_back_to_search_when_exact_fails(
+        self, mock_exact, mock_search, mock_metadata
+    ):
         """When exact match fails, search endpoint should be tried with ytmusicapi metadata."""
         mock_metadata.return_value = SongMetadata(
             title="Bohemian Rhapsody",
@@ -126,7 +128,9 @@ class TestLookupLyricsForVideo:
     @patch("kikusan.search.get_song_metadata")
     @patch("kikusan.lyrics._search_lyrics")
     @patch("kikusan.lyrics._get_lyrics_exact")
-    def test_returns_none_when_all_strategies_fail(self, mock_exact, mock_search, mock_metadata):
+    def test_returns_none_when_all_strategies_fail(
+        self, mock_exact, mock_search, mock_metadata
+    ):
         """When all lookup strategies fail, return None."""
         mock_metadata.return_value = SongMetadata(
             title="Some Song",
@@ -149,7 +153,9 @@ class TestLookupLyricsForVideo:
     @patch("kikusan.search.get_song_metadata")
     @patch("kikusan.lyrics._search_lyrics")
     @patch("kikusan.lyrics._get_lyrics_exact")
-    def test_tries_cleaned_ytmusicapi_metadata(self, mock_exact, mock_search, mock_metadata):
+    def test_tries_cleaned_ytmusicapi_metadata(
+        self, mock_exact, mock_search, mock_metadata
+    ):
         """When ytmusicapi metadata has parentheticals, cleaned version should be tried."""
         mock_metadata.return_value = SongMetadata(
             title="Force (Radio Edit)",
@@ -201,18 +207,20 @@ class TestGetLyricsForVideoCache:
         from kikusan.metadata_cache import CachedLyrics, MetadataCache
 
         mock_cfg = MagicMock()
-        mock_cfg.download_dir = tmp_path
+        mock_cfg.data_dir = tmp_path
         mock_cfg.lyrics_cache_hours = 168
         mock_config.return_value = mock_cfg
 
         # Pre-populate cache with positive result
-        cache_dir = tmp_path / ".kikusan"
+        cache_dir = tmp_path
         with MetadataCache(cache_dir) as cache:
-            cache.add_lyrics(CachedLyrics(
-                video_id="abc123",
-                lyrics="[00:00.00] Cached lyrics",
-                cached_at=time.time(),
-            ))
+            cache.add_lyrics(
+                CachedLyrics(
+                    video_id="abc123",
+                    lyrics="[00:00.00] Cached lyrics",
+                    cached_at=time.time(),
+                )
+            )
 
         result = get_lyrics_for_video("abc123", "Title", "Artist", 200)
 
@@ -227,17 +235,19 @@ class TestGetLyricsForVideoCache:
         from kikusan.metadata_cache import CachedLyrics, MetadataCache
 
         mock_cfg = MagicMock()
-        mock_cfg.download_dir = tmp_path
+        mock_cfg.data_dir = tmp_path
         mock_cfg.lyrics_cache_hours = 168
         mock_config.return_value = mock_cfg
 
-        cache_dir = tmp_path / ".kikusan"
+        cache_dir = tmp_path
         with MetadataCache(cache_dir) as cache:
-            cache.add_lyrics(CachedLyrics(
-                video_id="abc123",
-                lyrics=None,
-                cached_at=time.time(),
-            ))
+            cache.add_lyrics(
+                CachedLyrics(
+                    video_id="abc123",
+                    lyrics=None,
+                    cached_at=time.time(),
+                )
+            )
 
         result = get_lyrics_for_video("abc123", "Title", "Artist", 200)
 
@@ -246,12 +256,14 @@ class TestGetLyricsForVideoCache:
 
     @patch("kikusan.lyrics._lookup_lyrics_for_video")
     @patch("kikusan.config.get_config")
-    def test_cache_miss_does_lookup_and_stores(self, mock_config, mock_lookup, tmp_path):
+    def test_cache_miss_does_lookup_and_stores(
+        self, mock_config, mock_lookup, tmp_path
+    ):
         """On cache miss, perform lookup and store result."""
         from kikusan.metadata_cache import MetadataCache
 
         mock_cfg = MagicMock()
-        mock_cfg.download_dir = tmp_path
+        mock_cfg.data_dir = tmp_path
         mock_cfg.lyrics_cache_hours = 168
         mock_config.return_value = mock_cfg
 
@@ -263,7 +275,7 @@ class TestGetLyricsForVideoCache:
         mock_lookup.assert_called_once_with("abc123", "Title", "Artist", 200)
 
         # Verify it was stored in cache
-        cache_dir = tmp_path / ".kikusan"
+        cache_dir = tmp_path
         with MetadataCache(cache_dir) as cache:
             cached = cache.get_lyrics("abc123")
         assert cached is not None
@@ -276,7 +288,7 @@ class TestGetLyricsForVideoCache:
         from kikusan.metadata_cache import MetadataCache
 
         mock_cfg = MagicMock()
-        mock_cfg.download_dir = tmp_path
+        mock_cfg.data_dir = tmp_path
         mock_cfg.lyrics_cache_hours = 168
         mock_config.return_value = mock_cfg
 
@@ -286,7 +298,7 @@ class TestGetLyricsForVideoCache:
 
         assert result is None
 
-        cache_dir = tmp_path / ".kikusan"
+        cache_dir = tmp_path
         with MetadataCache(cache_dir) as cache:
             cached = cache.get_lyrics("abc123")
         assert cached is not None
@@ -294,24 +306,28 @@ class TestGetLyricsForVideoCache:
 
     @patch("kikusan.lyrics._lookup_lyrics_for_video")
     @patch("kikusan.config.get_config")
-    def test_expired_negative_triggers_relookup(self, mock_config, mock_lookup, tmp_path):
+    def test_expired_negative_triggers_relookup(
+        self, mock_config, mock_lookup, tmp_path
+    ):
         """Expired negative cache should trigger a fresh lookup."""
         import time
         from kikusan.metadata_cache import CachedLyrics, MetadataCache
 
         mock_cfg = MagicMock()
-        mock_cfg.download_dir = tmp_path
+        mock_cfg.data_dir = tmp_path
         mock_cfg.lyrics_cache_hours = 1  # 1 hour TTL
         mock_config.return_value = mock_cfg
 
         # Pre-populate with expired negative
-        cache_dir = tmp_path / ".kikusan"
+        cache_dir = tmp_path
         with MetadataCache(cache_dir) as cache:
-            cache.add_lyrics(CachedLyrics(
-                video_id="abc123",
-                lyrics=None,
-                cached_at=time.time() - 7200,  # 2 hours ago
-            ))
+            cache.add_lyrics(
+                CachedLyrics(
+                    video_id="abc123",
+                    lyrics=None,
+                    cached_at=time.time() - 7200,  # 2 hours ago
+                )
+            )
 
         mock_lookup.return_value = "[00:00.00] Now available!"
 
@@ -372,6 +388,11 @@ class TestGetLyricsExact:
         result = _get_lyrics_exact("Hello", "Adele", 300)
         assert result is None
 
+    def test_returns_none_when_duration_is_zero(self):
+        """Should skip exact lookup when duration is 0 (unknown)."""
+        result = _get_lyrics_exact("Foo", "Bar", 0)
+        assert result is None
+
     @patch("kikusan.lyrics.httpx.get")
     def test_passes_correct_params(self, mock_get):
         """Should pass correct parameters to lrclib API."""
@@ -412,7 +433,9 @@ class TestSearchLyrics:
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        result = _search_lyrics("Bohemian Rhapsody", "Queen", "A Night at the Opera", 354)
+        result = _search_lyrics(
+            "Bohemian Rhapsody", "Queen", "A Night at the Opera", 354
+        )
         assert result == "[00:00.00] Is this the real life?"
 
     @patch("kikusan.lyrics.httpx.get")
@@ -664,7 +687,9 @@ class TestTryCleanedLookup:
         """Should try exact match with cleaned title/artist."""
         mock_exact.return_value = "[00:00.00] lyrics"
 
-        result = _try_cleaned_lookup("Force (Radio Edit)", "8181 Enzo, Michael Ekow", None, 164)
+        result = _try_cleaned_lookup(
+            "Force (Radio Edit)", "8181 Enzo, Michael Ekow", None, 164
+        )
 
         assert result == "[00:00.00] lyrics"
         mock_exact.assert_called_once_with("Force", "8181 Enzo", 164)
@@ -681,3 +706,67 @@ class TestTryCleanedLookup:
 
         assert result == "[00:00.00] found via search"
         mock_search.assert_called_once_with("Song", "Artist", "Album", 200)
+
+    @patch("kikusan.lyrics._search_lyrics")
+    @patch("kikusan.lyrics._get_lyrics_exact")
+    def test_tries_artist_stripped_title(self, mock_exact, mock_search):
+        """Should try stripping artist prefix from title as additional step."""
+        mock_exact.return_value = None
+        mock_search.side_effect = [None, "[00:00.00] found via stripped"]
+
+        result = _try_cleaned_lookup(
+            "AK AUSSERKONTROLLE x PASHANIM - BLN [Visualizer]",
+            "AK AUSSERKONTROLLE",
+            None,
+            200,
+        )
+
+        assert result == "[00:00.00] found via stripped"
+        # First search call: cleaned title "AK AUSSERKONTROLLE x PASHANIM - BLN"
+        # Second search call: stripped title "BLN" with combined artists
+        assert mock_search.call_count == 2
+        mock_search.assert_called_with(
+            "BLN", "AK AUSSERKONTROLLE, PASHANIM", None, 200
+        )
+
+
+class TestStripArtistFromTitle:
+    """Tests for _strip_artist_from_title helper."""
+
+    def test_strips_single_artist_prefix(self):
+        result = _strip_artist_from_title("Coldplay - Yellow", "Coldplay")
+        assert result == ("Yellow", "Coldplay")
+
+    def test_strips_collab_prefix_with_x(self):
+        result = _strip_artist_from_title(
+            "AK AUSSERKONTROLLE x PASHANIM - BLN", "AK AUSSERKONTROLLE"
+        )
+        assert result == ("BLN", "AK AUSSERKONTROLLE, PASHANIM")
+
+    def test_strips_collab_prefix_with_ampersand(self):
+        result = _strip_artist_from_title(
+            "Artist1 & Artist2 - Song Name", "Artist1"
+        )
+        assert result == ("Song Name", "Artist1, Artist2")
+
+    def test_returns_none_when_no_dash(self):
+        result = _strip_artist_from_title("Just A Song Title", "Artist")
+        assert result is None
+
+    def test_returns_none_when_artist_not_in_prefix(self):
+        result = _strip_artist_from_title("Someone Else - Song", "My Artist")
+        assert result is None
+
+    def test_case_insensitive_match(self):
+        result = _strip_artist_from_title("coldplay - Yellow", "Coldplay")
+        assert result == ("Yellow", "coldplay")
+
+    def test_returns_none_for_empty_suffix(self):
+        result = _strip_artist_from_title("Artist - ", "Artist")
+        assert result is None
+
+    def test_multiple_collaborators_with_comma(self):
+        result = _strip_artist_from_title(
+            "Artist1, Artist2, Artist3 - Track", "Artist1"
+        )
+        assert result == ("Track", "Artist1, Artist2, Artist3")

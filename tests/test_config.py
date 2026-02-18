@@ -87,3 +87,13 @@ class TestConfigValidation:
             assert config.cookie_retry_delay == 1.0
             assert config.unavailable_cooldown_hours == 168
             assert config.web_port == 8000
+
+    def test_data_dir_defaults_under_download_dir(self):
+        """Without KIKUSAN_DATA_DIR, default to legacy location under download dir."""
+        with patch.dict(
+            os.environ,
+            {"KIKUSAN_DOWNLOAD_DIR": "/tmp/kikusan-downloads"},
+            clear=True,
+        ):
+            config = Config.from_env()
+            assert str(config.data_dir) == "/tmp/kikusan-downloads/.kikusan"

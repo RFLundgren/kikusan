@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 from typer.testing import CliRunner
 
-from kikusan.cli import app
+from kikusan.cli import _migrate_legacy_data_dir, app
 
 
 class TestGlobalOptions:
@@ -44,6 +44,42 @@ class TestGlobalOptions:
         runner = CliRunner()
         result = runner.invoke(app, ["--no-log-cookie-usage", "--help"])
         assert result.exit_code == 0
+
+
+class TestDataDirMigration:
+    """Test legacy data directory migration when --data-dir is used."""
+
+    def test_migrates_legacy_data_dir(self, tmp_path):
+        """Migrate <download_dir>/.kikusan to explicit data dir when target is absent."""
+        download_dir = tmp_path / "downloads"
+        legacy_data_dir = download_dir / ".kikusan"
+        legacy_data_dir.mkdir(parents=True)
+        legacy_file = legacy_data_dir / "state.json"
+        legacy_file.write_text('{"ok": true}')
+        target_data_dir = tmp_path / "custom-data"
+
+        with patch.dict(os.environ, {"KIKUSAN_DOWNLOAD_DIR": str(download_dir)}):
+            _migrate_legacy_data_dir(target_data_dir)
+
+        assert (target_data_dir / "state.json").read_text() == '{"ok": true}'
+        assert not legacy_data_dir.exists()
+
+    def test_skips_migration_when_target_not_empty(self, tmp_path):
+        """Do not migrate legacy directory into a non-empty target directory."""
+        download_dir = tmp_path / "downloads"
+        legacy_data_dir = download_dir / ".kikusan"
+        legacy_data_dir.mkdir(parents=True)
+        (legacy_data_dir / "legacy.txt").write_text("legacy")
+
+        target_data_dir = tmp_path / "custom-data"
+        target_data_dir.mkdir(parents=True)
+        (target_data_dir / "existing.txt").write_text("existing")
+
+        with patch.dict(os.environ, {"KIKUSAN_DOWNLOAD_DIR": str(download_dir)}):
+            _migrate_legacy_data_dir(target_data_dir)
+
+        assert (legacy_data_dir / "legacy.txt").exists()
+        assert (target_data_dir / "existing.txt").exists()
 
 
 class TestDownloadOptions:
@@ -95,6 +131,12 @@ class TestWebOptions:
         """Test --web-playlist is accepted."""
         runner = CliRunner()
         result = runner.invoke(app, ["web", "--web-playlist", "myplaylist", "--help"])
+        assert result.exit_code == 0
+
+    def test_output_option(self):
+        """Test --output is accepted."""
+        runner = CliRunner()
+        result = runner.invoke(app, ["web", "--output", "/tmp/music", "--help"])
         assert result.exit_code == 0
 
 

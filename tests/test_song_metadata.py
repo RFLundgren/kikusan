@@ -26,8 +26,8 @@ def _bypass_cache():
     """Bypass MetadataCache for all tests in this module."""
     with patch("kikusan.search.MetadataCache", return_value=_noop_cache()), \
          patch("kikusan.search.get_config") as mock_cfg:
-        mock_cfg.return_value.download_dir = MagicMock()
-        mock_cfg.return_value.download_dir.__truediv__ = MagicMock(return_value=MagicMock())
+        mock_cfg.return_value.data_dir = MagicMock()
+        mock_cfg.return_value.data_dir.__truediv__ = MagicMock(return_value=MagicMock())
         yield
 
 

@@ -50,7 +50,8 @@ def sync_explore(
         explore_config.type,
     )
 
-    state_dir = get_state_dir(download_dir)
+    config = get_config()
+    state_dir = get_state_dir(config.data_dir)
 
     try:
         # Fetch current tracks based on explore type
@@ -105,7 +106,7 @@ def sync_explore(
         # Remove old tracks if sync=true
         deleted_count = 0
         if explore_config.sync and removed_tracks:
-            deleted_count = remove_old_tracks(removed_tracks, state, download_dir)
+            deleted_count = remove_old_tracks(removed_tracks, state, download_dir, config.data_dir)
 
         # Update M3U playlist
         update_m3u_playlist(explore_config.name, state, download_dir)

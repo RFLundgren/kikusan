@@ -55,20 +55,11 @@ class CachedLyrics(BaseModel):
     cached_at: float  # time.time() for TTL check on negatives
 
 
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS song_metadata (
-    video_id TEXT PRIMARY KEY,
-    data TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS track (
-    video_id TEXT PRIMARY KEY,
-    data TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS lyrics (
-    video_id TEXT PRIMARY KEY,
-    data TEXT NOT NULL
-);
-"""
+_SCHEMA_STATEMENTS = [
+    "CREATE TABLE IF NOT EXISTS song_metadata (video_id TEXT PRIMARY KEY, data TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS track (video_id TEXT PRIMARY KEY, data TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS lyrics (video_id TEXT PRIMARY KEY, data TEXT NOT NULL)",
+]
 
 
 class MetadataCache:
@@ -92,8 +83,16 @@ class MetadataCache:
         try:
             self._cache_dir.mkdir(parents=True, exist_ok=True)
             self._conn = sqlite3.connect(str(self._db_path), timeout=5)
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.executescript(_SCHEMA_SQL)
+            try:
+                self._conn.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError:
+                logger.debug(
+                    "WAL mode unavailable for %s (network filesystem?), using default journal mode",
+                    self._db_path,
+                )
+            for stmt in _SCHEMA_STATEMENTS:
+                self._conn.execute(stmt)
+            self._conn.commit()
         except Exception:
             logger.warning("Failed to open metadata cache at %s", self._db_path, exc_info=True)
             self._conn = None

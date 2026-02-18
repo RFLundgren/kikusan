@@ -1219,12 +1219,11 @@ async def upload_cookies(file: UploadFile = File(...)):
             detail="Invalid cookie file format. Expected Netscape format with tab-separated values"
         )
 
-    # Create .kikusan directory if it doesn't exist
-    kikusan_dir = Path(".kikusan")
-    kikusan_dir.mkdir(exist_ok=True)
+    # Write cookie file to data directory
+    config = get_config()
+    config.data_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write cookie file
-    cookie_path = kikusan_dir / "cookies.txt"
+    cookie_path = config.data_dir / "cookies.txt"
     cookie_path.write_bytes(content)
     cookie_path.chmod(0o600)  # Secure permissions
 
@@ -1245,7 +1244,7 @@ async def get_cookie_status():
         path = Path(cookie_path)
         return {
             "configured": True,
-            "source": "uploaded" if ".kikusan/cookies.txt" in cookie_path else "environment",
+            "source": "uploaded" if "cookies.txt" in cookie_path and str(config.data_dir) in cookie_path else "environment",
             "path": cookie_path,
             "exists": path.exists(),
             "size": path.stat().st_size if path.exists() else 0
@@ -1262,7 +1261,7 @@ async def get_cookie_status():
 @app.delete("/api/settings/cookies")
 async def delete_cookies():
     """Delete uploaded cookie file."""
-    cookie_path = Path(".kikusan/cookies.txt")
+    cookie_path = get_config().data_dir / "cookies.txt"
     if cookie_path.exists():
         cookie_path.unlink()
         return {"success": True, "message": "Cookie file deleted"}

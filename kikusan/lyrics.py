@@ -29,6 +29,11 @@ _ARTIST_SPLIT_RE = re.compile(
     r"\s*[,;]\s*|\s+(?:feat\.?|ft\.?|featuring)\s+", re.IGNORECASE
 )
 
+# Splits artist collaboration prefixes on x, &, comma, semicolon, feat/ft
+_COLLAB_SPLIT_RE = re.compile(
+    r"\s+x\s+|\s*[,;&]\s*|\s+(?:feat\.?|ft\.?|featuring)\s+", re.IGNORECASE
+)
+
 
 def _clean_title(title: str) -> str:
     """Strip trailing parenthetical/bracketed suffixes from a track title.
@@ -56,6 +61,35 @@ def _clean_artist(artist: str) -> str:
     return primary if primary else artist
 
 
+def _strip_artist_from_title(title: str, artist: str) -> tuple[str, str] | None:
+    """Strip artist name prefix from a title like "Artist1 x Artist2 - Song Title".
+
+    Many YouTube video titles embed the artist names before a dash separator.
+    When the known artist appears in the prefix, extract the real song title
+    and combine all prefix artists into a proper artist string.
+
+    Returns (clean_title, combined_artists) if the prefix contains the known artist,
+    or None if no artist prefix was detected.
+    """
+    if " - " not in title:
+        return None
+
+    prefix, suffix = title.split(" - ", 1)
+    suffix = suffix.strip()
+    if not suffix:
+        return None
+
+    # Check if known artist appears in the prefix (case-insensitive)
+    if artist.lower() not in prefix.lower():
+        return None
+
+    # Extract all artists from the prefix
+    prefix_artists = [a.strip() for a in _COLLAB_SPLIT_RE.split(prefix) if a.strip()]
+    combined = ", ".join(prefix_artists) if prefix_artists else artist
+
+    return suffix, combined
+
+
 def _try_cleaned_lookup(
     title: str,
     artist: str,
@@ -70,22 +104,47 @@ def _try_cleaned_lookup(
     cleaned_title = _clean_title(title)
     cleaned_artist = _clean_artist(artist)
 
-    if cleaned_title == title and cleaned_artist == artist:
-        return None  # Nothing changed, skip
+    if cleaned_title != title or cleaned_artist != artist:
+        logger.info(
+            "Retrying lyrics with cleaned metadata: '%s' by '%s' (was: '%s' by '%s')",
+            cleaned_title,
+            cleaned_artist,
+            title,
+            artist,
+        )
 
-    logger.info(
-        "Retrying lyrics with cleaned metadata: '%s' by '%s' (was: '%s' by '%s')",
-        cleaned_title,
-        cleaned_artist,
-        title,
-        artist,
-    )
+        lyrics = _get_lyrics_exact(cleaned_title, cleaned_artist, duration_seconds)
+        if lyrics:
+            return lyrics
 
-    lyrics = _get_lyrics_exact(cleaned_title, cleaned_artist, duration_seconds)
-    if lyrics:
-        return lyrics
+        lyrics = _search_lyrics(cleaned_title, cleaned_artist, album, duration_seconds)
+        if lyrics:
+            return lyrics
 
-    return _search_lyrics(cleaned_title, cleaned_artist, album, duration_seconds)
+    # Try stripping artist prefix from title (e.g., "Artist x Artist2 - Song")
+    stripped = _strip_artist_from_title(cleaned_title, cleaned_artist)
+    if stripped:
+        stripped_title, stripped_artist = stripped
+        logger.info(
+            "Retrying lyrics with artist-stripped title: '%s' by '%s' (was: '%s' by '%s')",
+            stripped_title,
+            stripped_artist,
+            title,
+            artist,
+        )
+        lyrics = _get_lyrics_exact(stripped_title, stripped_artist, duration_seconds)
+        if lyrics:
+            return lyrics
+
+        lyrics = _search_lyrics(stripped_title, stripped_artist, album, duration_seconds)
+        if lyrics:
+            return lyrics
+
+    # Nothing worked
+    if cleaned_title == title and cleaned_artist == artist and stripped is None:
+        return None  # Nothing changed at all, signal skip
+
+    return None
 
 
 def get_lyrics_for_video(
@@ -122,7 +181,7 @@ def get_lyrics_for_video(
     from kikusan.search import get_song_metadata
 
     config = get_config()
-    cache_dir = config.download_dir / ".kikusan"
+    cache_dir = config.data_dir
 
     # Check cache first
     with MetadataCache(cache_dir) as cache:
@@ -241,6 +300,9 @@ def _get_lyrics_exact(track_name: str, artist_name: str, duration_seconds: int) 
     Returns:
         LRC formatted lyrics string, or None if not found
     """
+    if duration_seconds <= 0:
+        logger.debug("Skipping exact lyrics lookup (no duration): %s - %s", artist_name, track_name)
+        return None
     try:
         response = httpx.get(
             f"{LRCLIB_BASE_URL}/get",

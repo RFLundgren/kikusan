@@ -272,6 +272,33 @@ class TestTagFile:
 
         assert stats.errors == 1
 
+    def test_falls_back_to_path_metadata_for_corrupted_files(self, tmp_path):
+        """When mutagen can't read a corrupted file, use filename for lyrics lookup."""
+        audio = tmp_path / "Cool Artist - Great Song.opus"
+        audio.touch()
+
+        stats = TagStats()
+
+        with (
+            patch("kikusan.tagging.extract_metadata", return_value=None),
+            patch("kikusan.lyrics.get_lyrics", return_value="[00:00.00] Lyrics") as mock_get,
+            patch("kikusan.lyrics.save_lyrics") as mock_save,
+        ):
+            tag_file(audio, do_replaygain=False, root_dir=tmp_path, stats=stats)
+
+        assert stats.lyrics_added == 1
+        mock_get.assert_called_once_with("Great Song", "Cool Artist", 0)
+        mock_save.assert_called_once()
+
+    def test_path_fallback_skipped_when_no_artist_in_filename(self):
+        """Files without 'Artist - Title' pattern still get skipped."""
+        stats = TagStats()
+
+        with patch("kikusan.tagging.extract_metadata", return_value=None):
+            tag_file(Path("/fake/just-a-title.opus"), stats=stats)
+
+        assert stats.errors == 1
+
     def test_lyrics_skipped_when_lrc_exists(self, tmp_path):
         audio = tmp_path / "song.opus"
         audio.touch()
@@ -467,6 +494,10 @@ class TestTagDirectory:
         )
 
         with (
+            patch(
+                "kikusan.config.get_config",
+                return_value=MagicMock(data_dir=tmp_path, lyrics_cache_hours=168),
+            ),
             patch("kikusan.tagging.extract_metadata", return_value=metadata),
             patch("kikusan.lyrics.get_lyrics", return_value="[00:00.00] lyrics"),
             patch("kikusan.lyrics.save_lyrics"),
@@ -542,6 +573,10 @@ class TestTagDirectory:
         )
 
         with (
+            patch(
+                "kikusan.config.get_config",
+                return_value=MagicMock(data_dir=tmp_path, lyrics_cache_hours=168),
+            ),
             patch("kikusan.tagging.extract_metadata", return_value=metadata),
             patch("kikusan.lyrics.get_lyrics", return_value="[00:00.00] lyrics"),
             patch("kikusan.lyrics.save_lyrics"),
@@ -931,7 +966,7 @@ class TestNegativeResultCache:
 
     def test_enrichment_cache_factory(self, tmp_path):
         cache = _make_enrichment_cache(tmp_path, 168)
-        assert cache._path == tmp_path / ".kikusan_enrichment_cache.json"
+        assert cache._path == tmp_path / "enrichment_cache.json"
 
 
 class TestTagFileMetadataEnrichment:

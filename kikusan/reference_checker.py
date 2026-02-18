@@ -22,7 +22,7 @@ class NavidromeProtectionCache:
 
 def is_safe_to_delete(
     file_path: Path,
-    download_dir: Path,
+    data_dir: Path,
     current_playlist_name: str | None = None,
     current_plugin_name: str | None = None,
     navidrome_cache: NavidromeProtectionCache | None = None,
@@ -36,7 +36,7 @@ def is_safe_to_delete(
 
     Args:
         file_path: Path to the file to check
-        download_dir: Download directory (used to locate state files)
+        data_dir: Data directory (e.g. ~/.kikusan) containing state files
         current_playlist_name: Name of the playlist requesting deletion (to exclude from check)
         current_plugin_name: Name of the plugin requesting deletion (to exclude from check)
         navidrome_cache: Optional Navidrome protection cache for batch operations
@@ -47,7 +47,7 @@ def is_safe_to_delete(
     file_path_str = str(file_path)
 
     # Check playlist states
-    playlist_state_dir = download_dir / ".kikusan" / "state"
+    playlist_state_dir = data_dir / "state"
     if playlist_state_dir.exists():
         for state_file in playlist_state_dir.glob("*.json"):
             # Skip temp files and current playlist
@@ -79,7 +79,7 @@ def is_safe_to_delete(
                 # Continue checking other states
 
     # Check plugin states
-    plugin_state_dir = download_dir / ".kikusan" / "plugin_state"
+    plugin_state_dir = data_dir / "plugin_state"
     if plugin_state_dir.exists():
         for state_file in plugin_state_dir.glob("*.json"):
             # Skip temp files and current plugin

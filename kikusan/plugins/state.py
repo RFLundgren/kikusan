@@ -10,18 +10,18 @@ from kikusan.models.state import PluginState, PluginTrackState
 logger = logging.getLogger(__name__)
 
 
-def get_state_dir(download_dir: Path) -> Path:
+def get_state_dir(data_dir: Path) -> Path:
     """Get the plugin state directory path.
 
     Creates directory if it doesn't exist.
 
     Args:
-        download_dir: Download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
 
     Returns:
-        Path to plugin state directory ({download_dir}/.kikusan/plugin_state)
+        Path to plugin state directory ({data_dir}/plugin_state)
     """
-    state_dir = download_dir / ".kikusan" / "plugin_state"
+    state_dir = data_dir / "plugin_state"
     state_dir.mkdir(parents=True, exist_ok=True)
     return state_dir
 

@@ -21,6 +21,7 @@ class Config:
     """Application configuration."""
 
     download_dir: Path
+    data_dir: Path
     audio_format: str
     filename_template: str
     organization_mode: str
@@ -51,8 +52,8 @@ class Config:
     @property
     def cookie_file_path(self) -> str | None:
         """Get the effective cookie file path, checking uploaded file first."""
-        # Check for uploaded cookie file first
-        uploaded_cookie = Path(".kikusan/cookies.txt")
+        # Check for uploaded cookie file in data_dir
+        uploaded_cookie = self.data_dir / "cookies.txt"
         if uploaded_cookie.exists():
             return str(uploaded_cookie)
 
@@ -126,8 +127,18 @@ class Config:
                 f"KIKUSAN_WEB_PORT must be between 1 and 65535, got {web_port}"
             )
 
+        # Parse download directory first so data_dir can default under it
+        download_dir = Path(os.getenv("KIKUSAN_DOWNLOAD_DIR", "./downloads"))
+
+        # Parse data directory:
+        # - explicit KIKUSAN_DATA_DIR wins
+        # - default keeps legacy location under download_dir to avoid upgrade breakage
+        data_dir = Path(os.getenv("KIKUSAN_DATA_DIR", str(download_dir / ".kikusan")))
+        data_dir.mkdir(parents=True, exist_ok=True)
+
         return cls(
-            download_dir=Path(os.getenv("KIKUSAN_DOWNLOAD_DIR", "./downloads")),
+            download_dir=download_dir,
+            data_dir=data_dir,
             audio_format=os.getenv("KIKUSAN_AUDIO_FORMAT", "opus"),
             filename_template=os.getenv("KIKUSAN_FILENAME_TEMPLATE", DEFAULT_FILENAME_TEMPLATE),
             organization_mode=os.getenv("KIKUSAN_ORGANIZATION_MODE", "flat"),

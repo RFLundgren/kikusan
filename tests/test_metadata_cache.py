@@ -1,5 +1,6 @@
 """Tests for the SQLite metadata cache module."""
 
+import sqlite3
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -183,6 +184,55 @@ class TestMetadataCacheConnectionFailure:
         )
 
 
+class TestMetadataCacheWalFallback:
+    """Tests for WAL journal mode fallback on network filesystems."""
+
+    def test_wal_failure_falls_back_to_default_journal(self, tmp_path: Path):
+        """If WAL mode fails (e.g., network FS), cache still works with default journal."""
+
+        class WalFailConnection(sqlite3.Connection):
+            def execute(self, sql, *args):
+                if "journal_mode=WAL" in sql:
+                    raise sqlite3.OperationalError("database is locked")
+                return super().execute(sql, *args)
+
+        with patch(
+            "kikusan.metadata_cache.sqlite3.connect",
+            lambda *a, **kw: WalFailConnection(*a, **kw),
+        ):
+            with MetadataCache(tmp_path) as cache:
+                assert cache._conn is not None
+                entry = CachedSongMetadata(
+                    video_id="v1", title="T", artist="A", album=None, duration_seconds=1,
+                )
+                cache.add_song_metadata(entry)
+                assert cache.get_song_metadata("v1") is not None
+
+    def test_does_not_use_executescript(self, tmp_path: Path):
+        """Schema creation should use individual execute() calls, not executescript().
+
+        executescript() requires an exclusive lock which fails on NAS/network filesystems.
+        """
+
+        class NoExecuteScriptConnection(sqlite3.Connection):
+            def executescript(self, sql):
+                raise sqlite3.OperationalError(
+                    "database is locked — executescript should not be called"
+                )
+
+        with patch(
+            "kikusan.metadata_cache.sqlite3.connect",
+            lambda *a, **kw: NoExecuteScriptConnection(*a, **kw),
+        ):
+            with MetadataCache(tmp_path) as cache:
+                assert cache._conn is not None
+                entry = CachedSongMetadata(
+                    video_id="v1", title="T", artist="A", album=None, duration_seconds=1,
+                )
+                cache.add_song_metadata(entry)
+                assert cache.get_song_metadata("v1") is not None
+
+
 class TestGetSongMetadataCacheIntegration:
     """Integration test: get_song_metadata uses cache on second call."""
 
@@ -192,7 +242,7 @@ class TestGetSongMetadataCacheIntegration:
         from kikusan.search import get_song_metadata
 
         mock_config = MagicMock()
-        mock_config.download_dir = tmp_path
+        mock_config.data_dir = tmp_path
         mock_get_config.return_value = mock_config
 
         mock_yt = MagicMock()
@@ -235,7 +285,7 @@ class TestGetTrackFromVideoIdCacheIntegration:
         from kikusan.search import get_track_from_video_id
 
         mock_config = MagicMock()
-        mock_config.download_dir = tmp_path
+        mock_config.data_dir = tmp_path
         mock_get_config.return_value = mock_config
 
         mock_yt = MagicMock()

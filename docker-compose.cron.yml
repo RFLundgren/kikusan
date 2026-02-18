@@ -35,6 +35,9 @@ services:
 
       # Optional: ReplayGain/R128 loudness normalization tags
       # - KIKUSAN_REPLAYGAIN=true
+      #
+      # Optional: Change data dir where all the configs/caches are saved
+      # - KIKUSAN_DATA_DIR=/downloads
 
       # Optional: Gotify notifications
       # - GOTIFY_URL=  # Gotify server URL
@@ -86,7 +89,6 @@ services:
   #     # - NAVIDROME_KEEP_PLAYLIST=keep  # Optional: Playlist name for protection
   #
   #   restart: unless-stopped
-
 # Usage:
 #   1. Create cron.yaml with your playlist configurations
 #   2. Run: docker-compose -f docker-compose.cron.yml up -d

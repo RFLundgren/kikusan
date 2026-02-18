@@ -3,7 +3,7 @@
 Tracks YouTube video IDs that returned "Video unavailable" errors and
 prevents retrying them until a configurable cooldown period has elapsed.
 
-Storage: {download_dir}/.kikusan/unavailable.json
+Storage: {data_dir}/unavailable.json
 Format: {"video_id": {"failed_at": "ISO timestamp", "error": "error message", "title": "optional title"}}
 """
 
@@ -48,32 +48,31 @@ def is_unavailable_error(error_message: str) -> bool:
     return False
 
 
-def get_unavailable_file(download_dir: Path) -> Path:
+def get_unavailable_file(data_dir: Path) -> Path:
     """Get the path to the unavailable videos JSON file.
 
     Creates the parent directory if it doesn't exist.
 
     Args:
-        download_dir: Base download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
 
     Returns:
         Path to unavailable.json
     """
-    kikusan_dir = download_dir / ".kikusan"
-    kikusan_dir.mkdir(parents=True, exist_ok=True)
-    return kikusan_dir / "unavailable.json"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir / "unavailable.json"
 
 
-def load_unavailable(download_dir: Path) -> dict:
+def load_unavailable(data_dir: Path) -> dict:
     """Load the unavailable videos registry from disk.
 
     Args:
-        download_dir: Base download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
 
     Returns:
         Dict mapping video_id to failure record
     """
-    unavailable_file = get_unavailable_file(download_dir)
+    unavailable_file = get_unavailable_file(data_dir)
 
     if not unavailable_file.exists():
         return {}
@@ -98,14 +97,14 @@ def load_unavailable(download_dir: Path) -> dict:
         return {}
 
 
-def save_unavailable(download_dir: Path, data: dict) -> None:
+def save_unavailable(data_dir: Path, data: dict) -> None:
     """Save the unavailable videos registry to disk using atomic write.
 
     Args:
-        download_dir: Base download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
         data: Dict mapping video_id to failure record
     """
-    unavailable_file = get_unavailable_file(download_dir)
+    unavailable_file = get_unavailable_file(data_dir)
     temp_file = unavailable_file.with_suffix(".json.tmp")
 
     try:
@@ -121,7 +120,7 @@ def save_unavailable(download_dir: Path, data: dict) -> None:
 
 
 def record_unavailable(
-    download_dir: Path,
+    data_dir: Path,
     video_id: str,
     error_message: str,
     title: str | None = None,
@@ -130,13 +129,13 @@ def record_unavailable(
     """Record a video as unavailable.
 
     Args:
-        download_dir: Base download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
         video_id: YouTube video ID
         error_message: The error message from yt-dlp
         title: Optional track title for logging
         artist: Optional track artist for logging
     """
-    data = load_unavailable(download_dir)
+    data = load_unavailable(data_dir)
 
     record = UnavailableRecord(
         failed_at=datetime.now(timezone.utc).isoformat(),
@@ -146,21 +145,21 @@ def record_unavailable(
     )
     data[video_id] = record.model_dump()
 
-    save_unavailable(download_dir, data)
+    save_unavailable(data_dir, data)
 
     display_name = f"{artist} - {title}" if artist and title else video_id
     logger.info("Recorded unavailable video: %s (cooldown active)", display_name)
 
 
 def is_on_cooldown(
-    download_dir: Path,
+    data_dir: Path,
     video_id: str,
     cooldown_hours: int = DEFAULT_COOLDOWN_HOURS,
 ) -> bool:
     """Check if a video ID is on cooldown due to being unavailable.
 
     Args:
-        download_dir: Base download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
         video_id: YouTube video ID to check
         cooldown_hours: Hours to wait before retrying (0 = disabled)
 
@@ -170,7 +169,7 @@ def is_on_cooldown(
     if cooldown_hours <= 0:
         return False
 
-    data = load_unavailable(download_dir)
+    data = load_unavailable(data_dir)
 
     if video_id not in data:
         return False
@@ -195,14 +194,14 @@ def is_on_cooldown(
 
 
 def get_cooldown_remaining(
-    download_dir: Path,
+    data_dir: Path,
     video_id: str,
     cooldown_hours: int = DEFAULT_COOLDOWN_HOURS,
 ) -> timedelta | None:
     """Get remaining cooldown time for a video.
 
     Args:
-        download_dir: Base download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
         video_id: YouTube video ID
         cooldown_hours: Hours to wait before retrying
 
@@ -212,7 +211,7 @@ def get_cooldown_remaining(
     if cooldown_hours <= 0:
         return None
 
-    data = load_unavailable(download_dir)
+    data = load_unavailable(data_dir)
 
     if video_id not in data:
         return None
@@ -238,19 +237,19 @@ def get_cooldown_remaining(
 
 
 def clear_expired(
-    download_dir: Path,
+    data_dir: Path,
     cooldown_hours: int = DEFAULT_COOLDOWN_HOURS,
 ) -> int:
     """Remove expired entries from the unavailable registry.
 
     Args:
-        download_dir: Base download directory
+        data_dir: Data directory (e.g. ~/.kikusan)
         cooldown_hours: Hours after which entries expire
 
     Returns:
         Number of entries removed
     """
-    data = load_unavailable(download_dir)
+    data = load_unavailable(data_dir)
 
     if not data:
         return 0
@@ -276,7 +275,7 @@ def clear_expired(
     if expired_ids:
         for video_id in expired_ids:
             del data[video_id]
-        save_unavailable(download_dir, data)
+        save_unavailable(data_dir, data)
         logger.info("Cleared %d expired unavailable entries", len(expired_ids))
 
     return len(expired_ids)

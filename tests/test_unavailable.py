@@ -76,11 +76,12 @@ class TestGetUnavailableFile:
 
     def test_returns_correct_path(self, tmp_path):
         result = get_unavailable_file(tmp_path)
-        assert result == tmp_path / ".kikusan" / "unavailable.json"
+        assert result == tmp_path / "unavailable.json"
 
     def test_creates_parent_directory(self, tmp_path):
-        get_unavailable_file(tmp_path)
-        assert (tmp_path / ".kikusan").exists()
+        data_dir = tmp_path / "data"
+        get_unavailable_file(data_dir)
+        assert data_dir.exists()
 
 
 class TestLoadSaveUnavailable:
@@ -119,7 +120,7 @@ class TestLoadSaveUnavailable:
         result = load_unavailable(tmp_path)
         assert result == {}
         # Verify backup was created
-        backups = list((tmp_path / ".kikusan").glob("unavailable.json.corrupt.*"))
+        backups = list(tmp_path.glob("unavailable.json.corrupt.*"))
         assert len(backups) == 1
 
     def test_load_unexpected_format_returns_empty(self, tmp_path):

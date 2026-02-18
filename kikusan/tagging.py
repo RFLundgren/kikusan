@@ -126,8 +126,8 @@ class NegativeResultCache:
         self._save()
 
 
-def _make_enrichment_cache(directory: Path, ttl_hours: int) -> NegativeResultCache:
-    return NegativeResultCache(directory / ".kikusan_enrichment_cache.json", ttl_hours)
+def _make_enrichment_cache(data_dir: Path, ttl_hours: int) -> NegativeResultCache:
+    return NegativeResultCache(data_dir / "enrichment_cache.json", ttl_hours)
 
 
 # Backward-compatible alias
@@ -523,6 +523,24 @@ def tag_file(
 
     # Phase 2: Extract metadata for lyrics/replaygain (re-read after enrichment)
     metadata = extract_metadata(file_path)
+    if metadata is None and do_lyrics:
+        # Fallback: parse metadata from filename for lyrics lookup.
+        # This handles corrupted containers (e.g., bad Ogg pages) where mutagen
+        # can't open the file but the audio is still playable.
+        parsed_title, parsed_artist, parsed_album = _parse_metadata_from_path(
+            file_path, root_dir or file_path.parent,
+        )
+        if parsed_title and parsed_artist:
+            logger.info(
+                "Using path-based metadata for %s: %s - %s",
+                file_path.name, parsed_artist, parsed_title,
+            )
+            metadata = FileMetadata(
+                title=parsed_title,
+                artist=parsed_artist,
+                album=parsed_album,
+                duration_seconds=0,
+            )
     if metadata is None:
         if do_lyrics or do_replaygain:
             logger.warning("Skipping %s: could not extract metadata", file_path.name)
@@ -781,18 +799,15 @@ def tag_directory(
 
     logger.info("Found %d audio files in %s", len(files), directory)
 
-    # Resolve TTL for negative caches
+    # Resolve config for cache directories and TTL
     from kikusan.config import get_config
-    try:
-        config = get_config()
-        ttl_hours = config.lyrics_cache_hours
-    except Exception:
-        ttl_hours = 168
+    config = get_config()
+    ttl_hours = config.lyrics_cache_hours
 
-    enrichment_cache = _make_enrichment_cache(directory, ttl_hours) if do_metadata else None
+    enrichment_cache = _make_enrichment_cache(config.data_dir, ttl_hours) if do_metadata else None
 
-    # Lyrics cache uses MetadataCache (SQLite) in {directory}/.kikusan/
-    lyrics_cache_dir = directory / ".kikusan" if do_lyrics else None
+    # Lyrics cache uses MetadataCache (SQLite) in data_dir
+    lyrics_cache_dir = config.data_dir if do_lyrics else None
 
     for i, file_path in enumerate(files, 1):
         logger.info("[%d/%d] Processing: %s", i, len(files), file_path.name)

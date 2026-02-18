@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
@@ -51,6 +52,39 @@ app.add_typer(explore_app, name="explore")
 app.add_typer(plugins_app, name="plugins")
 
 app.command(name="cron")(cron_command)
+
+
+def _migrate_legacy_data_dir(data_dir: Path) -> None:
+    """Migrate legacy <download_dir>/.kikusan into an explicit data_dir."""
+    legacy_data_dir = Path(os.getenv("KIKUSAN_DOWNLOAD_DIR", "./downloads")) / ".kikusan"
+    if legacy_data_dir.resolve() == data_dir.resolve():
+        return
+    if not legacy_data_dir.exists() or not legacy_data_dir.is_dir():
+        return
+
+    logger = logging.getLogger(__name__)
+    if data_dir.exists():
+        if not data_dir.is_dir():
+            logger.warning(
+                "Skipping legacy data migration because target is not a directory: %s",
+                data_dir,
+            )
+            return
+        if any(data_dir.iterdir()):
+            logger.info(
+                "Skipping legacy data migration because target is not empty: %s",
+                data_dir,
+            )
+            return
+        for child in legacy_data_dir.iterdir():
+            shutil.move(str(child), str(data_dir / child.name))
+        legacy_data_dir.rmdir()
+        logger.info("Migrated legacy data from %s to %s", legacy_data_dir, data_dir)
+        return
+
+    data_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(legacy_data_dir), str(data_dir))
+    logger.info("Migrated legacy data from %s to %s", legacy_data_dir, data_dir)
 
 
 def _version_callback(value: bool):
@@ -103,6 +137,14 @@ def main_callback(
             help="Hours to cache negative lyrics lookups (0 = no expiry). Default: 168 (7 days)",
         ),
     ] = None,
+    data_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--data-dir",
+            envvar="KIKUSAN_DATA_DIR",
+            help="Data directory for state, cache, and metadata files. Default: <download-dir>/.kikusan",
+        ),
+    ] = None,
     version: Annotated[
         bool | None,
         typer.Option(
@@ -126,6 +168,9 @@ def main_callback(
         os.environ["KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS"] = str(unavailable_cooldown)
     if lyrics_cache_hours is not None:
         os.environ["KIKUSAN_LYRICS_CACHE_HOURS"] = str(lyrics_cache_hours)
+    if data_dir is not None:
+        _migrate_legacy_data_dir(data_dir)
+        os.environ["KIKUSAN_DATA_DIR"] = str(data_dir)
 
 
 @app.command(name="search")
@@ -801,6 +846,10 @@ def web(
             help="Include UGC (user-generated content) tracks in playlist/chart results. Default: exclude",
         ),
     ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", envvar="KIKUSAN_DOWNLOAD_DIR", help="Output directory"),
+    ] = None,
 ):
     """Start the web interface."""
     import uvicorn
@@ -822,6 +871,8 @@ def web(
         os.environ["KIKUSAN_REPLAYGAIN"] = "true" if replaygain else "false"
     if allow_ugc is not None:
         os.environ["KIKUSAN_ALLOW_UGC"] = "true" if allow_ugc else "false"
+    if output is not None:
+        os.environ["KIKUSAN_DOWNLOAD_DIR"] = str(output)
 
     config = get_config()
     server_port = port or config.web_port

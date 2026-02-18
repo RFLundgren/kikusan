@@ -170,7 +170,9 @@ All domain models that cross serialization boundaries (JSON persistence, API res
 - `kikusan/metadata_cache.py`: SQLite-backed metadata cache for YouTube Music API results and lyrics lookups
   - Caches `get_song_metadata()` and `get_track_from_video_id()` results by video_id
   - Caches lyrics lookup results (both positive and negative) by video_id in `lyrics` table
-  - Storage: `{download_dir}/.kikusan/metadata_cache.db` with WAL journal mode
+  - Storage: `{download_dir}/.kikusan/metadata_cache.db` with WAL journal mode (falls back to default on network filesystems)
+  - Schema creation uses individual `execute()` calls (not `executescript()`) to avoid exclusive lock requirements on NAS
+  - Cache call sites now resolve cache path from `config.data_dir` (tests that patch `get_config()` must provide `data_dir`)
   - Pydantic models (`CachedSongMetadata`, `CachedTrack`, `CachedLyrics`) for JSON serialization in SQLite key-value tables
   - `MetadataCache` class with context manager — per-call open/close pattern
   - Always-on (no opt-in flag) — pure performance optimization
@@ -249,7 +251,8 @@ All domain models that cross serialization boundaries (JSON persistence, API res
     5. Cleaned yt-dlp metadata retry
   - `_clean_title()`: Strips trailing parenthetical/bracketed suffixes (e.g., "(Radio Edit)", "[Official Video]") iteratively
   - `_clean_artist()`: Extracts primary artist from multi-artist strings by splitting on comma, semicolon, feat/ft/featuring
-  - `_try_cleaned_lookup()`: Applies both cleaning functions and retries exact + search (only if cleaning changed something)
+  - `_strip_artist_from_title()`: Strips artist name prefix from titles like "Artist1 x Artist2 - Song" and recombines collaborators into a proper artist string
+  - `_try_cleaned_lookup()`: Applies cleaning functions (_clean_title, _clean_artist, _strip_artist_from_title) and retries exact + search
   - `get_lyrics()`: Original function preserved for backward compatibility, delegates to `_get_lyrics_exact()`
   - `_search_lyrics()`: Uses `/api/search` endpoint with duration-based filtering (3s tolerance)
   - `save_lyrics()`: Saves LRC file alongside audio file
@@ -266,6 +269,7 @@ All domain models that cross serialization boundaries (JSON persistence, API res
   - Configurable cooldown period (default: 168 hours / 7 days)
   - Pattern matching for unavailable-specific errors (distinct from auth/network errors)
   - Functions: `is_unavailable_error()`, `record_unavailable()`, `is_on_cooldown()`, `clear_expired()`
+  - `download.py` callers now pass `config.data_dir`; tests mocking `kikusan.download.get_config()` must set `data_dir` to a real `Path` (not `MagicMock`) so JSON storage works
 - `kikusan/replaygain.py`: ReplayGain/R128 loudness normalization tagging via `rsgain`
   - `is_rsgain_available() -> bool`: Checks `shutil.which("rsgain")`, result cached via `@lru_cache`
   - `apply_replaygain(audio_path, audio_format) -> bool`: Runs `rsgain custom -q -s i [-o r] <file>`
@@ -307,6 +311,7 @@ All domain models that cross serialization boundaries (JSON persistence, API res
   - Skips files that already have ReplayGain tags (for ReplayGain)
   - Non-fatal per-file errors with `TagStats` summary at end
   - Data classes: `FileMetadata`, `PartialMetadata`, `TagStats` (includes counters for metadata, lyrics, and ReplayGain)
+  - `tag_directory()` resolves config via `kikusan.config.get_config()` at runtime; tests should patch `kikusan.config.get_config` (not `kikusan.tagging.get_config`) and provide isolated `data_dir` to avoid cross-test lyrics cache interference
 
 ### CI/CD
 
@@ -332,6 +337,8 @@ All major configuration variables have corresponding CLI flags:
 - `--no-log-cookie-usage`: Disable cookie usage logging
 - `--unavailable-cooldown`: Hours to wait before retrying unavailable videos (0 = disabled, default: 168)
 - `--lyrics-cache-hours`: Hours to cache negative lyrics lookups (0 = no expiry, default: 168)
+- `--data-dir`: Data directory for state/cache/metadata (env: `KIKUSAN_DATA_DIR`, default: `<download_dir>/.kikusan` for backward compatibility)
+  - Migration behavior: when `--data-dir` is explicitly set, CLI attempts one-time migration from legacy `<download_dir>/.kikusan` into the new data dir if legacy exists and target dir is empty/absent.
 
 **download command:**
 
@@ -344,6 +351,7 @@ All major configuration variables have corresponding CLI flags:
 
 - `--cors-origins`: CORS allowed origins
 - `--web-playlist`: M3U playlist name for web downloads
+- `--output/-o`: Override download directory (env: `KIKUSAN_DOWNLOAD_DIR`)
 - `--multi-user / --no-multi-user`: Enable per-user M3U playlists via Remote-User header (env: `KIKUSAN_MULTI_USER`)
 - `--replaygain / --no-replaygain`: Apply ReplayGain/R128 loudness normalization tags (env: `KIKUSAN_REPLAYGAIN`)
 - `--allow-ugc / --no-allow-ugc`: Include UGC tracks in playlist/chart results (env: `KIKUSAN_ALLOW_UGC`)

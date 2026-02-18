@@ -21,6 +21,7 @@ services:
       # - YT_DLP_COOKIE_FILE=/cookies/cookies.txt  # Optional: use env var instead of web upload
       # - KIKUSAN_CORS_ORIGINS=*  # Optional: CORS allowed origins (default: *)
       # - KIKUSAN_REPLAYGAIN=true  # Optional: Apply ReplayGain/R128 loudness normalization tags
+      # - KIKUSAN_DATA_DIR=/downloads
       # - GOTIFY_URL=  # Optional: Gotify server URL
       # - GOTIFY_TOKEN=  # Optional: Gotify app token
     restart: unless-stopped

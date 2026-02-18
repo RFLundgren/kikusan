@@ -678,7 +678,7 @@ def get_song_metadata(video_id: str) -> SongMetadata | None:
         SongMetadata with clean title/artist/album/duration, or None if fetch fails.
     """
     config = get_config()
-    cache_dir = config.download_dir / ".kikusan"
+    cache_dir = config.data_dir
 
     # Check cache first
     with MetadataCache(cache_dir) as cache:
@@ -946,7 +946,7 @@ def get_track_from_video_id(video_id: str) -> Track:
         Exception: If video is unavailable or API fails
     """
     config = get_config()
-    cache_dir = config.download_dir / ".kikusan"
+    cache_dir = config.data_dir
 
     # Check cache first
     with MetadataCache(cache_dir) as cache:

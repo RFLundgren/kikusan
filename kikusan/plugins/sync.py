@@ -36,9 +36,12 @@ def sync_plugin_instance(
     Returns:
         SyncResult with operation counts
     """
+    from kikusan.config import get_config as get_app_config
+    app_config = get_app_config()
+
     logger.info("Starting plugin sync: %s (%s)", config.name, plugin.name)
 
-    state_dir = get_state_dir(config.download_dir)
+    state_dir = get_state_dir(app_config.data_dir)
 
     try:
         # Fetch songs from plugin
@@ -80,7 +83,7 @@ def sync_plugin_instance(
         # Remove old tracks if sync=true
         deleted_count = 0
         if sync_mode and removed_tracks:
-            deleted_count = _remove_tracks(removed_tracks, state, config.download_dir)
+            deleted_count = _remove_tracks(removed_tracks, state, config.download_dir, app_config.data_dir)
 
         # Update M3U playlist
         _update_m3u(config.name, state, config.download_dir)
@@ -176,7 +179,7 @@ def _download_songs(
             video_id = yt_track.video_id
 
             # Check if found video is on unavailable cooldown
-            if is_on_cooldown(config.download_dir, video_id, cooldown_hours):
+            if is_on_cooldown(app_config.data_dir, video_id, cooldown_hours):
                 logger.info(
                     "  Skipping (unavailable cooldown): %s - %s",
                     yt_track.artist, yt_track.title,
@@ -218,7 +221,7 @@ def _download_songs(
             # Record unavailable videos for cooldown
             if video_id and is_unavailable_error(str(e)):
                 record_unavailable(
-                    config.download_dir, video_id, str(e),
+                    app_config.data_dir, video_id, str(e),
                     title=song.title, artist=song.artist,
                 )
 
@@ -230,7 +233,12 @@ def _download_songs(
     }
 
 
-def _remove_tracks(tracks: list[PluginTrackState], state: PluginState, download_dir: Path) -> int:
+def _remove_tracks(
+    tracks: list[PluginTrackState],
+    state: PluginState,
+    download_dir: Path,
+    data_dir: Path | None = None,
+) -> int:
     """Remove tracks from filesystem and state.
 
     Only deletes files if they are not referenced by other playlists or plugins.
@@ -239,10 +247,14 @@ def _remove_tracks(tracks: list[PluginTrackState], state: PluginState, download_
         tracks: Tracks to remove
         state: Plugin state to update
         download_dir: Download directory (used to check cross-references)
+        data_dir: Data directory for state files (defaults to config.data_dir)
 
     Returns:
         Number of tracks deleted
     """
+    if data_dir is None:
+        from kikusan.config import get_config
+        data_dir = get_config().data_dir
     deleted = 0
     skipped = 0
 
@@ -258,7 +270,7 @@ def _remove_tracks(tracks: list[PluginTrackState], state: PluginState, download_
         if file_path.exists():
             if not is_safe_to_delete(
                 file_path,
-                download_dir,
+                data_dir,
                 current_plugin_name=state.plugin_name,
                 navidrome_cache=navidrome_cache,
             ):

@@ -25,6 +25,7 @@ class TestDownloadRecordsUnavailable:
         mock_config.return_value = MagicMock(
             unavailable_cooldown_hours=168,
             cookie_file_path=None,
+            data_dir=tmp_path,
         )
         mock_extract.side_effect = DownloadError(
             "ERROR: [youtube] djiKWmUtCFU: Video unavailable. This video is not available"
@@ -51,6 +52,7 @@ class TestDownloadRecordsUnavailable:
         mock_config.return_value = MagicMock(
             unavailable_cooldown_hours=168,
             cookie_file_path=None,
+            data_dir=tmp_path,
         )
 
         # First call (info extraction) succeeds, second call (download) fails
@@ -78,6 +80,7 @@ class TestDownloadRecordsUnavailable:
         mock_config.return_value = MagicMock(
             unavailable_cooldown_hours=168,
             cookie_file_path=None,
+            data_dir=tmp_path,
         )
         mock_extract.side_effect = DownloadError("Network timeout while downloading")
 
@@ -103,6 +106,7 @@ class TestDownloadChecksCooldown:
         mock_config.return_value = MagicMock(
             unavailable_cooldown_hours=168,
             cookie_file_path=None,
+            data_dir=tmp_path,
         )
 
         # Pre-record the video as unavailable
@@ -125,6 +129,7 @@ class TestDownloadChecksCooldown:
         mock_config.return_value = MagicMock(
             unavailable_cooldown_hours=0,
             cookie_file_path=None,
+            data_dir=tmp_path,
         )
 
         # Pre-record the video as unavailable
@@ -147,6 +152,7 @@ class TestDownloadChecksCooldown:
         mock_config.return_value = MagicMock(
             unavailable_cooldown_hours=168,
             cookie_file_path=None,
+            data_dir=tmp_path,
         )
 
         # Should proceed to extract info (no cooldown record exists)
