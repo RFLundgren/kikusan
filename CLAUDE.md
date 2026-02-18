@@ -339,6 +339,7 @@ All major configuration variables have corresponding CLI flags:
 - `--lyrics-cache-hours`: Hours to cache negative lyrics lookups (0 = no expiry, default: 168)
 - `--data-dir`: Data directory for state/cache/metadata (env: `KIKUSAN_DATA_DIR`, default: `<download_dir>/.kikusan` for backward compatibility)
   - Migration behavior: when `--data-dir` is explicitly set, CLI attempts one-time migration from legacy `<download_dir>/.kikusan` into the new data dir if legacy exists and target dir is empty/absent.
+  - Migration is cross-filesystem safe (handles Docker volume boundaries by copy+delete fallback instead of rename-only move).
 
 **download command:**
 

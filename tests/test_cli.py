@@ -1,6 +1,8 @@
 """Tests for CLI options and flags."""
 
+import errno
 import os
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -80,6 +82,32 @@ class TestDataDirMigration:
 
         assert (legacy_data_dir / "legacy.txt").exists()
         assert (target_data_dir / "existing.txt").exists()
+
+    def test_migrates_legacy_data_dir_across_filesystems(self, tmp_path, monkeypatch):
+        """Fallback copy/delete migration works when rename raises EXDEV."""
+        download_dir = tmp_path / "downloads"
+        legacy_data_dir = download_dir / ".kikusan"
+        legacy_state_dir = legacy_data_dir / "state"
+        legacy_state_dir.mkdir(parents=True)
+        (legacy_state_dir / "queue.json").write_text('{"items": []}')
+
+        target_data_dir = tmp_path / "custom-data"
+        target_data_dir.mkdir(parents=True)
+
+        original_rename = Path.rename
+
+        def fake_rename(self, target):
+            if str(self).endswith("/.kikusan/state"):
+                raise OSError(errno.EXDEV, "Invalid cross-device link")
+            return original_rename(self, target)
+
+        monkeypatch.setattr(Path, "rename", fake_rename)
+
+        with patch.dict(os.environ, {"KIKUSAN_DOWNLOAD_DIR": str(download_dir)}):
+            _migrate_legacy_data_dir(target_data_dir)
+
+        assert (target_data_dir / "state" / "queue.json").read_text() == '{"items": []}'
+        assert not (legacy_data_dir / "state").exists()
 
 
 class TestDownloadOptions:

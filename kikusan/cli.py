@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+from errno import EXDEV
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
@@ -54,6 +55,24 @@ app.add_typer(plugins_app, name="plugins")
 app.command(name="cron")(cron_command)
 
 
+def _move_path(src: Path, dst: Path) -> None:
+    """Move src to dst, supporting cross-filesystem migrations."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        src.rename(dst)
+        return
+    except OSError as exc:
+        if exc.errno != EXDEV:
+            raise
+
+    if src.is_dir():
+        shutil.copytree(src, dst)
+        shutil.rmtree(src)
+    else:
+        shutil.copy2(src, dst)
+        src.unlink()
+
+
 def _migrate_legacy_data_dir(data_dir: Path) -> None:
     """Migrate legacy <download_dir>/.kikusan into an explicit data_dir."""
     legacy_data_dir = Path(os.getenv("KIKUSAN_DOWNLOAD_DIR", "./downloads")) / ".kikusan"
@@ -77,13 +96,12 @@ def _migrate_legacy_data_dir(data_dir: Path) -> None:
             )
             return
         for child in legacy_data_dir.iterdir():
-            shutil.move(str(child), str(data_dir / child.name))
+            _move_path(child, data_dir / child.name)
         legacy_data_dir.rmdir()
         logger.info("Migrated legacy data from %s to %s", legacy_data_dir, data_dir)
         return
 
-    data_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(legacy_data_dir), str(data_dir))
+    _move_path(legacy_data_dir, data_dir)
     logger.info("Migrated legacy data from %s to %s", legacy_data_dir, data_dir)
 
 
@@ -169,7 +187,14 @@ def main_callback(
     if lyrics_cache_hours is not None:
         os.environ["KIKUSAN_LYRICS_CACHE_HOURS"] = str(lyrics_cache_hours)
     if data_dir is not None:
-        _migrate_legacy_data_dir(data_dir)
+        try:
+            _migrate_legacy_data_dir(data_dir)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Failed to migrate legacy data directory to %s: %s",
+                data_dir,
+                exc,
+            )
         os.environ["KIKUSAN_DATA_DIR"] = str(data_dir)
 
 
