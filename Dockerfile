@@ -24,8 +24,8 @@ COPY kikusan/ ./kikusan/
 RUN uv sync --frozen
 
 # Create downloads directory and set permissions
-RUN mkdir -p /downloads && \
-    chown -R kikusan:kikusan /app /downloads
+RUN mkdir -p /downloads /data && \
+    chown -R kikusan:kikusan /app /downloads /data
 
 ENV KIKUSAN_DOWNLOAD_DIR=/downloads
 ENV KIKUSAN_WEB_PORT=8000
