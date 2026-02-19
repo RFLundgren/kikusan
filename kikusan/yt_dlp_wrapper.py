@@ -44,6 +44,8 @@ AUTH_REQUIRED_PATTERNS = [
     # Private/unlisted with auth
     r"granted.*access",
     r"unlisted.*video",
+    # Generic "not available" - often works with cookies (region/account-dependent)
+    r"video is not available",
 ]
 
 
