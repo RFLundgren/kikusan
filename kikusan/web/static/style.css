@@ -218,6 +218,13 @@ header p {
     background: var(--accent-hover);
 }
 
+.search-disabled input,
+.search-disabled button {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .status {
     padding: 0.75rem 1rem;
     border-radius: 8px;
@@ -1560,7 +1567,7 @@ header p {
 .explore-tracks-list {
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: 0.75rem;
 }
 
 /* Responsive - Explore tab mobile fixes */

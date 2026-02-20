@@ -613,6 +613,12 @@
         exploreResults.classList.remove("active");
         downloadsResults.classList.remove("active");
 
+        const searchDisabled = tab === "explore" || tab === "downloads";
+        searchInput.disabled = searchDisabled;
+        document.getElementById("search-clear-btn").disabled = searchDisabled;
+        document.querySelector("#search-form button[type='submit']").disabled = searchDisabled;
+        document.getElementById("search-form").classList.toggle("search-disabled", searchDisabled);
+
         if (tab === "songs") {
           songsResults.classList.add("active");
         } else if (tab === "albums") {
