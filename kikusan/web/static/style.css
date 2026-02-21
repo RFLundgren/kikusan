@@ -1431,6 +1431,93 @@ header p {
 }
 
 /* Moods & Genres section */
+/* New Releases section */
+.explore-new-releases-section {
+    margin-bottom: 2rem;
+}
+.new-releases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+.new-release-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+.new-release-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+}
+.new-release-cover {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: var(--bg-tertiary);
+}
+.new-release-info {
+    padding: 0.75rem;
+    flex: 1;
+}
+.new-release-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.new-release-artist {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.new-release-meta {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    display: flex;
+    gap: 0.5rem;
+}
+.new-release-actions {
+    padding: 0 0.75rem 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+}
+.new-release-actions button {
+    flex: 1;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.new-release-actions button:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+.explicit-badge {
+    display: inline-block;
+    background: var(--text-tertiary);
+    color: var(--bg-primary);
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.1rem 0.3rem;
+    border-radius: 2px;
+    margin-left: 0.35rem;
+    vertical-align: middle;
+}
+
 .explore-moods-section {
     margin-top: 1.5rem;
 }

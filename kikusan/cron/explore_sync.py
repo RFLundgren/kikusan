@@ -14,7 +14,7 @@ from kikusan.config import get_config
 from kikusan.cron.config import ExploreConfig
 from kikusan.cron.state import PlaylistState, TrackState, get_state_dir, load_state, save_state
 from kikusan.cron.sync import SyncResult, compare_tracks, download_new_tracks, remove_old_tracks, update_m3u_playlist
-from kikusan.search import get_charts, get_mood_playlists, get_playlist_tracks
+from kikusan.search import get_album_tracks, get_charts, get_mood_playlists, get_new_releases, get_playlist_tracks
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +157,8 @@ def fetch_explore_tracks(explore_config: ExploreConfig) -> list[tuple[str, str, 
         return _fetch_chart_tracks(explore_config.country, allow_ugc=config.allow_ugc)
     elif explore_config.type == "mood":
         return _fetch_mood_tracks(explore_config.params, explore_config.playlist_id, allow_ugc=config.allow_ugc)
+    elif explore_config.type == "new_releases":
+        return _fetch_new_release_tracks()
     else:
         logger.error("Unknown explore type: %s", explore_config.type)
         return []
@@ -250,6 +252,49 @@ def _fetch_mood_tracks(params: str, playlist_id: str = "", allow_ugc: bool = Fal
         return []
 
 
+def _fetch_new_release_tracks() -> list[tuple[str, str, str]]:
+    """Fetch tracks from all new release albums.
+
+    Calls get_new_releases() to get the album list, then fetches tracks
+    from each album via get_album_tracks().
+
+    Returns:
+        List of tuples: (video_id, title, artist)
+    """
+    try:
+        albums = get_new_releases()
+        if not albums:
+            logger.warning("No new release albums found")
+            return []
+
+        logger.info("Found %d new release albums", len(albums))
+
+        seen_ids: set[str] = set()
+        tracks: list[tuple[str, str, str]] = []
+
+        for album in albums:
+            try:
+                album_tracks = get_album_tracks(album.browse_id)
+                for track in album_tracks:
+                    if track.video_id and track.video_id not in seen_ids:
+                        seen_ids.add(track.video_id)
+                        tracks.append((track.video_id, track.title, track.artist))
+            except Exception as e:
+                logger.warning(
+                    "Failed to fetch tracks from album '%s' (%s): %s",
+                    album.title,
+                    album.browse_id,
+                    e,
+                )
+
+        logger.info("Fetched %d unique tracks from %d new release albums", len(tracks), len(albums))
+        return tracks
+
+    except Exception as e:
+        logger.error("Failed to fetch new releases: %s", e)
+        return []
+
+
 def _build_explore_url(explore_config: ExploreConfig) -> str:
     """Build a descriptive URL string for the state file.
 
@@ -268,4 +313,6 @@ def _build_explore_url(explore_config: ExploreConfig) -> str:
         if explore_config.playlist_id:
             return f"explore:mood:{explore_config.params}:playlist:{explore_config.playlist_id}"
         return f"explore:mood:{explore_config.params}"
+    elif explore_config.type == "new_releases":
+        return "explore:new_releases"
     return f"explore:{explore_config.type}"

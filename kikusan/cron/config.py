@@ -173,9 +173,9 @@ def load_config(path: Path) -> CronConfig:
                 raise ValueError(f"Explore '{name}' missing required field: schedule")
 
             explore_type = config["type"]
-            if explore_type not in ("charts", "mood"):
+            if explore_type not in ("charts", "mood", "new_releases"):
                 raise ValueError(
-                    f"Explore '{name}' type must be 'charts' or 'mood', got '{explore_type}'"
+                    f"Explore '{name}' type must be 'charts', 'mood', or 'new_releases', got '{explore_type}'"
                 )
 
             if not isinstance(config["sync"], bool):

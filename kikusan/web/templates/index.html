@@ -721,7 +721,7 @@
         exploreResults.innerHTML =
           '<div class="explore-loading">Loading explore content...</div>';
 
-        const [moodsResult, chartsResult] = await Promise.allSettled([
+        const [moodsResult, chartsResult, newReleasesResult] = await Promise.allSettled([
           fetch("/api/explore/moods").then((res) => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
@@ -732,21 +732,27 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
           }),
+          fetch("/api/explore/new-releases").then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          }),
         ]);
 
         let moods =
           moodsResult.status === "fulfilled" ? moodsResult.value : null;
         let charts =
           chartsResult.status === "fulfilled" ? chartsResult.value : null;
+        let newReleases =
+          newReleasesResult.status === "fulfilled" ? newReleasesResult.value : null;
 
-        if (!moods && !charts) {
+        if (!moods && !charts && !newReleases) {
           exploreResults.innerHTML =
             '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
           exploreLoaded = false;
           return;
         }
 
-        renderExploreHome(moods, charts, skipUrlUpdate);
+        renderExploreHome(moods, charts, skipUrlUpdate, newReleases);
       }
 
       // Extract search logic into reusable function
@@ -1531,6 +1537,13 @@
           yaml += `  sync: true\n`;
           yaml += `  schedule: "0 6 * * *"`;
           return yaml;
+        } else if (type === "new_releases") {
+          let yaml = `new-releases:\n`;
+          yaml += `  type: new_releases\n`;
+          yaml += `  sync: true\n`;
+          yaml += `  schedule: "0 6 * * *"\n`;
+          yaml += `  limit: 50`;
+          return yaml;
         }
         return "";
       }
@@ -1582,16 +1595,21 @@
         exploreResults.innerHTML =
           '<div class="explore-loading">Loading explore content...</div>';
 
-        // Fetch moods and charts independently so one failure does not block the other
+        // Fetch moods, charts, and new releases independently so one failure does not block the others
         let moods = null;
         let charts = null;
+        let newReleases = null;
 
-        const [moodsResult, chartsResult] = await Promise.allSettled([
+        const [moodsResult, chartsResult, newReleasesResult] = await Promise.allSettled([
           fetch("/api/explore/moods").then((res) => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
           }),
           fetch("/api/explore/charts?country=ZZ").then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+          }),
+          fetch("/api/explore/new-releases").then((res) => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
           }),
@@ -1609,22 +1627,31 @@
           console.error("Failed to load charts:", chartsResult.reason);
         }
 
-        if (!moods && !charts) {
+        if (newReleasesResult.status === "fulfilled") {
+          newReleases = newReleasesResult.value;
+        } else {
+          console.error("Failed to load new releases:", newReleasesResult.reason);
+        }
+
+        if (!moods && !charts && !newReleases) {
           exploreResults.innerHTML =
             '<div class="explore-error">Failed to load explore content. Please try again later.</div>';
           exploreLoaded = false;
           return;
         }
 
-        renderExploreHome(moods, charts);
+        renderExploreHome(moods, charts, false, newReleases);
       }
 
-      function renderExploreHome(moods, charts, skipUrlUpdate = false) {
+      function renderExploreHome(moods, charts, skipUrlUpdate = false, newReleases = null) {
         if (!skipUrlUpdate) chartPage = 0;
         exploreBreadcrumb = [];
-        // Cache moods so country selector changes skip re-fetching them
+        // Cache moods and new releases so country selector changes skip re-fetching them
         if (moods) {
           cachedMoods = moods;
+        }
+        if (newReleases) {
+          cachedNewReleases = newReleases;
         }
         // Update URL to reflect charts country if not ZZ
         if (!skipUrlUpdate) {
@@ -1707,6 +1734,47 @@
 
         html += "</div>";
 
+        // New Releases section
+        const releaseAlbums = (newReleases || cachedNewReleases || []);
+        if (releaseAlbums.length > 0) {
+          const nrStart = newReleasesPage * ALBUMS_PER_PAGE;
+          const pageAlbums = releaseAlbums.slice(nrStart, nrStart + ALBUMS_PER_PAGE);
+          html += `
+            <div class="explore-new-releases-section">
+              <div class="explore-section-header">
+                <h2>New Releases</h2>
+                <div class="explore-section-actions">
+                  <button class="cron-btn" id="cron-new-releases-btn" aria-label="Copy cron config" title="Copy cron.yaml config for new releases">+ Cron</button>
+                </div>
+              </div>
+              <div class="new-releases-grid">
+                ${pageAlbums.map((album) => `
+                  <div class="new-release-card">
+                    <img class="new-release-cover" src="${proxyImageUrl(album.thumbnail_url)}" alt="${escapeHtml(album.title)}" loading="lazy" onerror="this.style.display='none'">
+                    <div class="new-release-info">
+                      <div class="new-release-title">${escapeHtml(album.title)}${album.is_explicit ? '<span class="explicit-badge">E</span>' : ""}</div>
+                      <div class="new-release-artist">${escapeHtml(album.artist)}</div>
+                      <div class="new-release-meta">
+                        ${album.album_type ? `<span>${escapeHtml(album.album_type)}</span>` : ""}
+                        ${album.year ? `<span>${album.year}</span>` : ""}
+                      </div>
+                    </div>
+                    <div class="new-release-actions">
+                      <button class="view-album-btn" data-browse-id="${album.browse_id}">View Tracks</button>
+                      <button class="download-album-btn"
+                              data-browse-id="${album.browse_id}"
+                              data-title="${escapeHtml(album.title)}"
+                              data-artist="${escapeHtml(album.artist)}">
+                        Download Album
+                      </button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+              ${renderPaginationControls(newReleasesPage, releaseAlbums.length, "new-releases-page", ALBUMS_PER_PAGE)}
+            </div>`;
+        }
+
         // Moods & Genres section
         if (moods && moods.length > 0) {
           html += '<div class="explore-moods-section">';
@@ -1738,14 +1806,18 @@
 
       // Cache moods data so country selector changes do not re-fetch moods
       let cachedMoods = null;
+      let cachedNewReleases = null;
 
       // Pagination state
       const TRACKS_PER_PAGE = 10;
+      const ALBUMS_PER_PAGE = 8;
       let chartPage = 0;
       let playlistPage = 0;
+      let newReleasesPage = 0;
+      let albumExplorePage = 0;
 
-      function renderPaginationControls(page, totalTracks, idPrefix) {
-        const totalPages = Math.ceil(totalTracks / TRACKS_PER_PAGE);
+      function renderPaginationControls(page, totalTracks, idPrefix, perPage = TRACKS_PER_PAGE) {
+        const totalPages = Math.ceil(totalTracks / perPage);
         if (totalPages <= 1) return "";
         return `
           <div class="pagination-controls">
@@ -1780,7 +1852,7 @@
               if (!res.ok) throw new Error("Failed to load charts");
               const newCharts = await res.json();
               showStatus("");
-              renderExploreHome(cachedMoods, newCharts);
+              renderExploreHome(cachedMoods, newCharts, false, cachedNewReleases);
             } catch (error) {
               showStatus("Failed to load charts: " + error.message, true);
             }
@@ -1814,6 +1886,35 @@
             queueMultipleTracks(chartTracks, downloadAllChartsBtn);
           });
         }
+
+        // New releases pagination
+        attachPaginationHandlers("new-releases-page", (delta) => {
+          newReleasesPage += delta;
+          renderExploreHome(cachedMoods, charts, true, cachedNewReleases);
+        });
+
+        // Cron config button for new releases
+        const cronNewReleasesBtn = document.getElementById("cron-new-releases-btn");
+        if (cronNewReleasesBtn) {
+          cronNewReleasesBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const yaml = generateCronYaml("new_releases", {});
+            copyCronConfig(yaml, cronNewReleasesBtn);
+          });
+        }
+
+        // New releases album buttons — show tracks inline in explore tab
+        exploreResults.querySelectorAll(".new-release-card .view-album-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const browseId = e.target.dataset.browseId;
+            const card = e.target.closest(".new-release-card");
+            const title = card ? card.querySelector(".new-release-title")?.textContent?.trim() : "Album";
+            loadAlbumTracksInExplore(browseId, title);
+          });
+        });
+        exploreResults.querySelectorAll(".new-release-card .download-album-btn").forEach((btn) => {
+          btn.addEventListener("click", handleDownloadAlbum);
+        });
 
         // Mood category cards
         document.querySelectorAll(".mood-category-card").forEach((card) => {
@@ -2138,6 +2239,108 @@
         attachPaginationHandlers("playlist-page", (delta) => {
           playlistPage += delta;
           renderPlaylistTracks(tracks, playlistTitle, playlistId);
+        });
+      }
+
+      async function loadAlbumTracksInExplore(browseId, albumTitle) {
+        showStatus("Loading album tracks...");
+        try {
+          const res = await fetch(`/api/album/${encodeURIComponent(browseId)}/tracks`);
+          if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.detail || "Failed to load album tracks");
+          }
+          const data = await res.json();
+          showStatus("");
+          albumExplorePage = 0;
+          renderAlbumTracksInExplore(data.tracks, albumTitle || data.album_title);
+        } catch (error) {
+          showStatus("Failed to load album tracks: " + error.message, true);
+        }
+      }
+
+      function renderAlbumTracksInExplore(tracks, albumTitle) {
+        exploreBreadcrumb = [{ type: "album", title: albumTitle }];
+
+        let html = `
+          <div class="explore-breadcrumb">
+            <button class="breadcrumb-link" id="breadcrumb-home">Explore</button>
+            <span class="breadcrumb-sep">›</span>
+            <span class="breadcrumb-current">${escapeHtml(albumTitle)}</span>
+          </div>
+          <div class="explore-playlist-header">
+            <div>
+              <h2>${escapeHtml(albumTitle)}</h2>
+              <span class="explore-track-count">${tracks.length} tracks</span>
+            </div>
+            <div class="explore-section-actions">
+              <button class="download-all-btn" id="download-all-album-explore">Download All</button>
+            </div>
+          </div>
+          <div class="explore-tracks-list">`;
+
+        const start = albumExplorePage * TRACKS_PER_PAGE;
+        const pageTracks = tracks.slice(start, start + TRACKS_PER_PAGE);
+        html += pageTracks.map((track) => `
+          <div class="track">
+            <div class="track-main">
+              <img class="track-cover" src="${proxyImageUrl(track.thumbnail_url)}" alt="" loading="lazy">
+              <div class="track-info">
+                <div class="track-title">${escapeHtml(track.title)}${isUgcVideoType(track.video_type) ? '<span class="ugc-badge">UGC</span>' : ""}</div>
+                <div class="track-artist">${escapeHtml(track.artist)}${track.album ? " - " + escapeHtml(track.album) : ""}</div>
+                <div class="track-meta">
+                  <span class="track-duration">${track.duration}</span>
+                  ${track.view_count ? `<span class="track-views">${track.view_count} views</span>` : ""}
+                </div>
+              </div>
+            </div>
+            <div class="track-actions">
+              <button class="play-btn" data-video-id="${track.video_id}" aria-label="Play preview">&#9654;</button>
+              <button class="copy-url-btn" data-video-id="${track.video_id}" aria-label="Copy URL" title="Copy YouTube Music URL">&#128279;</button>
+              <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}">Download</button>
+            </div>
+          </div>
+        `).join("");
+
+        html += "</div>";
+        html += renderPaginationControls(albumExplorePage, tracks.length, "album-explore-page");
+        exploreResults.innerHTML = html;
+
+        // Breadcrumb home
+        document.getElementById("breadcrumb-home").addEventListener("click", () => {
+          exploreBreadcrumb = [];
+          exploreLoaded = false;
+          updateExploreUrlParams("home");
+          loadExploreContent();
+        });
+
+        // Download all
+        document.getElementById("download-all-album-explore").addEventListener("click", () => {
+          queueMultipleTracks(tracks, document.getElementById("download-all-album-explore"));
+        });
+
+        // Play buttons
+        exploreResults.querySelectorAll(".play-btn").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            togglePlay(e.target.dataset.videoId, e.target);
+          });
+        });
+
+        // Copy URL buttons
+        exploreResults.querySelectorAll(".copy-url-btn").forEach((btn) => {
+          btn.addEventListener("click", handleCopyUrl);
+        });
+
+        // Download buttons
+        exploreResults.querySelectorAll(".download-btn").forEach((btn) => {
+          btn.addEventListener("click", handleDownload);
+        });
+
+        // Pagination
+        attachPaginationHandlers("album-explore-page", (delta) => {
+          albumExplorePage += delta;
+          renderAlbumTracksInExplore(tracks, albumTitle);
         });
       }
 

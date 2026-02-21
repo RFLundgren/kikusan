@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from kikusan.search import (
+    Album,
     Charts,
     ChartArtist,
     ChartTrack,
@@ -15,6 +16,7 @@ from kikusan.search import (
     get_charts,
     get_mood_categories,
     get_mood_playlists,
+    get_new_releases,
     get_playlist_tracks,
 )
 
@@ -656,3 +658,111 @@ class TestGetPlaylistTracks:
 
         tracks = get_playlist_tracks("pl")
         assert tracks[0].duration_seconds == 150
+
+
+class TestGetNewReleases:
+    """Test get_new_releases()."""
+
+    @patch("kikusan.search.YTMusic")
+    def test_returns_albums(self, mock_ytmusic_cls):
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_explore.return_value = {
+            "new_releases": [
+                {
+                    "browseId": "MPREb_abc123",
+                    "title": "New Album",
+                    "type": "Album",
+                    "artists": [{"name": "Artist A", "id": "UCabc"}],
+                    "audioPlaylistId": "OLAK5uy_xyz",
+                    "thumbnails": [
+                        {"url": "https://lh3.example.com/thumb_small", "width": 60},
+                        {"url": "https://lh3.example.com/thumb_large", "width": 226},
+                    ],
+                    "isExplicit": True,
+                    "year": "2026",
+                },
+                {
+                    "browseId": "MPREb_def456",
+                    "title": "New Single",
+                    "type": "Single",
+                    "artists": [{"name": "Artist B"}],
+                    "audioPlaylistId": "OLAK5uy_uvw",
+                    "thumbnails": [],
+                    "isExplicit": False,
+                },
+            ],
+        }
+
+        albums = get_new_releases()
+        assert len(albums) == 2
+
+        assert isinstance(albums[0], Album)
+        assert albums[0].browse_id == "MPREb_abc123"
+        assert albums[0].title == "New Album"
+        assert albums[0].artist == "Artist A"
+        assert albums[0].year == 2026
+        assert albums[0].thumbnail_url == "https://lh3.example.com/thumb_large"
+        assert albums[0].audio_playlist_id == "OLAK5uy_xyz"
+        assert albums[0].album_type == "Album"
+        assert albums[0].is_explicit is True
+
+        assert albums[1].browse_id == "MPREb_def456"
+        assert albums[1].album_type == "Single"
+        assert albums[1].is_explicit is False
+        assert albums[1].thumbnail_url is None
+
+    @patch("kikusan.search.YTMusic")
+    def test_empty_new_releases(self, mock_ytmusic_cls):
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_explore.return_value = {}
+
+        albums = get_new_releases()
+        assert albums == []
+
+    @patch("kikusan.search.YTMusic")
+    def test_raises_on_error(self, mock_ytmusic_cls):
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_explore.side_effect = Exception("API error")
+
+        with pytest.raises(Exception, match="API error"):
+            get_new_releases()
+
+    @patch("kikusan.search.YTMusic")
+    def test_missing_artists(self, mock_ytmusic_cls):
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_explore.return_value = {
+            "new_releases": [
+                {
+                    "browseId": "MPREb_noa",
+                    "title": "No Artist Album",
+                    "artists": [],
+                    "thumbnails": [],
+                },
+            ],
+        }
+
+        albums = get_new_releases()
+        assert albums[0].artist == "Unknown Artist"
+
+    @patch("kikusan.search.YTMusic")
+    def test_non_numeric_year(self, mock_ytmusic_cls):
+        mock_yt = MagicMock()
+        mock_ytmusic_cls.return_value = mock_yt
+        mock_yt.get_explore.return_value = {
+            "new_releases": [
+                {
+                    "browseId": "MPREb_noyear",
+                    "title": "No Year",
+                    "artists": [{"name": "X"}],
+                    "thumbnails": [],
+                    "year": "N/A",
+                },
+            ],
+        }
+
+        albums = get_new_releases()
+        assert albums[0].year is None

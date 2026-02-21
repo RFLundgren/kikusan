@@ -38,6 +38,9 @@ class Album(BaseModel):
     year: int | None
     track_count: int | None
     thumbnail_url: str | None
+    audio_playlist_id: str | None = None
+    album_type: str | None = None
+    is_explicit: bool = False
 
 
 class MoodCategory(BaseModel):

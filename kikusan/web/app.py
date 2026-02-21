@@ -50,6 +50,7 @@ _moods_cache = TtlCache(max_entries=1, ttl_seconds=3600)          # 1 hour
 _mood_playlists_cache = TtlCache(max_entries=50, ttl_seconds=1800)  # 30 min
 _charts_cache = TtlCache(max_entries=20, ttl_seconds=1800)        # 30 min
 _playlist_tracks_cache = TtlCache(max_entries=50, ttl_seconds=900)  # 15 min
+_new_releases_cache = TtlCache(max_entries=1, ttl_seconds=1800)    # 30 min
 
 # Setup templates and static files
 templates_dir = Path(__file__).parent / "templates"
@@ -159,6 +160,9 @@ class AlbumResponse(BaseModel):
     year: int | None
     track_count: int | None
     thumbnail_url: str | None
+    audio_playlist_id: str | None = None
+    album_type: str | None = None
+    is_explicit: bool = False
 
 
 class AlbumSearchResponse(BaseModel):
@@ -1121,6 +1125,30 @@ async def api_explore_charts(country: str = Query("ZZ", description="ISO 3166-1 
     except Exception as e:
         logger.error("Failed to get charts: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to get charts: {str(e)}")
+
+
+@app.get("/api/explore/new-releases")
+async def api_explore_new_releases():
+    """Get new album releases from YouTube Music."""
+    from kikusan.search import get_new_releases
+    import logging
+    logger = logging.getLogger(__name__)
+
+    cached = _new_releases_cache.get("new_releases")
+    if cached is not None:
+        return cached
+
+    try:
+        albums = get_new_releases()
+        result = [
+            AlbumResponse(**album.model_dump())
+            for album in albums
+        ]
+        _new_releases_cache.put("new_releases", result)
+        return result
+    except Exception as e:
+        logger.error("Failed to get new releases: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to get new releases: {str(e)}")
 
 
 @app.get("/api/explore/playlist/{playlist_id}/tracks")

@@ -87,6 +87,27 @@ class TestExploreConfigParsing:
         assert entry.sync is False
         assert entry.schedule == "0 12 * * 0"
 
+    def test_new_releases_config(self, tmp_path):
+        """Test parsing a new_releases explore entry."""
+        config_path = self._write_yaml(tmp_path, """\
+            explore:
+              new-albums:
+                type: new_releases
+                sync: true
+                schedule: "0 6 * * *"
+                limit: 50
+        """)
+
+        config = load_config(config_path)
+        assert "new-albums" in config.explore
+        entry = config.explore["new-albums"]
+        assert isinstance(entry, ExploreConfig)
+        assert entry.name == "new-albums"
+        assert entry.type == "new_releases"
+        assert entry.sync is True
+        assert entry.schedule == "0 6 * * *"
+        assert entry.limit == 50
+
     def test_charts_default_country(self, tmp_path):
         """Test charts entry defaults to ZZ for country."""
         config_path = self._write_yaml(tmp_path, """\
@@ -182,7 +203,7 @@ class TestExploreConfigValidation:
                 schedule: "0 6 * * *"
         """)
 
-        with pytest.raises(ValueError, match="type must be 'charts' or 'mood'"):
+        with pytest.raises(ValueError, match="type must be"):
             load_config(config_path)
 
     def test_missing_type(self, tmp_path):

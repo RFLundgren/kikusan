@@ -10,11 +10,12 @@ from kikusan.cron.explore_sync import (
     _build_explore_url,
     _fetch_chart_tracks,
     _fetch_mood_tracks,
+    _fetch_new_release_tracks,
     fetch_explore_tracks,
     sync_explore,
 )
 from kikusan.cron.sync import SyncResult
-from kikusan.search import ChartTrack, Charts, MoodPlaylist, Track
+from kikusan.search import Album, ChartTrack, Charts, MoodPlaylist, Track
 
 
 class TestFetchChartTracks:
@@ -247,9 +248,26 @@ class TestFetchExploreTracks:
         assert tracks == [("vid1", "Song", "Artist")]
         mock_fetch_mood.assert_called_once_with("ggMPOg1uX1J", "RDCLAK5uy_test123", allow_ugc=False)
 
+    @patch("kikusan.cron.explore_sync.get_config")
+    @patch("kikusan.cron.explore_sync._fetch_new_release_tracks")
+    def test_routes_to_new_releases(self, mock_fetch_new, mock_get_config):
+        mock_config_obj = MagicMock()
+        mock_config_obj.allow_ugc = False
+        mock_get_config.return_value = mock_config_obj
+        mock_fetch_new.return_value = [("vid1", "Song", "Artist")]
+
+        config = ExploreConfig(
+            name="new-albums", type="new_releases", sync=True,
+            schedule="0 6 * * *",
+        )
+
+        tracks = fetch_explore_tracks(config)
+        assert tracks == [("vid1", "Song", "Artist")]
+        mock_fetch_new.assert_called_once()
+
     def test_unknown_type_raises_validation_error(self):
         import pydantic
-        with pytest.raises(pydantic.ValidationError, match="type must be 'charts' or 'mood'"):
+        with pytest.raises(pydantic.ValidationError, match="type must be"):
             ExploreConfig(
                 name="unknown", type="invalid", sync=True,
                 schedule="0 6 * * *",
@@ -634,3 +652,120 @@ class TestSyncExploreLimit:
         compare_args = mock_compare.call_args[0]
         assert len(compare_args[0]) == 1
         assert compare_args[0][0][0] == "vid1"
+
+
+class TestFetchNewReleaseTracks:
+    """Test _fetch_new_release_tracks()."""
+
+    @patch("kikusan.cron.explore_sync.get_album_tracks")
+    @patch("kikusan.cron.explore_sync.get_new_releases")
+    def test_returns_tracks_from_albums(self, mock_get_new, mock_get_album):
+        mock_get_new.return_value = [
+            Album(
+                browse_id="MPREb_abc",
+                title="Album One",
+                artist="Artist A",
+                year=2026,
+                track_count=None,
+                thumbnail_url=None,
+            ),
+            Album(
+                browse_id="MPREb_def",
+                title="Album Two",
+                artist="Artist B",
+                year=2026,
+                track_count=None,
+                thumbnail_url=None,
+            ),
+        ]
+        mock_get_album.side_effect = [
+            [
+                Track(
+                    video_id="vid1", title="Song 1", artist="Artist A",
+                    artists=["Artist A"], album="Album One",
+                    duration_seconds=200, thumbnail_url=None, view_count=None,
+                ),
+            ],
+            [
+                Track(
+                    video_id="vid2", title="Song 2", artist="Artist B",
+                    artists=["Artist B"], album="Album Two",
+                    duration_seconds=180, thumbnail_url=None, view_count=None,
+                ),
+            ],
+        ]
+
+        tracks = _fetch_new_release_tracks()
+        assert len(tracks) == 2
+        assert tracks[0] == ("vid1", "Song 1", "Artist A")
+        assert tracks[1] == ("vid2", "Song 2", "Artist B")
+
+    @patch("kikusan.cron.explore_sync.get_album_tracks")
+    @patch("kikusan.cron.explore_sync.get_new_releases")
+    def test_deduplicates_tracks(self, mock_get_new, mock_get_album):
+        """Tracks appearing in multiple albums are deduplicated."""
+        mock_get_new.return_value = [
+            Album(
+                browse_id="MPREb_abc", title="Album One", artist="A",
+                year=None, track_count=None, thumbnail_url=None,
+            ),
+            Album(
+                browse_id="MPREb_def", title="Album Two", artist="B",
+                year=None, track_count=None, thumbnail_url=None,
+            ),
+        ]
+        shared_track = Track(
+            video_id="vid1", title="Song", artist="A",
+            artists=["A"], album=None, duration_seconds=200,
+            thumbnail_url=None, view_count=None,
+        )
+        mock_get_album.side_effect = [[shared_track], [shared_track]]
+
+        tracks = _fetch_new_release_tracks()
+        assert len(tracks) == 1
+
+    @patch("kikusan.cron.explore_sync.get_album_tracks")
+    @patch("kikusan.cron.explore_sync.get_new_releases")
+    def test_continues_on_album_error(self, mock_get_new, mock_get_album):
+        """Failure fetching one album doesn't block others."""
+        mock_get_new.return_value = [
+            Album(
+                browse_id="MPREb_bad", title="Bad Album", artist="X",
+                year=None, track_count=None, thumbnail_url=None,
+            ),
+            Album(
+                browse_id="MPREb_good", title="Good Album", artist="Y",
+                year=None, track_count=None, thumbnail_url=None,
+            ),
+        ]
+        mock_get_album.side_effect = [
+            Exception("API error"),
+            [
+                Track(
+                    video_id="vid1", title="Good Song", artist="Y",
+                    artists=["Y"], album="Good Album",
+                    duration_seconds=200, thumbnail_url=None, view_count=None,
+                ),
+            ],
+        ]
+
+        tracks = _fetch_new_release_tracks()
+        assert len(tracks) == 1
+        assert tracks[0] == ("vid1", "Good Song", "Y")
+
+    @patch("kikusan.cron.explore_sync.get_new_releases")
+    def test_empty_releases(self, mock_get_new):
+        mock_get_new.return_value = []
+        tracks = _fetch_new_release_tracks()
+        assert tracks == []
+
+
+class TestBuildExploreUrlNewReleases:
+    """Test _build_explore_url() for new_releases type."""
+
+    def test_new_releases_url(self):
+        config = ExploreConfig(
+            name="new-albums", type="new_releases", sync=True,
+            schedule="0 6 * * *",
+        )
+        assert _build_explore_url(config) == "explore:new_releases"

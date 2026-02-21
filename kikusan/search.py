@@ -228,6 +228,54 @@ def get_album_tracks(browse_id: str) -> list[Track]:
     return tracks
 
 
+def get_new_releases() -> list[Album]:
+    """Fetch new album releases from YouTube Music explore page.
+
+    Uses ytmusicapi's get_explore() to retrieve the new_releases section,
+    which contains recently released albums.
+
+    Returns:
+        List of Album objects representing new releases.
+
+    Raises:
+        Exception: If YouTube Music API fails (e.g., JSONDecodeError, network error)
+    """
+    yt = YTMusic()
+    try:
+        raw = yt.get_explore()
+    except Exception as e:
+        logger.error("YouTube Music get_explore failed: %s", e)
+        raise
+
+    albums = []
+    for item in raw.get("new_releases", []):
+        artists = item.get("artists", [])
+        artist_name = artists[0]["name"] if artists else "Unknown Artist"
+
+        thumbnails = item.get("thumbnails", [])
+        thumbnail_url = thumbnails[-1]["url"] if thumbnails else None
+
+        year_raw = item.get("year")
+        year = int(year_raw) if year_raw and str(year_raw).isdigit() else None
+
+        albums.append(
+            Album(
+                browse_id=item.get("browseId", ""),
+                title=item.get("title", "Unknown"),
+                artist=artist_name,
+                year=year,
+                track_count=None,
+                thumbnail_url=thumbnail_url,
+                audio_playlist_id=item.get("audioPlaylistId"),
+                album_type=item.get("type"),
+                is_explicit=item.get("isExplicit", False),
+            )
+        )
+
+    logger.info("Found %d new release albums", len(albums))
+    return albums
+
+
 def get_mood_categories() -> list[MoodSection]:
     """Fetch mood & genre categories from YouTube Music.
 

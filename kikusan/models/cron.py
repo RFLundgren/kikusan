@@ -53,8 +53,8 @@ class ExploreConfig(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
-        if v not in ("charts", "mood"):
-            raise ValueError(f"type must be 'charts' or 'mood', got '{v}'")
+        if v not in ("charts", "mood", "new_releases"):
+            raise ValueError(f"type must be 'charts', 'mood', or 'new_releases', got '{v}'")
         return v
 
     @field_validator("limit")

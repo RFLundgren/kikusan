@@ -37,12 +37,22 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   - Three-level navigation: Categories -> Playlists -> Tracks (with breadcrumb nav)
   - Mood/genre categories displayed as clickable grid cards
   - Charts with country selector (11 countries + global)
+  - **New Releases**: Grid of newly released albums from YouTube Music explore page
+    - Album cards with cover art, title, artist, type (Album/Single/EP), year, and explicit badge
+    - "View Tracks" button opens album tracks in Songs tab (reuses existing album view flow)
+    - "Download Album" button queues all album tracks for download
+    - Paginated with 8 albums per page
+    - "+ Cron" button generates `type: new_releases` cron.yaml config snippet
+    - Data fetched via `/api/explore/new-releases` endpoint (30 min cache)
+    - Uses ytmusicapi `get_explore()` → `new_releases` section
+    - CSS classes: `.explore-new-releases-section`, `.new-releases-grid`, `.new-release-card`, `.explicit-badge`
   - View counts displayed for chart tracks and playlist tracks (when available from API)
   - Play preview button and Copy URL button on all explore track listings (charts and playlists)
   - Duration displayed alongside view counts in chart track metadata
   - "Download All" buttons for bulk queueing of playlist tracks and chart tracks
-  - "Cron" button (+ Cron) on charts header and mood/genre breadcrumb for copying cron.yaml config snippets to clipboard
+  - "Cron" button (+ Cron) on charts header, new releases header, and mood/genre breadcrumb for copying cron.yaml config snippets to clipboard
     - Charts: generates `type: charts` config with selected country, sync, schedule, and limit
+    - New Releases: generates `type: new_releases` config with sync, schedule, and limit
     - Moods: generates `type: mood` config with category params, sync, and schedule
     - Sanitizes category titles into valid cron config keys (lowercase, alphanumeric + dashes)
     - Clipboard copy with "Copied!" feedback and fallback for older browsers
@@ -157,11 +167,13 @@ All domain models that cross serialization boundaries (JSON persistence, API res
 
 - `kikusan/search.py`: Uses ytmusicapi to search and explore YouTube Music
   - Search: `search()`, `search_albums()`, `get_album_tracks()` — song/album search with view_count extraction
-  - Explore: `get_mood_categories()`, `get_mood_playlists()`, `get_charts()`, `get_playlist_tracks()` — mood/genre browsing and chart data
+  - Explore: `get_mood_categories()`, `get_mood_playlists()`, `get_charts()`, `get_playlist_tracks()`, `get_new_releases()` — mood/genre browsing, chart data, and new album releases
   - `get_mood_playlists()`: Has fallback parsing (`_get_mood_playlists_fallback()`) for when ytmusicapi crashes with KeyError on `musicTwoRowItemRenderer`. Some mood/genre categories return mixed content: some sections contain playlist items (`musicTwoRowItemRenderer`) while others contain song items (`musicResponsiveListItemRenderer`). The fallback manually parses the raw YouTube Music API response, skipping incompatible sections and handling individual item parse failures gracefully.
   - `get_mood_playlists()` normalizes playlist `author` payloads from ytmusicapi/fallback to a stable `str | None` (`_normalize_mood_playlist_author`) to avoid API response validation errors.
   - `get_charts()`: ytmusicapi returns `videos` as a list of playlist references (not individual tracks) and `artists` as a flat list. The function fetches tracks from the first working video playlist via `get_playlist()`, with fallback to subsequent playlists if one fails (e.g. album-style IDs like `OLAK5uy_...` are not fetchable via `get_playlist`).
   - `ChartTrack` includes `view_count` (str|None) and `duration_seconds` (int) with a `duration_display` property (MM:SS format), extracted from playlist data in `get_charts()`
+  - `get_new_releases()`: Uses `YTMusic().get_explore()` to fetch `new_releases` section (recently released albums). Returns `list[Album]` with `audio_playlist_id`, `album_type`, and `is_explicit` fields. Albums have no `track_count` (not in ytmusicapi parse_album output).
+  - `Album` model extended with: `audio_playlist_id: str | None`, `album_type: str | None`, `is_explicit: bool`
   - Metadata: `get_song_metadata()` — fetches clean title/artist/album/duration from `YTMusic().get_song()` and `get_watch_playlist()` for lyrics lookup enhancement
   - `SongMetadata` dataclass: title, artist, album (optional), duration_seconds — used by `lyrics.py` for lrclib.net lookups
   - `_get_album_from_watch_playlist()`: Extracts album name from watch playlist (not available in `get_song()` videoDetails)
@@ -192,6 +204,7 @@ All domain models that cross serialization boundaries (JSON persistence, API res
     - `GET /api/explore/moods`: 1 hour TTL
     - `GET /api/explore/mood-playlists`: 30 min TTL
     - `GET /api/explore/charts`: 30 min TTL
+    - `GET /api/explore/new-releases`: 30 min TTL
     - `GET /api/explore/playlist/{id}/tracks`: 15 min TTL
   - Test coverage: `tests/test_api_cache.py`
 - `kikusan/web/app.py`: FastAPI backend with search, download, and explore endpoints
@@ -208,7 +221,7 @@ All domain models that cross serialization boundaries (JSON persistence, API res
   - `fetch_current_tracks()` now dispatches Deezer URLs to `_fetch_deezer_tracks()` (Deezer -> YouTube Music resolution)
 - `kikusan/cron/config.py`:
   - `validate_url()` accepts Deezer playlist URLs
-  - Explore endpoints: `GET /api/explore/moods`, `GET /api/explore/mood-playlists`, `GET /api/explore/charts`, `GET /api/explore/playlist/{playlist_id}/tracks`
+  - Explore endpoints: `GET /api/explore/moods`, `GET /api/explore/mood-playlists`, `GET /api/explore/charts`, `GET /api/explore/new-releases`, `GET /api/explore/playlist/{playlist_id}/tracks`
 - `kikusan/web/templates/index.html`: Single-page frontend with embedded JavaScript (Songs, Albums, Explore tabs)
 - `kikusan/web/static/style.css`: Responsive CSS with dark/light themes, explore grid layouts
 - `kikusan/reference_checker.py`: Cross-playlist/plugin reference checking for safe file deletion
@@ -223,9 +236,10 @@ All domain models that cross serialization boundaries (JSON persistence, API res
 - `kikusan/cron/sync.py`: Playlist synchronization with reference-aware deletion and Navidrome protection
 - `kikusan/cron/explore_sync.py`: Explore (charts/moods/genres) synchronization for cron mode
   - `sync_explore()`: Main entry point, reuses `download_new_tracks`, `remove_old_tracks`, `update_m3u_playlist` from `sync.py`. Applies `limit` truncation after fetching tracks (before compare/download).
-  - `fetch_explore_tracks()`: Routes to `_fetch_chart_tracks()` or `_fetch_mood_tracks()` based on type
+  - `fetch_explore_tracks()`: Routes to `_fetch_chart_tracks()`, `_fetch_mood_tracks()`, or `_fetch_new_release_tracks()` based on type
   - `_fetch_chart_tracks()`: Fetches tracks from YouTube Music charts via `get_charts()`
   - `_fetch_mood_tracks()`: Fetches tracks from a specific playlist (if `playlist_id` is set) or from all playlists in the category (if `playlist_id` is not set, legacy behavior). Accepts optional `playlist_id` parameter to target a single playlist instead of fetching all playlists in the mood/genre category.
+  - `_fetch_new_release_tracks()`: Fetches all new release albums via `get_new_releases()`, then gets tracks from each album via `get_album_tracks()`. Deduplicates tracks across albums. Continues on individual album fetch failures.
   - State is stored using the same `PlaylistState` model in `.kikusan/state/`
   - All safety features apply: cross-reference protection, Navidrome protection, unavailable cooldown
 - `kikusan/cron/config.py`: Cron configuration loading with support for `playlists`, `plugins`, `explore`, and `hooks` sections
@@ -363,10 +377,11 @@ All major configuration variables have corresponding CLI flags:
 - `--organization-mode`: File organization
 - `--use-primary-artist / --no-use-primary-artist`: Use primary artist for folder names
 - `--replaygain / --no-replaygain`: Apply ReplayGain/R128 loudness normalization tags (env: `KIKUSAN_REPLAYGAIN`)
-- Supports `explore` section in `cron.yaml` for syncing charts and moods/genres:
+- Supports `explore` section in `cron.yaml` for syncing charts, moods/genres, and new releases:
   - `type: charts` with optional `country` (ISO 3166-1 Alpha-2, default ZZ)
   - `type: mood` with required `params` (from `explore moods` command)
     - Optional `playlist_id` (str): Target a specific playlist instead of all playlists in the category. Get playlist IDs from `kikusan explore mood-playlists <PARAMS>` command.
+  - `type: new_releases` — syncs tracks from all new release albums on YouTube Music explore page. No additional parameters needed (no country, no params).
   - Each entry has `sync` (bool) and `schedule` (cron expression)
   - Optional `limit` (int, default 0 = no limit): Maximum number of tracks to sync. Tracks are truncated from the end, preserving the top-ranked entries (e.g., `limit: 10` keeps the top 10 chart tracks).
   - State stored in `.kikusan/state/` using same format as playlist state
