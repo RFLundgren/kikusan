@@ -155,6 +155,23 @@ class TestGetYdlOptsTrimFileName:
         )
         assert opts["trim_file_name"] == MAX_FILENAME_BYTES
 
+    def test_sets_explicit_youtube_player_clients(self):
+        """yt-dlp opts pin YouTube clients for consistent Docker/host behavior."""
+        output_dir = Path("/downloads")
+        info = {"artist": "Test", "title": "Test Song"}
+        opts = _get_ydl_opts(
+            output_dir=output_dir,
+            audio_format="opus",
+            filename_template="%(artist)s - %(title)s",
+            organization_mode="flat",
+            info=info,
+        )
+        assert opts["extractor_args"]["youtube"]["player_client"] == [
+            "android",
+            "web",
+            "web_safari",
+        ]
+
 
 class TestGetOutputPathTruncation:
     """Test that album mode output paths have truncated directory names."""

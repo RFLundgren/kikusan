@@ -95,6 +95,31 @@ class TestDownloadRecordsUnavailable:
         data = load_unavailable(tmp_path)
         assert "xyz789" not in data
 
+    @patch("kikusan.download.extract_info_with_retry")
+    @patch("kikusan.download.get_config")
+    def test_does_not_record_ambiguous_video_not_available_message(
+        self, mock_config, mock_extract, tmp_path
+    ):
+        """Bare 'This video is not available' should not start unavailable cooldown."""
+        mock_config.return_value = MagicMock(
+            unavailable_cooldown_hours=168,
+            cookie_file_path=None,
+            data_dir=tmp_path,
+        )
+        mock_extract.side_effect = DownloadError(
+            "ERROR: [youtube] 4tItYh2lEmY: This video is not available"
+        )
+
+        with pytest.raises(DownloadError):
+            download(
+                video_id="4tItYh2lEmY",
+                output_dir=tmp_path,
+                audio_format="opus",
+            )
+
+        data = load_unavailable(tmp_path)
+        assert "4tItYh2lEmY" not in data
+
 
 class TestDownloadChecksCooldown:
     """Tests that download() checks unavailable cooldown before hitting YouTube."""

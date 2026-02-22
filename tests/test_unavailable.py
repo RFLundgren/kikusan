@@ -27,9 +27,13 @@ class TestIsUnavailableError:
         msg = "ERROR: [youtube] 4kvgkNHs3jM: Video unavailable. This video is not available"
         assert is_unavailable_error(msg) is True
 
-    def test_detects_video_not_available(self):
+    def test_detects_video_not_available_in_country(self):
         msg = "This video is not available in your country"
         assert is_unavailable_error(msg) is True
+
+    def test_ignores_bare_video_not_available(self):
+        msg = "This video is not available"
+        assert is_unavailable_error(msg) is False
 
     def test_detects_video_removed(self):
         msg = "This video has been removed by the uploader"

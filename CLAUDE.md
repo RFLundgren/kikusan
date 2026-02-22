@@ -103,6 +103,7 @@ Kikusan is a tool to search and download music from youtube music. It must use y
   2. **Path component level**: `_sanitize_path_component()` truncates directory names (artist, album) in album mode
 - `_truncate_to_bytes()` handles UTF-8 safely (never splits multi-byte characters)
 - The constant `MAX_FILENAME_BYTES` is defined in `kikusan/config.py`
+- yt-dlp options explicitly set `extractor_args.youtube.player_client = ["android", "web", "web_safari"]` in `_get_ydl_opts()` to reduce Docker-vs-host YouTube extraction differences in minimal containers
 
 ### Video Type Filtering
 
@@ -132,6 +133,9 @@ Kikusan is a tool to search and download music from youtube music. It must use y
 - Default cooldown: 168 hours (7 days), configurable via `KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS` env var or `--unavailable-cooldown` CLI flag
 - Set cooldown to 0 to disable the feature entirely
 - Only "Video unavailable" errors trigger cooldown (not auth errors, network errors, etc.)
+- Bare yt-dlp error text `"This video is not available"` is treated as ambiguous (can be environment/extractor-related, e.g. Docker) and does NOT trigger auth-cookie fallback or unavailable cooldown by itself; explicit phrases like `"Video unavailable"` and geo-restriction variants still trigger unavailable handling
+- `kikusan/yt_dlp_wrapper.py` adds an additional retry path for ambiguous YouTube `"This video is not available"` errors (no cookies): retries with alternate `extractor_args.youtube.player_client` presets and, when applicable, retries the canonical `https://www.youtube.com/watch?v=...` URL instead of `music.youtube.com`
+- Fallback retry logging is intentionally low-noise: per-strategy attempts/failures are `DEBUG`, successful recovery emits one `INFO`, and a `WARNING` is emitted only if all fallback strategies fail
 - Integrated into ALL download paths:
   - `kikusan/download.py`: `download()` (single video - checks cooldown + records on failure), `_download_single()` (URL-based single track), `_download_playlist()` (playlist entries), `download_url()` (URL info extraction)
   - `kikusan/cron/sync.py`: `download_new_tracks()` (additional pre-check before calling `download()`)

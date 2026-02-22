@@ -54,6 +54,16 @@ class TestAuthErrorDetection:
         error = ExtractorError("AGE-RESTRICTED content warning")
         assert is_auth_error(error) is True
 
+    def test_ignores_generic_video_not_available(self):
+        """Bare 'video is not available' is ambiguous and should not imply auth."""
+        error = DownloadError("This video is not available")
+        assert is_auth_error(error) is False
+
+    def test_ignores_geo_restriction_not_available_variation(self):
+        """Geo-restriction errors are not auth/cookie errors."""
+        error = ExtractorError("ERROR: video is not available in your country")
+        assert is_auth_error(error) is False
+
     def test_ignores_unrelated_errors(self):
         """Test that unrelated errors are not matched."""
         error = DownloadError("Network timeout")
@@ -245,6 +255,62 @@ class TestExtractInfoWithRetry:
             )
 
         # Should only attempt once (can't retry without cookie file)
+        assert mock_ydl.extract_info.call_count == 1
+
+    @patch('kikusan.yt_dlp_wrapper.yt_dlp.YoutubeDL')
+    def test_retries_ambiguous_youtube_unavailable_with_fallback_clients(self, mock_ydl_class):
+        """Ambiguous YouTube unavailable errors get Docker-oriented fallback retries."""
+        mock_ydl = MagicMock()
+        mock_ydl.extract_info.side_effect = [
+            DownloadError("ERROR: [youtube] 4tItYh2lEmY: This video is not available"),
+            {"id": "4tItYh2lEmY", "title": "Test Video"},
+        ]
+        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+
+        config = Mock()
+        config.cookie_mode = "auto"
+        config.cookie_retry_delay = 1.0
+        config.log_cookie_usage = True
+
+        result = extract_info_with_retry(
+            ydl_opts={},
+            url="https://music.youtube.com/watch?v=4tItYh2lEmY",
+            download=False,
+            cookie_file=None,
+            config=config,
+        )
+
+        assert result["id"] == "4tItYh2lEmY"
+        assert mock_ydl.extract_info.call_count == 2
+        retry_opts = mock_ydl_class.call_args_list[1][0][0]
+        assert retry_opts["extractor_args"]["youtube"]["player_client"] == [
+            "tv_simply",
+            "tv_downgraded",
+            "android",
+            "web",
+        ]
+
+    @patch('kikusan.yt_dlp_wrapper.yt_dlp.YoutubeDL')
+    def test_does_not_retry_ambiguous_unavailable_for_non_youtube_url(self, mock_ydl_class):
+        """The ambiguous unavailable fallback is only for YouTube URLs."""
+        mock_ydl = MagicMock()
+        mock_ydl.extract_info.side_effect = DownloadError("This video is not available")
+        mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+
+        config = Mock()
+        config.cookie_mode = "auto"
+        config.cookie_retry_delay = 1.0
+        config.log_cookie_usage = True
+
+        with pytest.raises(DownloadError):
+            extract_info_with_retry(
+                ydl_opts={},
+                url="https://example.com/video/123",
+                download=False,
+                cookie_file=None,
+                config=config,
+            )
+
         assert mock_ydl.extract_info.call_count == 1
 
     @patch('kikusan.yt_dlp_wrapper.yt_dlp.YoutubeDL')

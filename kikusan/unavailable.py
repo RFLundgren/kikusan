@@ -19,10 +19,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_COOLDOWN_HOURS = 168  # 7 days
 
-# Patterns indicating the video itself is unavailable (not auth/network issues)
+# Patterns indicating the video itself is unavailable (not auth/network issues).
+# Keep these specific: bare "This video is not available" is ambiguous and may be
+# returned for transient extractor/client issues in some environments (e.g. Docker).
 UNAVAILABLE_PATTERNS = [
     r"Video unavailable",
-    r"This video is not available",
+    r"This video is not available in your country",
     r"This video has been removed",
     r"This video is no longer available",
     r"This video does not exist",

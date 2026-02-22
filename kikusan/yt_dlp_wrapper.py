@@ -15,10 +15,15 @@ import logging
 import re
 import threading
 import time
+from urllib.parse import parse_qs, urlparse
 from typing import Any, Optional
 
 import yt_dlp
 from yt_dlp.utils import DownloadError, ExtractorError
+try:
+    from yt_dlp.version import __version__ as YT_DLP_VERSION
+except Exception:  # pragma: no cover - defensive import
+    YT_DLP_VERSION = "unknown"
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +49,6 @@ AUTH_REQUIRED_PATTERNS = [
     # Private/unlisted with auth
     r"granted.*access",
     r"unlisted.*video",
-    # Generic "not available" - often works with cookies (region/account-dependent)
-    r"video is not available",
 ]
 
 
@@ -110,6 +113,151 @@ def is_auth_error(exception: Exception) -> bool:
             return True
 
     return False
+
+
+def _is_ambiguous_youtube_unavailable_error(exception: Exception) -> bool:
+    """Detect Docker-prone generic YouTube unavailable errors worth retrying."""
+    message = str(exception).lower()
+    if "youtube" not in message and "video is not available" not in message:
+        return False
+    return "this video is not available" in message and "video unavailable" not in message
+
+
+def _is_youtube_url(url: str) -> bool:
+    parsed = urlparse(url)
+    host = (parsed.netloc or "").lower()
+    return host in {"youtube.com", "www.youtube.com", "music.youtube.com", "youtu.be"}
+
+
+def _to_canonical_youtube_watch_url(url: str) -> str | None:
+    """Convert music.youtube.com/youtu.be URLs to youtube.com watch URL when possible."""
+    parsed = urlparse(url)
+    host = (parsed.netloc or "").lower()
+
+    if host in {"youtube.com", "www.youtube.com"}:
+        return None
+
+    if host == "music.youtube.com":
+        video_id = parse_qs(parsed.query).get("v", [None])[0]
+        if video_id:
+            return f"https://www.youtube.com/watch?v={video_id}"
+        return None
+
+    if host == "youtu.be":
+        video_id = parsed.path.lstrip("/")
+        if video_id:
+            return f"https://www.youtube.com/watch?v={video_id}"
+
+    return None
+
+
+def _with_youtube_player_clients(
+    ydl_opts: dict[str, Any], player_clients: list[str]
+) -> dict[str, Any]:
+    """Return a copy of ydl_opts with youtube player_client override merged in."""
+    opts = ydl_opts.copy()
+    extractor_args = dict(opts.get("extractor_args") or {})
+    youtube_args = dict(extractor_args.get("youtube") or {})
+    youtube_args["player_client"] = list(player_clients)
+    extractor_args["youtube"] = youtube_args
+    opts["extractor_args"] = extractor_args
+    return opts
+
+
+def _execute_ydl_once(
+    ydl_opts: dict[str, Any],
+    url: str,
+    download: bool,
+    cookie_file: Optional[str],
+    use_cookies: bool,
+) -> dict[str, Any]:
+    """Single yt-dlp execution attempt."""
+    opts = ydl_opts.copy()
+
+    if use_cookies and cookie_file:
+        opts["cookiefile"] = cookie_file
+
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        return ydl.extract_info(url, download=download)
+
+
+def _retry_ambiguous_youtube_unavailable(
+    original_error: Exception,
+    ydl_opts: dict[str, Any],
+    url: str,
+    download: bool,
+    cookie_file: Optional[str],
+    use_cookies: bool,
+) -> dict[str, Any]:
+    """Retry ambiguous YouTube unavailable errors with alternate client strategies."""
+    if use_cookies:
+        raise original_error
+    if not _is_youtube_url(url):
+        raise original_error
+    if not _is_ambiguous_youtube_unavailable_error(original_error):
+        raise original_error
+
+    alternate_url = _to_canonical_youtube_watch_url(url)
+    strategies: list[tuple[str, str, dict[str, Any]]] = [
+        (
+            "youtube_client_fallback_tv",
+            url,
+            _with_youtube_player_clients(ydl_opts, ["tv_simply", "tv_downgraded", "android", "web"]),
+        ),
+        (
+            "youtube_client_fallback_ios",
+            url,
+            _with_youtube_player_clients(ydl_opts, ["ios", "android", "web"]),
+        ),
+    ]
+    if alternate_url:
+        strategies.extend(
+            [
+                ("youtube_canonical_url_retry", alternate_url, ydl_opts),
+                (
+                    "youtube_canonical_url_tv_client_retry",
+                    alternate_url,
+                    _with_youtube_player_clients(
+                        ydl_opts, ["tv_simply", "tv_downgraded", "android", "web"]
+                    ),
+                ),
+            ]
+        )
+
+    logger.debug(
+        "Ambiguous YouTube unavailable error; retrying with fallback strategies "
+        "(yt-dlp=%s, url=%s): %s",
+        YT_DLP_VERSION,
+        url,
+        str(original_error)[:160],
+    )
+
+    last_error: Exception = original_error
+    for strategy_name, retry_url, retry_opts in strategies:
+        try:
+            logger.debug("yt-dlp fallback retry strategy=%s url=%s", strategy_name, retry_url)
+            result = _execute_ydl_once(retry_opts, retry_url, download, cookie_file, use_cookies)
+            logger.info(
+                "Recovered from ambiguous YouTube unavailable error using fallback strategy=%s",
+                strategy_name,
+            )
+            return result
+        except (ExtractorError, DownloadError) as retry_error:
+            last_error = retry_error
+            logger.debug(
+                "yt-dlp fallback retry failed strategy=%s error=%s",
+                strategy_name,
+                str(retry_error)[:160],
+            )
+
+    logger.warning(
+        "All yt-dlp fallback strategies failed for ambiguous YouTube unavailable error "
+        "(yt-dlp=%s, url=%s, attempts=%d)",
+        YT_DLP_VERSION,
+        url,
+        len(strategies),
+    )
+    raise last_error
 
 
 def extract_info_with_retry(
@@ -219,22 +367,9 @@ def _execute_ydl(
     Returns:
         yt-dlp info dict
     """
-    # Create options copy to avoid modifying input
-    opts = ydl_opts.copy()
-
-    # Add cookies if requested and available
-    if use_cookies and cookie_file:
-        opts["cookiefile"] = cookie_file
-
-    # Execute yt-dlp
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        if download:
-            # Download and return info
-            # Note: yt-dlp.download() returns error code, not info
-            # We need to call extract_info with download=True
-            info = ydl.extract_info(url, download=True)
-        else:
-            # Just extract info
-            info = ydl.extract_info(url, download=False)
-
-    return info
+    try:
+        return _execute_ydl_once(ydl_opts, url, download, cookie_file, use_cookies)
+    except (ExtractorError, DownloadError) as e:
+        return _retry_ambiguous_youtube_unavailable(
+            e, ydl_opts, url, download, cookie_file, use_cookies
+        )
