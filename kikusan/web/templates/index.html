@@ -96,9 +96,13 @@
       <div id="queue-section" class="queue-section">
         <div class="queue-header">
           <h2>Download Queue</h2>
-          <button id="clear-completed-btn" class="clear-btn">
-            Clear Completed
-          </button>
+          <div class="queue-header-actions">
+            <button id="retry-all-btn" class="clear-btn">Retry All</button>
+            <button id="clear-failed-btn" class="clear-btn">Clear Failed</button>
+            <button id="clear-completed-btn" class="clear-btn">
+              Clear Completed
+            </button>
+          </div>
         </div>
         <div id="queue-list" class="queue-list"></div>
       </div>
@@ -1869,7 +1873,7 @@
           const response = await fetch("/api/queue/jobs");
           const data = await response.json();
           for (const job of data.jobs) {
-            if (job.status === "completed" || job.status === "failed") {
+            if (job.status === "completed") {
               await removeJob(job.id);
             }
           }
@@ -1882,6 +1886,81 @@
       document
         .getElementById("clear-completed-btn")
         .addEventListener("click", clearCompleted);
+
+      async function clearFailed() {
+        try {
+          const response = await fetch("/api/queue/jobs");
+          const data = await response.json();
+          for (const job of data.jobs) {
+            if (job.status === "failed") {
+              await removeJob(job.id);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to clear failed jobs:", error);
+          showStatus("Failed to clear failed jobs", true);
+        }
+      }
+
+      document
+        .getElementById("clear-failed-btn")
+        .addEventListener("click", clearFailed);
+
+      async function retryAllFailed() {
+        const btn = document.getElementById("retry-all-btn");
+        btn.disabled = true;
+        const originalText = btn.textContent;
+
+        let succeeded = 0;
+        let failed = 0;
+
+        try {
+          const response = await fetch("/api/queue/jobs");
+          const data = await response.json();
+          const failedJobs = data.jobs.filter((job) => job.status === "failed");
+
+          for (const job of failedJobs) {
+            btn.textContent = `Retrying ${succeeded + failed + 1}/${failedJobs.length}...`;
+            try {
+              const addResponse = await fetch("/api/queue/add", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  video_id: job.video_id,
+                  title: job.title,
+                  artist: job.artist,
+                  audio_format: job.format,
+                }),
+              });
+              if (addResponse.ok) {
+                await removeJob(job.id);
+                succeeded++;
+              } else {
+                failed++;
+              }
+            } catch (error) {
+              failed++;
+            }
+          }
+
+          showStatus(
+            failed > 0
+              ? `Retried ${succeeded} download(s), ${failed} failed to re-queue`
+              : `Retried ${succeeded} download(s)`,
+            failed > 0,
+          );
+        } catch (error) {
+          console.error("Failed to retry all failed jobs:", error);
+          showStatus("Failed to retry all failed downloads", true);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      }
+
+      document
+        .getElementById("retry-all-btn")
+        .addEventListener("click", retryAllFailed);
 
       // Initialize queue on page load
       initQueue();

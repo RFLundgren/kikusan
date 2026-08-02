@@ -908,6 +908,11 @@ header p {
     color: var(--text-primary);
 }
 
+.queue-header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
 .clear-btn {
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
@@ -1128,6 +1133,10 @@ header p {
 
     .queue-header h2 {
         font-size: 1.25rem;
+    }
+
+    .queue-header-actions {
+        flex-direction: column;
     }
 
     .clear-btn {
