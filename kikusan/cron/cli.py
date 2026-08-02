@@ -56,7 +56,7 @@ def cron_command(
         OrganizationMode | None,
         typer.Option(
             "--organization-mode",
-            help="File organization: flat (all in one dir) or album (Artist/Year - Album/Track). Default: flat",
+            help="File organization: flat (all in one dir) or album (Artist/Album (Year)/Track). Default: flat",
             envvar="KIKUSAN_ORGANIZATION_MODE",
         ),
     ] = None,

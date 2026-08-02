@@ -468,8 +468,8 @@ export KIKUSAN_ORGANIZATION_MODE=album
 
 **Behavior:**
 
-- **Full metadata**: `Artist/Year - Album/NN - Track.ext`
-- **Missing track number**: `Artist/Year - Album/Track.ext`
+- **Full metadata**: `Artist/Album (Year)/NN - Track.ext`
+- **Missing track number**: `Artist/Album (Year)/Track.ext`
 - **Missing album**: `Artist/Track.ext`
 - **Path sanitization**: Invalid filesystem characters are automatically removed
 

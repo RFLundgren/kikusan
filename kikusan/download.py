@@ -136,7 +136,7 @@ def _get_output_path(
         # We have album info
         album = _sanitize_path_component(album)
         if year:
-            album_folder = f"{year} - {album}"
+            album_folder = f"{album} ({year})"
         else:
             album_folder = album
         path_parts.append(album_folder)
