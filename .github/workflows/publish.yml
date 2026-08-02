@@ -109,5 +109,5 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/dadav/kikusan:${{ steps.vars.outputs.tag }}
-            ghcr.io/dadav/kikusan:latest
+            ghcr.io/rflundgren/kikusan:${{ steps.vars.outputs.tag }}
+            ghcr.io/rflundgren/kikusan:latest

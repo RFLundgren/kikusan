@@ -7,3 +7,5 @@ wheels/
 .venv
 downloads/
 cookies.txt
+.env
+cron.yaml
