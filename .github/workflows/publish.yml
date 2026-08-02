@@ -33,6 +33,7 @@ jobs:
 
   create-release:
     needs: build
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -65,6 +66,7 @@ jobs:
 
   publish:
     needs: build
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
