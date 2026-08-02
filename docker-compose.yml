@@ -13,6 +13,7 @@ services:
       - KIKUSAN_AUDIO_FORMAT=opus
       - KIKUSAN_WEB_PORT=8000
       - KIKUSAN_WEB_PLAYLIST=web-downloads
+      - KIKUSAN_ORGANIZATION_MODE=album  # Artist/Album (Year)/Track.ext, matches Navidrome's layout
       # - YT_DLP_COOKIE_FILE=/cookies/cookies.txt  # Optional: use env var instead of web upload
       # - KIKUSAN_CORS_ORIGINS=*  # Optional: CORS allowed origins (default: *)
       # - KIKUSAN_REPLAYGAIN=true  # Optional: Apply ReplayGain/R128 loudness normalization tags
