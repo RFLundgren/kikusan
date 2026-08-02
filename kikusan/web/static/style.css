@@ -974,7 +974,8 @@ header p {
 
 /* Job Actions */
 .download-file-btn,
-.clear-job-btn {
+.clear-job-btn,
+.retry-job-btn {
     padding: 0.5rem 1rem;
     font-size: 0.85rem;
     font-weight: 600;
@@ -1009,6 +1010,20 @@ header p {
     color: white;
 }
 
+.retry-job-btn {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.retry-job-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.retry-job-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Mobile Queue Adjustments */
 @media (max-width: 640px) {
     .queue-header {
@@ -1040,7 +1055,8 @@ header p {
     }
 
     .queue-list .download-file-btn,
-    .queue-list .clear-job-btn {
+    .queue-list .clear-job-btn,
+    .queue-list .retry-job-btn {
         width: 100%;
         margin-right: 0;
         margin-bottom: 0.25rem;

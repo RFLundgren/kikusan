@@ -1456,8 +1456,10 @@
       }
 
       let previousJobStatuses = {};
+      let latestJobsById = {};
 
       function updateQueueUI(jobs) {
+        latestJobsById = Object.fromEntries(jobs.map((job) => [job.id, job]));
         const queueList = document.getElementById("queue-list");
         const queueSection = document.getElementById("queue-section");
 
@@ -1507,6 +1509,12 @@
                     `;
             }
 
+            if (job.status === "failed") {
+              actionsHtml += `
+                        <button class="retry-job-btn" data-job-id="${job.id}">Retry</button>
+                    `;
+            }
+
             if (job.status === "completed" || job.status === "failed") {
               actionsHtml += `
                         <button class="clear-job-btn" data-job-id="${job.id}">Clear</button>
@@ -1541,6 +1549,49 @@
             await removeJob(jobId);
           });
         });
+
+        // Add retry button handlers
+        document.querySelectorAll(".retry-job-btn").forEach((btn) => {
+          btn.addEventListener("click", async (e) => {
+            const jobId = e.target.dataset.jobId;
+            await retryJob(jobId, e.target);
+          });
+        });
+      }
+
+      async function retryJob(jobId, btn) {
+        const job = latestJobsById[jobId];
+        if (!job) return;
+
+        btn.disabled = true;
+        btn.textContent = "Retrying...";
+
+        try {
+          const response = await fetch("/api/queue/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              video_id: job.video_id,
+              title: job.title,
+              artist: job.artist,
+              audio_format: job.format,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response
+              .json()
+              .catch(() => ({ detail: "Unknown error" }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+          }
+
+          await removeJob(jobId);
+        } catch (error) {
+          console.error("Failed to retry job:", error);
+          showStatus("Failed to retry download: " + error.message, true);
+          btn.disabled = false;
+          btn.textContent = "Retry";
+        }
       }
 
       async function removeJob(jobId) {
