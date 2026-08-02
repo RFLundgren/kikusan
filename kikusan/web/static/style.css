@@ -324,6 +324,80 @@ header p {
     border-color: var(--border-hover);
 }
 
+.track-select-checkbox {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+}
+
+.batch-bar {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-primary);
+    border-radius: 8px;
+}
+
+.batch-bar.active {
+    display: flex;
+}
+
+.batch-count {
+    font-weight: 600;
+    margin-right: auto;
+}
+
+.batch-download-btn,
+.batch-clear-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.batch-download-btn {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.batch-download-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.batch-download-btn:disabled,
+.batch-clear-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.batch-clear-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.batch-clear-btn:hover {
+    background: var(--border-color);
+}
+
+@media (max-width: 640px) {
+    .batch-bar {
+        flex-wrap: wrap;
+    }
+
+    .batch-count {
+        width: 100%;
+        margin-right: 0;
+    }
+}
+
 .track-main {
     display: flex;
     align-items: center;
@@ -514,6 +588,7 @@ header p {
 }
 
 .album-card {
+    position: relative;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -521,6 +596,25 @@ header p {
     transition: all 0.2s;
     display: flex;
     flex-direction: column;
+}
+
+.select-overlay {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 2;
+    display: flex;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 6px;
+    padding: 0.3rem;
+    cursor: pointer;
+}
+
+.album-select-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
 }
 
 .album-card:hover {

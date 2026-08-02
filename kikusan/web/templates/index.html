@@ -103,7 +103,26 @@
         <div id="queue-list" class="queue-list"></div>
       </div>
 
+      <div id="songs-batch-bar" class="batch-bar">
+        <span id="songs-batch-count" class="batch-count">0 selected</span>
+        <button id="songs-batch-download" class="batch-download-btn">
+          Download Selected
+        </button>
+        <button id="songs-batch-clear" class="batch-clear-btn">
+          Clear Selection
+        </button>
+      </div>
       <div id="songs-results" class="results active"></div>
+
+      <div id="albums-batch-bar" class="batch-bar">
+        <span id="albums-batch-count" class="batch-count">0 selected</span>
+        <button id="albums-batch-download" class="batch-download-btn">
+          Download Selected
+        </button>
+        <button id="albums-batch-clear" class="batch-clear-btn">
+          Clear Selection
+        </button>
+      </div>
       <div id="albums-results" class="albums-grid"></div>
       <div id="artists-results" class="albums-grid"></div>
       <div id="explore-results" class="explore-section"></div>
@@ -334,11 +353,19 @@
       let viewingAlbum = null; // Tracks current album view mode { id, title, query }
       let viewingArtist = null; // Tracks current artist-albums view mode { id, name, query }
 
+      // Batch selection state (cleared whenever their results re-render)
+      let selectedTrackIds = new Set();
+      let selectedAlbumIds = new Set();
+      let latestTracksById = {};
+      let latestAlbumsById = {};
+
       tabButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
           const tab = btn.dataset.tab;
           exitAlbumViewMode(); // Clear album view mode when switching tabs
           exitArtistViewMode(); // Clear artist view mode when switching tabs
+          clearSongsSelection(); // Clear batch selection when switching tabs
+          clearAlbumsSelection();
 
           if (tab === "explore") {
             // Explore tab manages its own URL params via updateExploreUrlParams
@@ -1077,10 +1104,16 @@
       initAutoSearch();
 
       function renderAlbums(albums) {
+        selectedAlbumIds.clear();
+        latestAlbumsById = Object.fromEntries(albums.map((a) => [a.browse_id, a]));
+
         albumsResults.innerHTML = albums
           .map(
             (album) => `
                 <div class="album-card">
+                    <label class="select-overlay">
+                        <input type="checkbox" class="album-select-checkbox" data-browse-id="${album.browse_id}">
+                    </label>
                     <img class="album-cover" src="${proxyImageUrl(album.thumbnail_url)}" alt="${escapeHtml(album.title)}" onerror="this.style.display='none'">
                     <div class="album-info">
                         <div class="album-title">${escapeHtml(album.title)}</div>
@@ -1110,6 +1143,18 @@
         document.querySelectorAll(".download-album-btn").forEach((btn) => {
           btn.addEventListener("click", handleDownloadAlbum);
         });
+        document.querySelectorAll(".album-select-checkbox").forEach((cb) => {
+          cb.addEventListener("change", (e) => {
+            const id = e.target.dataset.browseId;
+            if (e.target.checked) {
+              selectedAlbumIds.add(id);
+            } else {
+              selectedAlbumIds.delete(id);
+            }
+            updateAlbumsBatchBar();
+          });
+        });
+        updateAlbumsBatchBar();
       }
 
       function renderArtists(artists) {
@@ -1259,10 +1304,14 @@
         // Stop any playing audio when re-rendering results
         stopCurrentAudio();
 
+        selectedTrackIds.clear();
+        latestTracksById = Object.fromEntries(tracks.map((t) => [t.video_id, t]));
+
         songsResults.innerHTML = tracks
           .map(
             (track) => `
                 <div class="track" data-video-id="${track.video_id}">
+                    <input type="checkbox" class="track-select-checkbox" data-video-id="${track.video_id}">
                     <div class="track-main">
                         <img
                             class="track-cover"
@@ -1323,6 +1372,20 @@
           btn.addEventListener("click", handleDownload);
         });
 
+        // Add select checkbox handlers
+        document.querySelectorAll(".track-select-checkbox").forEach((cb) => {
+          cb.addEventListener("change", (e) => {
+            const id = e.target.dataset.videoId;
+            if (e.target.checked) {
+              selectedTrackIds.add(id);
+            } else {
+              selectedTrackIds.delete(id);
+            }
+            updateSongsBatchBar();
+          });
+        });
+        updateSongsBatchBar();
+
         annotateDownloadStatus(tracks.map((t) => t.video_id));
       }
 
@@ -1358,6 +1421,169 @@
           console.error("Failed to fetch download status:", error);
         }
       }
+
+      // Batch selection: Songs
+      function updateSongsBatchBar() {
+        const bar = document.getElementById("songs-batch-bar");
+        const count = document.getElementById("songs-batch-count");
+        if (selectedTrackIds.size > 0) {
+          bar.classList.add("active");
+          count.textContent = `${selectedTrackIds.size} selected`;
+        } else {
+          bar.classList.remove("active");
+        }
+      }
+
+      function clearSongsSelection() {
+        selectedTrackIds.clear();
+        document.querySelectorAll(".track-select-checkbox").forEach((cb) => {
+          cb.checked = false;
+        });
+        updateSongsBatchBar();
+      }
+
+      async function handleBatchDownloadTracks() {
+        const btn = document.getElementById("songs-batch-download");
+        const ids = [...selectedTrackIds];
+        if (ids.length === 0) return;
+
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        const format = formatSelector.value;
+
+        let succeeded = 0;
+        let failed = 0;
+
+        for (const videoId of ids) {
+          const track = latestTracksById[videoId];
+          if (!track) {
+            failed++;
+            continue;
+          }
+          btn.textContent = `Queuing ${succeeded + failed + 1}/${ids.length}...`;
+          try {
+            const response = await fetch("/api/queue/add", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                video_id: track.video_id,
+                title: track.title,
+                artist: track.artist,
+                audio_format: format,
+              }),
+            });
+            if (response.ok) {
+              succeeded++;
+            } else {
+              failed++;
+            }
+          } catch (error) {
+            failed++;
+          }
+        }
+
+        btn.disabled = false;
+        btn.textContent = originalText;
+
+        showStatus(
+          failed > 0
+            ? `Queued ${succeeded} track(s), ${failed} failed`
+            : `Queued ${succeeded} track(s) for download`,
+          failed > 0,
+        );
+
+        clearSongsSelection();
+      }
+
+      document
+        .getElementById("songs-batch-clear")
+        .addEventListener("click", clearSongsSelection);
+      document
+        .getElementById("songs-batch-download")
+        .addEventListener("click", handleBatchDownloadTracks);
+
+      // Batch selection: Albums
+      function updateAlbumsBatchBar() {
+        const bar = document.getElementById("albums-batch-bar");
+        const count = document.getElementById("albums-batch-count");
+        if (selectedAlbumIds.size > 0) {
+          bar.classList.add("active");
+          count.textContent = `${selectedAlbumIds.size} selected`;
+        } else {
+          bar.classList.remove("active");
+        }
+      }
+
+      function clearAlbumsSelection() {
+        selectedAlbumIds.clear();
+        document.querySelectorAll(".album-select-checkbox").forEach((cb) => {
+          cb.checked = false;
+        });
+        updateAlbumsBatchBar();
+      }
+
+      async function handleBatchDownloadAlbums() {
+        const btn = document.getElementById("albums-batch-download");
+        const ids = [...selectedAlbumIds];
+        if (ids.length === 0) return;
+
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        const format = formatSelector.value;
+
+        let succeeded = 0;
+        let failed = 0;
+        let totalTracks = 0;
+
+        for (const browseId of ids) {
+          const album = latestAlbumsById[browseId];
+          if (!album) {
+            failed++;
+            continue;
+          }
+          btn.textContent = `Queuing album ${succeeded + failed + 1}/${ids.length}...`;
+          try {
+            const response = await fetch("/api/queue/add-album", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                browse_id: album.browse_id,
+                album_title: album.title,
+                artist: album.artist,
+                audio_format: format,
+              }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+              succeeded++;
+              totalTracks += data.track_count || 0;
+            } else {
+              failed++;
+            }
+          } catch (error) {
+            failed++;
+          }
+        }
+
+        btn.disabled = false;
+        btn.textContent = originalText;
+
+        showStatus(
+          failed > 0
+            ? `Queued ${succeeded} album(s) (${totalTracks} tracks), ${failed} failed`
+            : `Queued ${succeeded} album(s) for download (${totalTracks} tracks)`,
+          failed > 0,
+        );
+
+        clearAlbumsSelection();
+      }
+
+      document
+        .getElementById("albums-batch-clear")
+        .addEventListener("click", clearAlbumsSelection);
+      document
+        .getElementById("albums-batch-download")
+        .addEventListener("click", handleBatchDownloadAlbums);
 
       async function handleCopyUrl(e) {
         e.stopPropagation();
