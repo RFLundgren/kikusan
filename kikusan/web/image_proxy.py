@@ -14,6 +14,8 @@ ALLOWED_HOSTS: frozenset[str] = frozenset({
     "lh3.googleusercontent.com",
     "i.ytimg.com",
     "yt3.ggpht.com",
+    "yt3.googleusercontent.com",
+    "www.gstatic.com",
 })
 
 _MAX_CACHE_ENTRIES = 500
