@@ -51,6 +51,8 @@ _mood_playlists_cache = TtlCache(max_entries=50, ttl_seconds=1800)  # 30 min
 _charts_cache = TtlCache(max_entries=20, ttl_seconds=1800)        # 30 min
 _playlist_tracks_cache = TtlCache(max_entries=50, ttl_seconds=900)  # 15 min
 _new_releases_cache = TtlCache(max_entries=1, ttl_seconds=1800)    # 30 min
+_artist_search_cache = TtlCache(max_entries=200, ttl_seconds=300)  # 5 min
+_artist_albums_cache = TtlCache(max_entries=100, ttl_seconds=900)  # 15 min
 
 # Setup templates and static files
 templates_dir = Path(__file__).parent / "templates"
@@ -178,6 +180,30 @@ class AlbumTracksResponse(BaseModel):
     browse_id: str
     album_title: str
     tracks: list[TrackResponse]
+
+
+class ArtistResponse(BaseModel):
+    """Artist data for API responses."""
+
+    browse_id: str
+    name: str
+    thumbnail_url: str | None
+    subscribers: str | None = None
+
+
+class ArtistSearchResponse(BaseModel):
+    """Response body for artist search endpoint."""
+
+    query: str
+    results: list[ArtistResponse]
+
+
+class ArtistAlbumsResponse(BaseModel):
+    """Response body for artist albums endpoint."""
+
+    browse_id: str
+    artist_name: str
+    results: list[AlbumResponse]
 
 
 class StreamUrlResponse(BaseModel):
@@ -615,6 +641,66 @@ async def api_get_album_tracks(browse_id: str):
         raise
     except Exception as e:
         logger.error("Failed to get album tracks: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/search/artists", response_model=ArtistSearchResponse)
+async def api_search_artists(q: str = Query(..., min_length=1)):
+    """Search YouTube Music for artists."""
+    from kikusan.search import search_artists
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    cached = _artist_search_cache.get(f"artist_search:{q}")
+    if cached is not None:
+        results = cached
+    else:
+        try:
+            results = search_artists(q, limit=20)
+        except Exception as e:
+            logger.error("Artist search failed for query '%s': %s", q, e)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Artist search failed: {str(e)}"
+            )
+        _artist_search_cache.put(f"artist_search:{q}", results)
+
+    return ArtistSearchResponse(
+        query=q,
+        results=[ArtistResponse(**artist.model_dump()) for artist in results],
+    )
+
+
+@app.get("/api/artist/{browse_id}/albums", response_model=ArtistAlbumsResponse)
+async def api_get_artist_albums(browse_id: str):
+    """Get an artist's albums and singles."""
+    from kikusan.search import get_artist_albums
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    cache_key = f"artist_albums:{browse_id}"
+    cached = _artist_albums_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        albums = get_artist_albums(browse_id)
+        if not albums:
+            raise HTTPException(status_code=404, detail="No albums found for this artist")
+
+        response = ArtistAlbumsResponse(
+            browse_id=browse_id,
+            artist_name=albums[0].artist,
+            results=[AlbumResponse(**album.model_dump()) for album in albums],
+        )
+        _artist_albums_cache.put(cache_key, response)
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get artist albums: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

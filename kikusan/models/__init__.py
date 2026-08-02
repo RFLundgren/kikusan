@@ -14,6 +14,7 @@ from kikusan.models.deezer import DeezerTrack
 from kikusan.models.queue import DownloadJob, JobStatus
 from kikusan.models.search import (
     Album,
+    Artist,
     ChartArtist,
     Charts,
     ChartTrack,
@@ -33,6 +34,7 @@ from kikusan.models.unavailable import UnavailableRecord
 
 __all__ = [
     "Album",
+    "Artist",
     "ChartArtist",
     "Charts",
     "ChartTrack",

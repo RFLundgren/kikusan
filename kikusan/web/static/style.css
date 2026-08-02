@@ -575,7 +575,8 @@ header p {
 }
 
 .view-album-btn,
-.download-album-btn {
+.download-album-btn,
+.view-artist-btn {
     padding: 0.6rem 1rem;
     font-size: 0.9rem;
     font-weight: 600;
@@ -585,12 +586,14 @@ header p {
     transition: all 0.2s;
 }
 
-.view-album-btn {
+.view-album-btn,
+.view-artist-btn {
     background: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
-.view-album-btn:hover:not(:disabled) {
+.view-album-btn:hover:not(:disabled),
+.view-artist-btn:hover:not(:disabled) {
     background: var(--accent-primary);
     color: white;
 }

@@ -9,6 +9,7 @@ from kikusan.config import get_config
 from kikusan.metadata_cache import CachedSongMetadata, CachedTrack, MetadataCache
 from kikusan.models.search import (
     Album,
+    Artist,
     ChartArtist,
     Charts,
     ChartTrack,
@@ -52,7 +53,7 @@ def is_allowed_video_type(video_type: str | None, allow_ugc: bool = False) -> bo
 # Track, Album, MoodCategory, MoodSection, MoodPlaylist, ChartTrack,
 # ChartArtist, Charts, SongMetadata
 __all__ = [
-    "Track", "Album", "MoodCategory", "MoodSection", "MoodPlaylist",
+    "Track", "Album", "Artist", "MoodCategory", "MoodSection", "MoodPlaylist",
     "ChartTrack", "ChartArtist", "Charts", "SongMetadata",
 ]
 
@@ -173,6 +174,130 @@ def search_albums(query: str, limit: int = 20) -> list[Album]:
         )
 
     logger.info("Found %d albums for query: %s", len(albums), query)
+    return albums
+
+
+def search_artists(query: str, limit: int = 20) -> list[Artist]:
+    """
+    Search YouTube Music for artists.
+
+    Args:
+        query: Search query string
+        limit: Maximum number of results to return
+
+    Returns:
+        List of Artist objects matching the query
+
+    Raises:
+        Exception: If YouTube Music API fails (e.g., JSONDecodeError, network error)
+    """
+    yt = YTMusic()
+    try:
+        results = yt.search(query, filter="artists", limit=limit)
+    except Exception as e:
+        logger.error("YouTube Music artist search failed for query '%s': %s", query, e)
+        raise
+
+    artists = []
+    for item in results:
+        if item.get("resultType") != "artist":
+            continue
+
+        browse_id = item.get("browseId")
+        if not browse_id:
+            continue
+
+        thumbnails = item.get("thumbnails", [])
+        thumbnail_url = thumbnails[-1]["url"] if thumbnails else None
+
+        artists.append(
+            Artist(
+                browse_id=browse_id,
+                name=item.get("artist", "Unknown Artist"),
+                thumbnail_url=thumbnail_url,
+                subscribers=item.get("subscribers"),
+            )
+        )
+
+    logger.info("Found %d artists for query: %s", len(artists), query)
+    return artists
+
+
+def get_artist_albums(browse_id: str) -> list[Album]:
+    """
+    Get an artist's albums and singles.
+
+    Fetches the initial albums/singles shelves from the artist page, then
+    follows YouTube Music's pagination (when present) to return the full
+    discography rather than just the short preview shown on the artist page.
+
+    Args:
+        browse_id: YouTube Music artist browse ID
+
+    Returns:
+        List of Album objects (albums and singles combined, deduplicated)
+
+    Raises:
+        Exception: If YouTube Music API fails (e.g., JSONDecodeError, network error)
+    """
+    yt = YTMusic()
+    try:
+        artist_info = yt.get_artist(browse_id)
+    except Exception as e:
+        logger.error("YouTube Music get_artist failed for browse_id '%s': %s", browse_id, e)
+        raise
+
+    artist_name = artist_info.get("name") or "Unknown Artist"
+
+    albums: list[Album] = []
+    seen_browse_ids: set[str] = set()
+
+    for section_key in ("albums", "singles"):
+        section = artist_info.get(section_key)
+        if not section:
+            continue
+
+        results = section.get("results", [])
+
+        # YouTube Music only inlines a short preview; if there's a "more" shelf
+        # (params + its own browseId), fetch the full list instead.
+        params = section.get("params")
+        section_browse_id = section.get("browseId")
+        if params and section_browse_id:
+            try:
+                results = yt.get_artist_albums(section_browse_id, params)
+            except Exception as e:
+                logger.warning(
+                    "Failed to fetch full %s list for artist '%s': %s",
+                    section_key, browse_id, e,
+                )
+
+        for item in results:
+            item_browse_id = item.get("browseId")
+            if not item_browse_id or item_browse_id in seen_browse_ids:
+                continue
+            seen_browse_ids.add(item_browse_id)
+
+            thumbnails = item.get("thumbnails", [])
+            thumbnail_url = thumbnails[-1]["url"] if thumbnails else None
+
+            year_raw = item.get("year")
+            year = int(year_raw) if year_raw and str(year_raw).isdigit() else None
+
+            albums.append(
+                Album(
+                    browse_id=item_browse_id,
+                    title=item.get("title", "Unknown Album"),
+                    artist=artist_name,
+                    year=year,
+                    track_count=None,
+                    thumbnail_url=thumbnail_url,
+                    album_type=item.get("type"),
+                    is_explicit=item.get("isExplicit", False),
+                )
+            )
+
+    logger.info("Found %d albums/singles for artist: %s", len(albums), artist_name)
     return albums
 
 

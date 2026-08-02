@@ -43,6 +43,17 @@ class Album(BaseModel):
     is_explicit: bool = False
 
 
+class Artist(BaseModel):
+    """Represents an artist from YouTube Music."""
+
+    model_config = ConfigDict(frozen=True)
+
+    browse_id: str
+    name: str
+    thumbnail_url: str | None
+    subscribers: str | None = None
+
+
 class MoodCategory(BaseModel):
     """A single mood/genre category with a params identifier for fetching playlists."""
 
