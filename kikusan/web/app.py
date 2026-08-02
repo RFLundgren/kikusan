@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from kikusan import __version__
 from kikusan.config import get_config
 from kikusan.download import download
+from kikusan.download_index import get_download_statuses
 from kikusan.playlist import add_to_m3u, read_m3u, remove_from_m3u
 from kikusan.queue import QueueManager
 from kikusan.search import search
@@ -204,6 +205,22 @@ class ArtistAlbumsResponse(BaseModel):
     browse_id: str
     artist_name: str
     results: list[AlbumResponse]
+
+
+class DownloadStatusRequest(BaseModel):
+    """Request body for checking download status of a batch of video IDs."""
+
+    video_ids: list[str]
+
+
+class DownloadStatusResponse(BaseModel):
+    """Response body for download status check.
+
+    Maps video_id to "downloaded" or "missing" (downloaded previously but
+    the file no longer exists). Video IDs never downloaded are omitted.
+    """
+
+    statuses: dict[str, str]
 
 
 class StreamUrlResponse(BaseModel):
@@ -702,6 +719,14 @@ async def api_get_artist_albums(browse_id: str):
     except Exception as e:
         logger.error("Failed to get artist albums: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/download-status", response_model=DownloadStatusResponse)
+async def api_download_status(request: DownloadStatusRequest):
+    """Check which of the given video IDs have already been downloaded."""
+    config = get_config()
+    statuses = get_download_statuses(config.data_dir, request.video_ids)
+    return DownloadStatusResponse(statuses=statuses)
 
 
 @app.post("/api/download", response_model=DownloadResponse)

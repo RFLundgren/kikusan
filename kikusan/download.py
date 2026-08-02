@@ -6,6 +6,7 @@ from pathlib import Path
 import yt_dlp
 
 from kikusan.config import DEFAULT_FILENAME_TEMPLATE, MAX_FILENAME_BYTES, get_config
+from kikusan.download_index import record_downloaded
 from kikusan.lyrics import get_lyrics_for_video, save_lyrics
 from kikusan.tags import write_multi_artist_tags
 from kikusan.unavailable import is_on_cooldown, is_unavailable_error, record_unavailable
@@ -395,6 +396,7 @@ def download(
     )
     if existing:
         logger.info("Skipping (exists): %s - %s", artist, title)
+        record_downloaded(config.data_dir, video_id, str(existing), title=title, artist=artist)
         return existing
 
     logger.info("Downloading: %s - %s", artist, title)
@@ -450,6 +452,8 @@ def download(
             from kikusan.replaygain import apply_replaygain as rsgain_apply
 
             rsgain_apply(audio_path, audio_format)
+
+        record_downloaded(config.data_dir, video_id, str(audio_path), title=title, artist=artist)
 
     return audio_path
 
@@ -572,6 +576,8 @@ def _download_single(
     )
     if existing:
         logger.info("Skipping (exists): %s - %s", artist, title)
+        if video_id:
+            record_downloaded(get_config().data_dir, video_id, str(existing), title=title, artist=artist)
         return existing
 
     logger.info("Downloading: %s - %s", artist, title)
@@ -617,6 +623,9 @@ def _download_single(
         from kikusan.replaygain import apply_replaygain as rsgain_apply
 
         rsgain_apply(audio_path, audio_format)
+
+    if audio_path and video_id:
+        record_downloaded(get_config().data_dir, video_id, str(audio_path), title=title, artist=artist)
 
     return audio_path
 
@@ -678,6 +687,8 @@ def _download_playlist(
             logger.info(
                 "[%d/%d] Skipping (exists): %s - %s", i, len(entries), artist, title
             )
+            if video_id:
+                record_downloaded(config.data_dir, video_id, str(existing), title=title, artist=artist)
             downloaded.append(existing)
             skipped += 1
             continue
@@ -723,6 +734,8 @@ def _download_playlist(
                     from kikusan.replaygain import apply_replaygain as rsgain_apply
 
                     rsgain_apply(audio_path, audio_format)
+                if video_id:
+                    record_downloaded(config.data_dir, video_id, str(audio_path), title=title, artist=artist)
 
         except Exception as e:
             logger.warning("Failed to download %s: %s", title, e)

@@ -11,6 +11,7 @@ from kikusan.models.cron import (
     PluginInstanceConfig,
 )
 from kikusan.models.deezer import DeezerTrack
+from kikusan.models.download_index import DownloadRecord
 from kikusan.models.queue import DownloadJob, JobStatus
 from kikusan.models.search import (
     Album,
@@ -41,6 +42,7 @@ __all__ = [
     "CronConfig",
     "DeezerTrack",
     "DownloadJob",
+    "DownloadRecord",
     "ExploreConfig",
     "JobStatus",
     "MoodCategory",

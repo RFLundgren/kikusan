@@ -1262,7 +1262,7 @@
         songsResults.innerHTML = tracks
           .map(
             (track) => `
-                <div class="track">
+                <div class="track" data-video-id="${track.video_id}">
                     <div class="track-main">
                         <img
                             class="track-cover"
@@ -1271,7 +1271,7 @@
                             loading="lazy"
                         >
                         <div class="track-info">
-                            <div class="track-title">${escapeHtml(track.title)}${isUgcVideoType(track.video_type) ? '<span class="ugc-badge">UGC</span>' : ""}</div>
+                            <div class="track-title">${escapeHtml(track.title)}${isUgcVideoType(track.video_type) ? '<span class="ugc-badge">UGC</span>' : ""}<span class="download-status-badge" data-status-for="${track.video_id}"></span></div>
                             <div class="track-artist">${escapeHtml(track.artist)}${track.album ? " - " + escapeHtml(track.album) : ""}</div>
                             <div class="track-meta">
                                 <span class="track-duration">${track.duration}</span>
@@ -1322,6 +1322,41 @@
         document.querySelectorAll(".download-btn").forEach((btn) => {
           btn.addEventListener("click", handleDownload);
         });
+
+        annotateDownloadStatus(tracks.map((t) => t.video_id));
+      }
+
+      // Fetch and apply "already downloaded" / "downloaded, now missing" badges
+      async function annotateDownloadStatus(videoIds) {
+        if (!videoIds.length) return;
+
+        try {
+          const response = await fetch("/api/download-status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ video_ids: videoIds }),
+          });
+          if (!response.ok) return;
+
+          const data = await response.json();
+          for (const [videoId, status] of Object.entries(data.statuses)) {
+            const badge = document.querySelector(
+              `.download-status-badge[data-status-for="${CSS.escape(videoId)}"]`,
+            );
+            if (!badge) continue;
+
+            if (status === "downloaded") {
+              badge.textContent = "Downloaded";
+              badge.className = "download-status-badge downloaded";
+            } else if (status === "missing") {
+              badge.textContent = "Downloaded (deleted)";
+              badge.className = "download-status-badge missing";
+            }
+          }
+        } catch (error) {
+          // Non-critical — just skip badges on failure
+          console.error("Failed to fetch download status:", error);
+        }
       }
 
       async function handleCopyUrl(e) {
