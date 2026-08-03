@@ -4,26 +4,44 @@
 
 **Search, download and sync music from YouTube Music and other places (reddit, listenbrainz, billboard) with lyrics.**
 
-[![Release](https://img.shields.io/github/v/tag/dadav/kikusan)](https://github.com/dadav/kikusan/releases)
-[![License](https://img.shields.io/github/license/dadav/kikusan)](https://github.com/dadav/kikusan/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/tag/RFLundgren/kikusan)](https://github.com/RFLundgren/kikusan/releases)
+[![License](https://img.shields.io/github/license/RFLundgren/kikusan)](https://github.com/RFLundgren/kikusan/blob/main/LICENSE)
 
 ![UI](ui.png)
 
 </div>
 
+> **Credit:** Kikusan was originally created by [dadav](https://github.com/dadav) — see the [original project](https://github.com/dadav/kikusan). This repository started as a fork and continues independently (the upstream project is archived), with the additional features listed in [What's New in This Fork](#whats-new-in-this-fork) below.
+
 ## Features
 
 - **Search & Download**: Search YouTube Music and download audio in OPUS/MP3/FLAC format
+- **Artist Browsing**: Search artists directly and browse their full discography (albums and singles, with pagination past YouTube Music's short preview)
+- **Batch Downloads**: Select multiple tracks or albums in search results and queue them all in one action
+- **Already-Downloaded Indicators**: Search results show whether a track is already downloaded, or was downloaded previously and later removed
 - **Playlist Support**: Download entire playlists from YouTube Music, YouTube, and Deezer
 - **Quick Download**: Search and download first match with a single command
 - **Automatic Lyrics**: Fetch and embed synchronized lyrics from lrclib.net (LRC format)
 - **Web Interface**: Modern web UI with search, download, theme toggle, and format selection
+- **Download Queue Management**: Retry individual or all failed downloads, and clear failed/completed jobs independently
 - **Docker Support**: Easy deployment with Docker and docker-compose
 - **Plugin System**: Extensible architecture for custom music sources
 - **Scheduled Sync**: Automated playlist monitoring with cron scheduling
 - **M3U Playlists**: Automatic playlist file generation for downloads
 - **Hooks**: Run custom commands when events occur (e.g., import playlists to Navidrome)
 - **Retroactive Tagging**: Add lyrics and ReplayGain tags to existing audio files without re-downloading
+
+## What's New in This Fork
+
+This repository builds on [dadav/kikusan](https://github.com/dadav/kikusan) (now archived) with the following additions:
+
+- **Artists tab**: Search for an artist by name and browse their full discography — the underlying fetch follows YouTube Music's pagination to return the complete list of albums/singles, not just the short preview shown on the artist page.
+- **Batch selection & download**: Checkboxes on both the Songs and Albums tabs let you select several tracks or albums and queue them all with one "Download Selected" action, instead of clicking Download individually.
+- **Already-downloaded status on search results**: A badge next to each track shows whether it's already downloaded, or was downloaded before and the file has since been removed — backed by a lightweight index recorded on every successful download (single track, album, or playlist).
+- **Download queue management**: A per-job "Retry" button for failed downloads, plus queue-wide "Retry All" and "Clear Failed" actions (separate from "Clear Completed", which now only affects completed jobs).
+- **Album folder naming**: Album mode now organizes files as `Artist/Album (Year)/Track.ext` (matching Navidrome's expected layout) rather than `Artist/Year - Album/Track.ext`.
+- **`KIKUSAN_ORGANIZATION_MODE` and `KIKUSAN_COOKIE_MODE` wired through `.env`** in the example `docker-compose.yml`, rather than requiring a compose-file edit to change them.
+- Assorted fixes: broadened the image proxy's allowed hosts so artist thumbnails and album art from `yt3.googleusercontent.com`/`gstatic.com` actually load, and kept the `publish.yml` workflow and Docker image pointed at this repository's own namespace.
 
 ## Usecase
 
@@ -76,7 +94,7 @@ See [`examples/third-party-plugin/`](examples/third-party-plugin/) for a complet
 Run from git:
 
 ```bash
-git clone https://github.com/dadav/kikusan
+git clone https://github.com/RFLundgren/kikusan
 cd kikusan
 uv sync
 uv run kikusan --help

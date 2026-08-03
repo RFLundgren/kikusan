@@ -336,9 +336,9 @@ All domain models that cross serialization boundaries (JSON persistence, API res
 - `.github/workflows/publish.yml`: Single workflow handles all release automation
   - Triggers: tag push (`v*`), release event (`published`), workflow_dispatch
   - `build` job: Builds Python package (sdist + wheel) using `python -m build`, uploads as artifact
-  - `create-release` job: Creates GitHub Release with auto-generated release notes, attaches built artifacts. Only runs on tag push events (guarded by `if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')`)
-  - `publish` job: Publishes to PyPI using trusted publishing (OIDC, `id-token: write`)
-  - `build-and-push-image` job: Builds and pushes Docker image to `ghcr.io/dadav/kikusan` (tagged with version + `latest`)
+  - `create-release` job: Creates GitHub Release with auto-generated release notes, attaches built artifacts. Skipped on manual `workflow_dispatch` runs (guarded by `if: github.event_name != 'workflow_dispatch'`) since there's no tag to release
+  - `publish` job: Publishes to PyPI using trusted publishing (OIDC, `id-token: write`). Also skipped on `workflow_dispatch` for the same reason
+  - `build-and-push-image` job: Builds and pushes Docker image to `ghcr.io/rflundgren/kikusan` (tagged with version + `latest`); runs on every trigger including manual `workflow_dispatch`
 - All GitHub Actions are pinned by commit SHA with version comments (e.g., `@sha # v6`)
 - Release workflow: Push a `v*` tag to trigger build -> create release -> publish to PyPI -> push Docker image
 - `softprops/action-gh-release` (v2) creates the GitHub Release with `generate_release_notes: true`
