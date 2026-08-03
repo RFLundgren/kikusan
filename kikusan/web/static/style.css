@@ -353,7 +353,8 @@ header p {
 }
 
 .batch-download-btn,
-.batch-clear-btn {
+.batch-clear-btn,
+.batch-select-all-btn {
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
     font-weight: 600;
@@ -385,6 +386,17 @@ header p {
 
 .batch-clear-btn:hover {
     background: var(--border-color);
+}
+
+.batch-select-all-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.batch-select-all-btn:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-secondary);
 }
 
 @media (max-width: 640px) {

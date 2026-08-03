@@ -108,6 +108,9 @@
       </div>
 
       <div id="songs-batch-bar" class="batch-bar">
+        <button id="songs-select-all-btn" class="batch-select-all-btn">
+          Select All
+        </button>
         <span id="songs-batch-count" class="batch-count">0 selected</span>
         <button id="songs-batch-download" class="batch-download-btn">
           Download Selected
@@ -119,6 +122,9 @@
       <div id="songs-results" class="results active"></div>
 
       <div id="albums-batch-bar" class="batch-bar">
+        <button id="albums-select-all-btn" class="batch-select-all-btn">
+          Select All
+        </button>
         <span id="albums-batch-count" class="batch-count">0 selected</span>
         <button id="albums-batch-download" class="batch-download-btn">
           Download Selected
@@ -1430,12 +1436,17 @@
       function updateSongsBatchBar() {
         const bar = document.getElementById("songs-batch-bar");
         const count = document.getElementById("songs-batch-count");
-        if (selectedTrackIds.size > 0) {
-          bar.classList.add("active");
-          count.textContent = `${selectedTrackIds.size} selected`;
-        } else {
-          bar.classList.remove("active");
-        }
+        const selectAllBtn = document.getElementById("songs-select-all-btn");
+        const downloadBtn = document.getElementById("songs-batch-download");
+        const clearBtn = document.getElementById("songs-batch-clear");
+        const total = Object.keys(latestTracksById).length;
+
+        bar.classList.toggle("active", total > 0);
+        count.textContent = `${selectedTrackIds.size} selected`;
+        selectAllBtn.textContent =
+          total > 0 && selectedTrackIds.size === total ? "Deselect All" : "Select All";
+        downloadBtn.disabled = selectedTrackIds.size === 0;
+        clearBtn.disabled = selectedTrackIds.size === 0;
       }
 
       function clearSongsSelection() {
@@ -1445,6 +1456,23 @@
         });
         updateSongsBatchBar();
       }
+
+      function handleSelectAllTracks() {
+        const total = Object.keys(latestTracksById).length;
+        if (selectedTrackIds.size === total) {
+          selectedTrackIds.clear();
+        } else {
+          selectedTrackIds = new Set(Object.keys(latestTracksById));
+        }
+        document.querySelectorAll(".track-select-checkbox").forEach((cb) => {
+          cb.checked = selectedTrackIds.has(cb.dataset.videoId);
+        });
+        updateSongsBatchBar();
+      }
+
+      document
+        .getElementById("songs-select-all-btn")
+        .addEventListener("click", handleSelectAllTracks);
 
       async function handleBatchDownloadTracks() {
         const btn = document.getElementById("songs-batch-download");
@@ -1510,12 +1538,17 @@
       function updateAlbumsBatchBar() {
         const bar = document.getElementById("albums-batch-bar");
         const count = document.getElementById("albums-batch-count");
-        if (selectedAlbumIds.size > 0) {
-          bar.classList.add("active");
-          count.textContent = `${selectedAlbumIds.size} selected`;
-        } else {
-          bar.classList.remove("active");
-        }
+        const selectAllBtn = document.getElementById("albums-select-all-btn");
+        const downloadBtn = document.getElementById("albums-batch-download");
+        const clearBtn = document.getElementById("albums-batch-clear");
+        const total = Object.keys(latestAlbumsById).length;
+
+        bar.classList.toggle("active", total > 0);
+        count.textContent = `${selectedAlbumIds.size} selected`;
+        selectAllBtn.textContent =
+          total > 0 && selectedAlbumIds.size === total ? "Deselect All" : "Select All";
+        downloadBtn.disabled = selectedAlbumIds.size === 0;
+        clearBtn.disabled = selectedAlbumIds.size === 0;
       }
 
       function clearAlbumsSelection() {
@@ -1525,6 +1558,23 @@
         });
         updateAlbumsBatchBar();
       }
+
+      function handleSelectAllAlbums() {
+        const total = Object.keys(latestAlbumsById).length;
+        if (selectedAlbumIds.size === total) {
+          selectedAlbumIds.clear();
+        } else {
+          selectedAlbumIds = new Set(Object.keys(latestAlbumsById));
+        }
+        document.querySelectorAll(".album-select-checkbox").forEach((cb) => {
+          cb.checked = selectedAlbumIds.has(cb.dataset.browseId);
+        });
+        updateAlbumsBatchBar();
+      }
+
+      document
+        .getElementById("albums-select-all-btn")
+        .addEventListener("click", handleSelectAllAlbums);
 
       async function handleBatchDownloadAlbums() {
         const btn = document.getElementById("albums-batch-download");
