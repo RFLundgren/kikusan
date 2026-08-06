@@ -31,6 +31,7 @@ class DownloadJob(BaseModel):
     album: Optional[str] = None
     year: Optional[int] = None
     track_number: Optional[int] = None
+    fetch_lyrics: bool = True
     progress: float = 0.0
     speed: str = ""
     eta: str = ""
@@ -58,6 +59,7 @@ class DownloadJob(BaseModel):
             "album": self.album,
             "year": self.year,
             "track_number": self.track_number,
+            "fetch_lyrics": self.fetch_lyrics,
             "format": self.format,
             "status": self.status.value,
             "progress": self.progress,

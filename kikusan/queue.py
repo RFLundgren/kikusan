@@ -64,6 +64,7 @@ class QueueManager:
         album: Optional[str] = None,
         year: Optional[int] = None,
         track_number: Optional[int] = None,
+        fetch_lyrics: bool = True,
     ) -> str:
         """
         Add a download job to the queue.
@@ -94,6 +95,7 @@ class QueueManager:
             album=album,
             year=year,
             track_number=track_number,
+            fetch_lyrics=fetch_lyrics,
         )
         async with self._jobs_lock:
             self.jobs[job_id] = job
@@ -168,7 +170,7 @@ class QueueManager:
                     output_dir=config.download_dir,
                     audio_format=job.format,
                     filename_template=config.filename_template,
-                    fetch_lyrics=True,
+                    fetch_lyrics=job.fetch_lyrics,
                     progress_callback=progress_callback,
                     organization_mode=config.organization_mode,
                     use_primary_artist=config.use_primary_artist,

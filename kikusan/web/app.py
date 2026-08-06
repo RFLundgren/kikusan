@@ -957,6 +957,7 @@ class QueueAddRequest(BaseModel):
     album: str | None = None
     year: int | None = None
     track_number: int | None = None
+    fetch_lyrics: bool = True
 
 
 class QueueAddAlbumRequest(BaseModel):
@@ -966,6 +967,7 @@ class QueueAddAlbumRequest(BaseModel):
     album_title: str
     artist: str
     audio_format: str = "opus"
+    fetch_lyrics: bool = True
 
 
 class QueueAddResponse(BaseModel):
@@ -1003,6 +1005,7 @@ async def add_to_queue(request: QueueAddRequest, http_request: Request):
         album=request.album,
         year=request.year,
         track_number=request.track_number,
+        fetch_lyrics=request.fetch_lyrics,
     )
 
     return QueueAddResponse(job_id=job_id, status="queued")
@@ -1048,6 +1051,7 @@ async def add_album_to_queue(request: QueueAddAlbumRequest, http_request: Reques
                 album=track.album,
                 year=getattr(track, "year", None),
                 track_number=getattr(track, "track_number", None),
+                fetch_lyrics=request.fetch_lyrics,
             )
             job_ids.append(job_id)
 

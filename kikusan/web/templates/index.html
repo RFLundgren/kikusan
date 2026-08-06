@@ -148,6 +148,18 @@
         </div>
         <div class="modal-body">
           <section class="settings-section">
+            <h3>Download Preferences</h3>
+            <label class="settings-checkbox-label">
+              <input type="checkbox" id="skip-lyrics-checkbox" />
+              Skip lyrics download
+            </label>
+            <p class="settings-description">
+              When enabled, downloads won't fetch or embed synced lyrics
+              (.lrc files) from lrclib.net.
+            </p>
+          </section>
+
+          <section class="settings-section">
             <h3>Cookie Authentication</h3>
             <p class="settings-description">
               Upload a cookies.txt file to access age-restricted or
@@ -239,6 +251,24 @@
 
       formatSelector.addEventListener("change", saveFormat);
       initFormat();
+
+      // Skip-lyrics preference
+      const skipLyricsCheckbox = document.getElementById("skip-lyrics-checkbox");
+
+      function initSkipLyrics() {
+        skipLyricsCheckbox.checked = localStorage.getItem("skipLyrics") === "true";
+      }
+
+      function saveSkipLyrics() {
+        localStorage.setItem("skipLyrics", skipLyricsCheckbox.checked);
+      }
+
+      function shouldFetchLyrics() {
+        return !skipLyricsCheckbox.checked;
+      }
+
+      skipLyricsCheckbox.addEventListener("change", saveSkipLyrics);
+      initSkipLyrics();
 
       // Audio playback management
       let currentAudio = null;
@@ -1286,6 +1316,7 @@
               album_title: title,
               artist: artist,
               audio_format: format,
+              fetch_lyrics: shouldFetchLyrics(),
             }),
           });
           const data = await response.json();
@@ -1508,6 +1539,7 @@
                 album: track.album,
                 year: track.year,
                 track_number: track.track_number,
+                fetch_lyrics: shouldFetchLyrics(),
               }),
             });
             if (response.ok) {
@@ -1611,6 +1643,7 @@
                 album_title: album.title,
                 artist: album.artist,
                 audio_format: format,
+                fetch_lyrics: shouldFetchLyrics(),
               }),
             });
             const data = await response.json().catch(() => ({}));
@@ -1718,6 +1751,7 @@
               album,
               year,
               track_number: trackNumber,
+              fetch_lyrics: shouldFetchLyrics(),
             }),
           });
           const data = await response.json();
@@ -1907,6 +1941,7 @@
               album: job.album,
               year: job.year,
               track_number: job.track_number,
+              fetch_lyrics: job.fetch_lyrics,
             }),
           });
 
@@ -2000,6 +2035,7 @@
                   album: job.album,
               year: job.year,
               track_number: job.track_number,
+              fetch_lyrics: job.fetch_lyrics,
                 }),
               });
               if (addResponse.ok) {
@@ -3047,6 +3083,7 @@
                 album: track.album,
                 year: track.year,
                 track_number: track.track_number,
+                fetch_lyrics: shouldFetchLyrics(),
               }),
             });
             if (response.ok) queued++;
