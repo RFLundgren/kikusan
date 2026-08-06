@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 
 import yt_dlp
+from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 
 from kikusan.config import DEFAULT_FILENAME_TEMPLATE, MAX_FILENAME_BYTES, get_config
 from kikusan.download_index import record_downloaded
@@ -13,6 +14,15 @@ from kikusan.unavailable import is_on_cooldown, is_unavailable_error, record_una
 from kikusan.yt_dlp_wrapper import extract_info_with_retry
 
 logger = logging.getLogger(__name__)
+
+# Strips video-descriptor suffixes (e.g. "(Official Music Video)", "[Lyric Video]")
+# from titles before they're used for filenames/tags. Anchored per-bracket-group
+# (not to end-of-string) since these often aren't the last group, e.g.
+# "Song (Official Video) (4K Remaster)". Applied case-insensitively via inline (?i).
+VIDEO_DESCRIPTOR_TITLE_PATTERN = (
+    r"(?i)\s*[\(\[](?:official\s+)?(?:music\s+)?"
+    r"(?:video|audio|lyrics?\s*video|visualizer|mv)[\)\]]"
+)
 
 
 class UnavailableCooldownError(Exception):
@@ -176,6 +186,18 @@ def _get_ydl_opts(
         "color": "never",
         "trim_file_name": MAX_FILENAME_BYTES,
         "postprocessors": [
+            {
+                "key": "MetadataParser",
+                "actions": [
+                    (
+                        MetadataParserPP.Actions.REPLACE,
+                        "title",
+                        VIDEO_DESCRIPTOR_TITLE_PATTERN,
+                        "",
+                    ),
+                ],
+                "when": "pre_process",
+            },
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": audio_format,
