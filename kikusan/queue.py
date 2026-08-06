@@ -180,6 +180,7 @@ class QueueManager:
                     album=job.album,
                     year=job.year,
                     track_number=job.track_number,
+                    artist_override=job.artist,
                 ),
             )
 

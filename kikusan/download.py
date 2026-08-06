@@ -376,6 +376,7 @@ def download(
     album: str | None = None,
     year: int | None = None,
     track_number: int | None = None,
+    artist_override: str | None = None,
 ) -> Path:
     """
     Download a track from YouTube Music.
@@ -400,6 +401,11 @@ def download(
         track_number: Known position within the album, same override rationale as
             album/year — also drives the "NN - Title" filename prefix and gets
             embedded as an actual track-number tag, so players sort albums correctly.
+        artist_override: Known artist name from search/browse, same override rationale
+            as album/year/track_number — yt-dlp's own artist/uploader field comes from
+            whichever channel uploaded that specific video, which can vary between
+            tracks of the same artist (official channel vs. a differently-named
+            aggregator), splitting one artist across multiple folders.
 
     Returns:
         Path to the downloaded audio file
@@ -443,6 +449,8 @@ def download(
         info["release_year"] = year
     if track_number:
         info["track_number"] = track_number
+    if artist_override:
+        info["artist"] = artist_override
 
     title = info.get("title", "Unknown")
     artist = info.get("artist") or info.get("uploader", "Unknown")
@@ -475,6 +483,8 @@ def download(
         field_overrides["track_number"] = track_number
     if year:
         field_overrides["meta_date"] = str(year)
+    if artist_override:
+        field_overrides["artist"] = artist_override
 
     try:
         # Download the track
