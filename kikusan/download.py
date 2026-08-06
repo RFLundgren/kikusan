@@ -15,14 +15,11 @@ from kikusan.yt_dlp_wrapper import extract_info_with_retry
 
 logger = logging.getLogger(__name__)
 
-# Strips video-descriptor suffixes (e.g. "(Official Music Video)", "[Lyric Video]")
-# from titles before they're used for filenames/tags. Anchored per-bracket-group
-# (not to end-of-string) since these often aren't the last group, e.g.
-# "Song (Official Video) (4K Remaster)". Applied case-insensitively via inline (?i).
-VIDEO_DESCRIPTOR_TITLE_PATTERN = (
-    r"(?i)\s*[\(\[](?:official\s+)?(?:music\s+)?"
-    r"(?:video|audio|lyrics?\s*video|visualizer|mv)[\)\]]"
-)
+# Strips every trailing parenthetical/bracketed qualifier from titles before
+# they're used for filenames/tags, leaving just the bare song title — e.g.
+# "Song (Official Video) (Live) [Remastered]" -> "Song". Anchored to the end
+# with a repeating group so multiple stacked qualifiers are removed together.
+TITLE_QUALIFIER_SUFFIX_PATTERN = r"(?:\s*[\(\[][^\)\]]*[\)\]])+\s*$"
 
 
 class UnavailableCooldownError(Exception):
@@ -192,7 +189,7 @@ def _get_ydl_opts(
                     (
                         MetadataParserPP.Actions.REPLACE,
                         "title",
-                        VIDEO_DESCRIPTOR_TITLE_PATTERN,
+                        TITLE_QUALIFIER_SUFFIX_PATTERN,
                         "",
                     ),
                 ],
