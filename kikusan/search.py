@@ -84,6 +84,10 @@ def search(query: str, limit: int = 20) -> list[Track]:
         if item.get("resultType") != "song":
             continue
 
+        video_id = item.get("videoId")
+        if not video_id:
+            continue
+
         # Extract artist name(s) - keep full list for multi-value tags
         artist_objects = item.get("artists", [])
         artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
@@ -106,7 +110,7 @@ def search(query: str, limit: int = 20) -> list[Track]:
 
         tracks.append(
             Track(
-                video_id=item["videoId"],
+                video_id=video_id,
                 title=item.get("title", "Unknown Title"),
                 artist=artist_name,
                 artists=artist_names,
@@ -326,6 +330,11 @@ def get_album_tracks(browse_id: str) -> list[Track]:
 
     tracks = []
     for position, item in enumerate(album_info.get("tracks", []), start=1):
+        # Some albums include bonus/preview entries with no real video mapping
+        video_id = item.get("videoId")
+        if not video_id:
+            continue
+
         # Extract artist name(s) - keep full list for multi-value tags
         artist_objects = item.get("artists", [])
         artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
@@ -345,7 +354,7 @@ def get_album_tracks(browse_id: str) -> list[Track]:
 
         tracks.append(
             Track(
-                video_id=item["videoId"],
+                video_id=video_id,
                 title=item.get("title", "Unknown Title"),
                 artist=artist_name,
                 artists=artist_names,
