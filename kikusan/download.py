@@ -1,6 +1,7 @@
 """Download functionality using yt-dlp."""
 
 import logging
+import re
 from pathlib import Path
 
 import yt_dlp
@@ -20,6 +21,22 @@ logger = logging.getLogger(__name__)
 # "Song (Official Video) (Live) [Remastered]" -> "Song". Anchored to the end
 # with a repeating group so multiple stacked qualifiers are removed together.
 TITLE_QUALIFIER_SUFFIX_PATTERN = r"(?:\s*[\(\[][^\)\]]*[\)\]])+\s*$"
+
+# YouTube video titles often duplicate the artist as a literal prefix, e.g.
+# "Rick Astley - Never Gonna Give You Up". Placeholder-like artist values are
+# excluded so a missing/unknown artist never turns into an accidental match.
+_UNKNOWN_ARTIST_VALUES = {"unknown", "unknown artist", ""}
+
+
+def _build_artist_prefix_pattern(artist: str | None) -> str | None:
+    """Build a regex that strips a literal "Artist - "/"Artist: " title prefix.
+
+    Conservative on purpose: only matches when the prefix is exactly the known
+    artist name, so it never risks eating part of a legitimate title.
+    """
+    if not artist or artist.strip().lower() in _UNKNOWN_ARTIST_VALUES:
+        return None
+    return rf"(?i)^\s*{re.escape(artist)}\s*[-:]\s*"
 
 
 class UnavailableCooldownError(Exception):
@@ -177,6 +194,20 @@ def _get_ydl_opts(
         output_dir, info, filename_template, organization_mode, use_primary_artist
     )
 
+    # Strip trailing qualifiers first, then a literal artist prefix (order matters:
+    # "Artist - Title (Official Video)" needs the suffix gone before the prefix
+    # match sees a clean "Artist - Title" to work with).
+    title_cleanup_actions = [
+        (MetadataParserPP.Actions.REPLACE, "title", TITLE_QUALIFIER_SUFFIX_PATTERN, ""),
+    ]
+    artist_prefix_pattern = _build_artist_prefix_pattern(
+        info.get("artist") or info.get("uploader")
+    )
+    if artist_prefix_pattern:
+        title_cleanup_actions.append(
+            (MetadataParserPP.Actions.REPLACE, "title", artist_prefix_pattern, "")
+        )
+
     opts = {
         "format": f"bestaudio[ext={audio_format}]/bestaudio[acodec*={audio_format}]/bestaudio/best",
         "outtmpl": output_path,
@@ -185,14 +216,7 @@ def _get_ydl_opts(
         "postprocessors": [
             {
                 "key": "MetadataParser",
-                "actions": [
-                    (
-                        MetadataParserPP.Actions.REPLACE,
-                        "title",
-                        TITLE_QUALIFIER_SUFFIX_PATTERN,
-                        "",
-                    ),
-                ],
+                "actions": title_cleanup_actions,
                 "when": "pre_process",
             },
             {
@@ -351,6 +375,7 @@ def download(
     apply_replaygain: bool = False,
     album: str | None = None,
     year: int | None = None,
+    track_number: int | None = None,
 ) -> Path:
     """
     Download a track from YouTube Music.
@@ -372,6 +397,9 @@ def download(
         year: Known album release year from search/browse, same override rationale as
             album (avoids splitting one album into "Name" and "Name (Year)" folders
             depending on whether yt-dlp's own extraction happened to include a year).
+        track_number: Known position within the album, same override rationale as
+            album/year — also drives the "NN - Title" filename prefix and gets
+            embedded as an actual track-number tag, so players sort albums correctly.
 
     Returns:
         Path to the downloaded audio file
@@ -413,6 +441,8 @@ def download(
         info["album"] = album
     if year:
         info["release_year"] = year
+    if track_number:
+        info["track_number"] = track_number
 
     title = info.get("title", "Unknown")
     artist = info.get("artist") or info.get("uploader", "Unknown")
@@ -434,6 +464,18 @@ def download(
 
     logger.info("Downloading: %s - %s", artist, title)
 
+    # Force these onto the actual download's own info_dict too (not just the
+    # one used for the output path above) so the embedded tags match — yt-dlp's
+    # own re-extraction during the real download is a separate info_dict that
+    # doesn't inherit the mutations made to `info` earlier.
+    field_overrides = {}
+    if album:
+        field_overrides["album"] = album
+    if track_number:
+        field_overrides["track_number"] = track_number
+    if year:
+        field_overrides["meta_date"] = str(year)
+
     try:
         # Download the track
         ydl_opts = _get_ydl_opts(
@@ -452,6 +494,7 @@ def download(
             download=True,
             cookie_file=cookie_file,
             config=config,
+            field_overrides=field_overrides or None,
         )
     except Exception as e:
         # Record unavailable videos for cooldown, then re-raise

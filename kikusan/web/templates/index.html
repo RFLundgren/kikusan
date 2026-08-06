@@ -1356,6 +1356,7 @@
                             data-artist="${escapeHtml(track.artist)}"
                             data-album="${escapeHtml(track.album || "")}"
                             data-year="${track.year || ""}"
+                            data-track-number="${track.track_number || ""}"
                         >
                             Download
                         </button>
@@ -1506,6 +1507,7 @@
                 audio_format: format,
                 album: track.album,
                 year: track.year,
+                track_number: track.track_number,
               }),
             });
             if (response.ok) {
@@ -1695,6 +1697,9 @@
         const artist = btn.dataset.artist;
         const album = btn.dataset.album || null;
         const year = btn.dataset.year ? parseInt(btn.dataset.year, 10) : null;
+        const trackNumber = btn.dataset.trackNumber
+          ? parseInt(btn.dataset.trackNumber, 10)
+          : null;
         const format = formatSelector.value;
 
         btn.disabled = true;
@@ -1712,6 +1717,7 @@
               audio_format: format,
               album,
               year,
+              track_number: trackNumber,
             }),
           });
           const data = await response.json();
@@ -1900,6 +1906,7 @@
               audio_format: job.format,
               album: job.album,
               year: job.year,
+              track_number: job.track_number,
             }),
           });
 
@@ -1992,6 +1999,7 @@
                   audio_format: job.format,
                   album: job.album,
               year: job.year,
+              track_number: job.track_number,
                 }),
               });
               if (addResponse.ok) {
@@ -2386,7 +2394,7 @@
                                 <div class="track-actions">
                                     <button class="play-btn" data-video-id="${track.video_id}" aria-label="Play preview">&#9654;</button>
                                     <button class="copy-url-btn" data-video-id="${track.video_id}" aria-label="Copy URL" title="Copy YouTube Music URL">&#128279;</button>
-                                    <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}" data-album="${escapeHtml(track.album || "")}" data-year="${track.year || ""}">Download</button>
+                                    <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}" data-album="${escapeHtml(track.album || "")}" data-year="${track.year || ""}" data-track-number="${track.track_number || ""}">Download</button>
                                 </div>
                             </div>
                         `,
@@ -2825,7 +2833,7 @@
                     <div class="track-actions">
                         <button class="play-btn" data-video-id="${track.video_id}" aria-label="Play preview">&#9654;</button>
                         <button class="copy-url-btn" data-video-id="${track.video_id}" aria-label="Copy URL" title="Copy YouTube Music URL">&#128279;</button>
-                        <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}" data-album="${escapeHtml(track.album || "")}" data-year="${track.year || ""}">Download</button>
+                        <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}" data-album="${escapeHtml(track.album || "")}" data-year="${track.year || ""}" data-track-number="${track.track_number || ""}">Download</button>
                     </div>
                 </div>
             `,
@@ -2965,7 +2973,7 @@
             <div class="track-actions">
               <button class="play-btn" data-video-id="${track.video_id}" aria-label="Play preview">&#9654;</button>
               <button class="copy-url-btn" data-video-id="${track.video_id}" aria-label="Copy URL" title="Copy YouTube Music URL">&#128279;</button>
-              <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}" data-album="${escapeHtml(track.album || "")}" data-year="${track.year || ""}">Download</button>
+              <button class="download-btn" data-video-id="${track.video_id}" data-title="${escapeHtml(track.title)}" data-artist="${escapeHtml(track.artist)}" data-album="${escapeHtml(track.album || "")}" data-year="${track.year || ""}" data-track-number="${track.track_number || ""}">Download</button>
             </div>
           </div>
         `).join("");
@@ -3038,6 +3046,7 @@
                 audio_format: format,
                 album: track.album,
                 year: track.year,
+                track_number: track.track_number,
               }),
             });
             if (response.ok) queued++;

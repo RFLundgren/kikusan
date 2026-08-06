@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 from typing import Any, Optional
 
 import yt_dlp
+from yt_dlp.postprocessor.common import PostProcessor
 from yt_dlp.utils import DownloadError, ExtractorError
 try:
     from yt_dlp.version import __version__ as YT_DLP_VERSION
@@ -26,6 +27,27 @@ except Exception:  # pragma: no cover - defensive import
     YT_DLP_VERSION = "unknown"
 
 logger = logging.getLogger(__name__)
+
+
+class _SetFieldsPP(PostProcessor):
+    """Force specific info_dict fields to known-correct values.
+
+    yt-dlp's own per-video metadata extraction is often missing fields (album,
+    track number) that are reliably known from search/browse instead. Plain
+    dict-based postprocessors like MetadataParser can only edit a field that
+    already has a value — they can't inject one into a missing field — so this
+    runs as a real pre_process hook on the YoutubeDL instance actually used for
+    the download, guaranteeing the override reaches both the filename
+    templating and the embedded tags.
+    """
+
+    def __init__(self, downloader, fields: dict[str, Any]):
+        super().__init__(downloader)
+        self._fields = fields
+
+    def run(self, info):
+        info.update(self._fields)
+        return [], info
 
 # Patterns indicating authentication/cookies are required
 # These are matched case-insensitively against exception messages
@@ -170,6 +192,7 @@ def _execute_ydl_once(
     download: bool,
     cookie_file: Optional[str],
     use_cookies: bool,
+    field_overrides: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Single yt-dlp execution attempt."""
     opts = ydl_opts.copy()
@@ -178,6 +201,8 @@ def _execute_ydl_once(
         opts["cookiefile"] = cookie_file
 
     with yt_dlp.YoutubeDL(opts) as ydl:
+        if field_overrides:
+            ydl.add_post_processor(_SetFieldsPP(ydl, field_overrides), when="pre_process")
         return ydl.extract_info(url, download=download)
 
 
@@ -188,6 +213,7 @@ def _retry_ambiguous_youtube_unavailable(
     download: bool,
     cookie_file: Optional[str],
     use_cookies: bool,
+    field_overrides: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Retry ambiguous YouTube unavailable errors with alternate client strategies."""
     if use_cookies:
@@ -236,7 +262,9 @@ def _retry_ambiguous_youtube_unavailable(
     for strategy_name, retry_url, retry_opts in strategies:
         try:
             logger.debug("yt-dlp fallback retry strategy=%s url=%s", strategy_name, retry_url)
-            result = _execute_ydl_once(retry_opts, retry_url, download, cookie_file, use_cookies)
+            result = _execute_ydl_once(
+                retry_opts, retry_url, download, cookie_file, use_cookies, field_overrides
+            )
             logger.info(
                 "Recovered from ambiguous YouTube unavailable error using fallback strategy=%s",
                 strategy_name,
@@ -266,6 +294,7 @@ def extract_info_with_retry(
     download: bool = True,
     cookie_file: Optional[str] = None,
     config: Optional[Any] = None,
+    field_overrides: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Extract info with intelligent cookie fallback.
 
@@ -278,6 +307,9 @@ def extract_info_with_retry(
         download: Whether to download (True) or just extract info (False)
         cookie_file: Path to cookie file (if available)
         config: Config object with cookie_mode, cookie_retry_delay, etc.
+        field_overrides: Known-correct info_dict fields (e.g. album, track_number)
+            to force via a real pre_process hook, since yt-dlp's own extraction
+            often lacks them even when this specific video does belong to one.
 
     Returns:
         yt-dlp info dict
@@ -306,13 +338,13 @@ def extract_info_with_retry(
         if log_cookie_usage:
             logger.debug("Cookie mode=always: Using cookies for all requests")
         CookieUsageStats.increment_always_cookie()
-        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=True)
+        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=True, field_overrides=field_overrides)
 
     # Mode: never - never use cookies
     if cookie_mode == "never":
         if log_cookie_usage:
             logger.debug("Cookie mode=never: Never using cookies")
-        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=False)
+        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=False, field_overrides=field_overrides)
 
     # Mode: auto - try without cookies first, fallback on auth errors
     if log_cookie_usage:
@@ -320,7 +352,7 @@ def extract_info_with_retry(
 
     try:
         # First attempt: no cookies
-        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=False)
+        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=False, field_overrides=field_overrides)
 
     except (ExtractorError, DownloadError) as e:
         # Check if this is an auth error that cookies might fix
@@ -345,7 +377,7 @@ def extract_info_with_retry(
         time.sleep(retry_delay)
 
         # Retry with cookies
-        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=True)
+        return _execute_ydl(ydl_opts, url, download, cookie_file, use_cookies=True, field_overrides=field_overrides)
 
 
 def _execute_ydl(
@@ -354,6 +386,7 @@ def _execute_ydl(
     download: bool,
     cookie_file: Optional[str],
     use_cookies: bool,
+    field_overrides: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Execute yt-dlp with or without cookies.
 
@@ -363,13 +396,14 @@ def _execute_ydl(
         download: Whether to download or just extract info
         cookie_file: Path to cookie file
         use_cookies: Whether to use cookies
+        field_overrides: See extract_info_with_retry
 
     Returns:
         yt-dlp info dict
     """
     try:
-        return _execute_ydl_once(ydl_opts, url, download, cookie_file, use_cookies)
+        return _execute_ydl_once(ydl_opts, url, download, cookie_file, use_cookies, field_overrides)
     except (ExtractorError, DownloadError) as e:
         return _retry_ambiguous_youtube_unavailable(
-            e, ydl_opts, url, download, cookie_file, use_cookies
+            e, ydl_opts, url, download, cookie_file, use_cookies, field_overrides
         )

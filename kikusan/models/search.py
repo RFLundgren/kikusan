@@ -18,6 +18,7 @@ class Track(BaseModel):
     view_count: str | None
     video_type: str | None = None
     year: int | None = None
+    track_number: int | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

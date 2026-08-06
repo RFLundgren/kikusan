@@ -63,6 +63,7 @@ class QueueManager:
         playlist_name: Optional[str] = None,
         album: Optional[str] = None,
         year: Optional[int] = None,
+        track_number: Optional[int] = None,
     ) -> str:
         """
         Add a download job to the queue.
@@ -92,6 +93,7 @@ class QueueManager:
             playlist_name=playlist_name,
             album=album,
             year=year,
+            track_number=track_number,
         )
         async with self._jobs_lock:
             self.jobs[job_id] = job
@@ -175,6 +177,7 @@ class QueueManager:
                     apply_replaygain=config.replaygain,
                     album=job.album,
                     year=job.year,
+                    track_number=job.track_number,
                 ),
             )
 

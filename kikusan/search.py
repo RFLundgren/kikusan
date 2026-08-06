@@ -325,7 +325,7 @@ def get_album_tracks(browse_id: str) -> list[Track]:
     year = int(year_str) if year_str and str(year_str).isdigit() else None
 
     tracks = []
-    for item in album_info.get("tracks", []):
+    for position, item in enumerate(album_info.get("tracks", []), start=1):
         # Extract artist name(s) - keep full list for multi-value tags
         artist_objects = item.get("artists", [])
         artist_names = [a["name"] for a in artist_objects] if artist_objects else ["Unknown Artist"]
@@ -339,6 +339,10 @@ def get_album_tracks(browse_id: str) -> list[Track]:
         thumbnails = album_info.get("thumbnails", [])
         thumbnail_url = thumbnails[-1]["url"] if thumbnails else None
 
+        # Prefer ytmusicapi's own track number (handles multi-disc albums correctly),
+        # falling back to position in the returned list.
+        track_number = item.get("trackNumber") or position
+
         tracks.append(
             Track(
                 video_id=item["videoId"],
@@ -350,6 +354,7 @@ def get_album_tracks(browse_id: str) -> list[Track]:
                 thumbnail_url=thumbnail_url,
                 view_count=None,
                 year=year,
+                track_number=track_number,
             )
         )
 
