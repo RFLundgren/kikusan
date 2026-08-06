@@ -352,6 +352,8 @@ def download(
     cookie_file: str | None = None,
     artists: list[str] | None = None,
     apply_replaygain: bool = False,
+    album: str | None = None,
+    year: int | None = None,
 ) -> Path:
     """
     Download a track from YouTube Music.
@@ -366,6 +368,13 @@ def download(
         organization_mode: "flat" or "album" organization
         use_primary_artist: Extract primary artist for folder (before feat., &, etc.)
         artists: List of individual artist names for multi-value tags (optional)
+        album: Known album name from search/browse (e.g. ytmusicapi), used to override
+            yt-dlp's own metadata extraction, which often lacks an album field even for
+            tracks that do belong to a real album — without this, album-mode organization
+            silently falls back to a flat Artist/Track.ext layout for those tracks.
+        year: Known album release year from search/browse, same override rationale as
+            album (avoids splitting one album into "Name" and "Name (Year)" folders
+            depending on whether yt-dlp's own extraction happened to include a year).
 
     Returns:
         Path to the downloaded audio file
@@ -402,6 +411,11 @@ def download(
         if is_unavailable_error(str(e)):
             record_unavailable(config.data_dir, video_id, str(e))
         raise
+
+    if album:
+        info["album"] = album
+    if year:
+        info["release_year"] = year
 
     title = info.get("title", "Unknown")
     artist = info.get("artist") or info.get("uploader", "Unknown")

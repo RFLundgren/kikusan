@@ -17,6 +17,7 @@ class Track(BaseModel):
     thumbnail_url: str | None
     view_count: str | None
     video_type: str | None = None
+    year: int | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

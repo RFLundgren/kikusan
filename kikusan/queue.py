@@ -61,6 +61,8 @@ class QueueManager:
         format: str = "opus",
         artists: Optional[list[str]] = None,
         playlist_name: Optional[str] = None,
+        album: Optional[str] = None,
+        year: Optional[int] = None,
     ) -> str:
         """
         Add a download job to the queue.
@@ -72,6 +74,8 @@ class QueueManager:
             format: Audio format (opus, mp3, flac)
             artists: List of individual artist names for multi-value tags
             playlist_name: Resolved playlist name for this job (from Remote-User header)
+            album: Known album name (from search/browse), used to override yt-dlp's
+                often-missing album metadata so album-mode organization is reliable
 
         Returns:
             Job ID
@@ -86,6 +90,8 @@ class QueueManager:
             status=JobStatus.QUEUED,
             artists=artists,
             playlist_name=playlist_name,
+            album=album,
+            year=year,
         )
         async with self._jobs_lock:
             self.jobs[job_id] = job
@@ -167,6 +173,8 @@ class QueueManager:
                     cookie_file=config.cookie_file_path,
                     artists=job.artists,
                     apply_replaygain=config.replaygain,
+                    album=job.album,
+                    year=job.year,
                 ),
             )
 

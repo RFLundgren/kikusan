@@ -125,6 +125,7 @@ class TrackResponse(BaseModel):
     thumbnail_url: str | None
     view_count: str | None
     video_type: str | None = None
+    year: int | None = None
 
 
 def _track_to_response(track) -> TrackResponse:
@@ -139,6 +140,7 @@ def _track_to_response(track) -> TrackResponse:
         thumbnail_url=track.thumbnail_url,
         view_count=track.view_count,
         video_type=getattr(track, "video_type", None),
+        year=getattr(track, "year", None),
     )
 
 
@@ -950,6 +952,8 @@ class QueueAddRequest(BaseModel):
     artist: str
     artists: list[str] | None = None
     audio_format: str = "opus"
+    album: str | None = None
+    year: int | None = None
 
 
 class QueueAddAlbumRequest(BaseModel):
@@ -993,6 +997,8 @@ async def add_to_queue(request: QueueAddRequest, http_request: Request):
         format=audio_format,
         artists=request.artists,
         playlist_name=playlist_name,
+        album=request.album,
+        year=request.year,
     )
 
     return QueueAddResponse(job_id=job_id, status="queued")
@@ -1035,6 +1041,8 @@ async def add_album_to_queue(request: QueueAddAlbumRequest, http_request: Reques
                 format=audio_format,
                 artists=track.artists,
                 playlist_name=playlist_name,
+                album=track.album,
+                year=getattr(track, "year", None),
             )
             job_ids.append(job_id)
 

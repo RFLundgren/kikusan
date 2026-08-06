@@ -321,6 +321,9 @@ def get_album_tracks(browse_id: str) -> list[Track]:
         logger.error("YouTube Music get_album failed for browse_id '%s': %s", browse_id, e)
         raise
 
+    year_str = album_info.get("year")
+    year = int(year_str) if year_str and str(year_str).isdigit() else None
+
     tracks = []
     for item in album_info.get("tracks", []):
         # Extract artist name(s) - keep full list for multi-value tags
@@ -346,6 +349,7 @@ def get_album_tracks(browse_id: str) -> list[Track]:
                 duration_seconds=duration_seconds,
                 thumbnail_url=thumbnail_url,
                 view_count=None,
+                year=year,
             )
         )
 

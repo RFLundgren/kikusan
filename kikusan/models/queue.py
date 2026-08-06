@@ -28,6 +28,8 @@ class DownloadJob(BaseModel):
     format: str
     status: JobStatus
     artists: Optional[list[str]] = None
+    album: Optional[str] = None
+    year: Optional[int] = None
     progress: float = 0.0
     speed: str = ""
     eta: str = ""
@@ -52,6 +54,8 @@ class DownloadJob(BaseModel):
             "video_id": self.video_id,
             "title": self.title,
             "artist": self.artist,
+            "album": self.album,
+            "year": self.year,
             "format": self.format,
             "status": self.status.value,
             "progress": self.progress,
