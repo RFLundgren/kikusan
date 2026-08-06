@@ -24,6 +24,8 @@
 - **Automatic Lyrics**: Fetch and embed synchronized lyrics from lrclib.net (LRC format)
 - **Web Interface**: Modern web UI with search, download, theme toggle, and format selection
 - **Download Queue Management**: Retry individual or all failed downloads, and clear failed/completed jobs independently
+- **Clean, Reliable Metadata**: Downloaded titles have video-descriptor suffixes and duplicate artist prefixes stripped automatically, and album/artist/year/track-number are taken from the reliable search/browse data rather than YouTube's often-inconsistent per-video metadata
+- **Optional Lyrics**: Skip fetching lyrics entirely via a Settings toggle, if you don't want `.lrc` files
 - **Docker Support**: Easy deployment with Docker and docker-compose
 - **Plugin System**: Extensible architecture for custom music sources
 - **Scheduled Sync**: Automated playlist monitoring with cron scheduling
@@ -36,11 +38,17 @@
 This repository builds on [dadav/kikusan](https://github.com/dadav/kikusan) (now archived) with the following additions:
 
 - **Artists tab**: Search for an artist by name and browse their full discography — the underlying fetch follows YouTube Music's pagination to return the complete list of albums/singles, not just the short preview shown on the artist page.
-- **Batch selection & download**: Checkboxes on both the Songs and Albums tabs let you select several tracks or albums and queue them all with one "Download Selected" action, instead of clicking Download individually.
+- **Batch selection & download**: Checkboxes on both the Songs and Albums tabs let you select several tracks or albums and queue them all with one "Download Selected" action, with "Select All"/"Deselect All" for large result sets (e.g. a 200-track playlist), instead of clicking Download individually.
 - **Already-downloaded status on search results**: A badge next to each track shows whether it's already downloaded, or was downloaded before and the file has since been removed — backed by a lightweight index recorded on every successful download (single track, album, or playlist).
 - **Download queue management**: A per-job "Retry" button for failed downloads, plus queue-wide "Retry All" and "Clear Failed" actions (separate from "Clear Completed", which now only affects completed jobs).
 - **Album folder naming**: Album mode now organizes files as `Artist/Album (Year)/Track.ext` (matching Navidrome's expected layout) rather than `Artist/Year - Album/Track.ext`.
+- **Clean titles**: Video-descriptor suffixes (`(Official Music Video)`, `(Official Audio)`, `[Lyric Video]`, etc.) and a duplicated artist prefix (e.g. `Rick Astley - Never Gonna Give You Up` → `Never Gonna Give You Up`) are stripped from the saved filename and tags — conservatively, so genuine info like `(Live)` or `(Remastered)` is left alone.
+- **Reliable album/artist/year/track-number metadata**: YouTube's own per-video metadata is often inconsistent — one track in an album might report the right album/artist and another might not (or report it under a differently-named uploader channel), which used to split a single album or artist across multiple, wrongly-named folders and left tracks unsorted in players. These fields are now taken from the reliable search/browse data and forced onto both the output path and the embedded tags, so an album downloads into one consistently-named folder with correct track-order tags every time.
+- **Skip Lyrics option**: A checkbox in Settings to skip fetching/embedding lyrics entirely, for anyone who doesn't want `.lrc` files.
+- **Cookie freshness tracking**: An uploaded `cookies.txt` older than `KIKUSAN_COOKIE_MAX_AGE_HOURS` (default 30 days) is automatically treated as unconfigured rather than forced onto every request — a stale exported session can read as more suspicious to YouTube than an anonymous request, which previously caused every download to fail at once. The Settings UI also shows the file's age and flags it once stale.
+- **Broader automatic cookie fallback**: `auto` cookie mode now also retries with cookies on YouTube's "Requested format is not available" error (a bot-detection symptom), not just literal sign-in-required messages.
 - **`KIKUSAN_ORGANIZATION_MODE` and `KIKUSAN_COOKIE_MODE` wired through `.env`** in the example `docker-compose.yml`, rather than requiring a compose-file edit to change them.
+- **Bug fix**: albums containing bonus/preview tracks with no real video no longer fail the whole album — that one track is skipped instead.
 - Assorted fixes: broadened the image proxy's allowed hosts so artist thumbnails and album art from `yt3.googleusercontent.com`/`gstatic.com` actually load, and kept the `publish.yml` workflow and Docker image pointed at this repository's own namespace.
 
 ## Usecase
@@ -409,6 +417,7 @@ docker compose up -d
 | `KIKUSAN_CORS_ORIGINS`               | `*`                               | CORS allowed origins (comma-separated)                          |
 | `KIKUSAN_COOKIE_MODE`                | `auto`                            | Cookie usage: auto, always, or never                            |
 | `KIKUSAN_COOKIE_RETRY_DELAY`         | `1.0`                             | Delay in seconds before retrying with cookies                   |
+| `KIKUSAN_COOKIE_MAX_AGE_HOURS`       | `720`                             | Treat an uploaded cookie file as unconfigured past this age (0 = never) |
 | `KIKUSAN_LOG_COOKIE_USAGE`           | `true`                            | Log cookie usage statistics (true, false)                       |
 | `GOTIFY_URL`                         | `None`                            | Gotify server URL for notifications (optional)                  |
 | `GOTIFY_TOKEN`                       | `None`                            | Gotify application token (optional)                             |
