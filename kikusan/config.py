@@ -33,6 +33,7 @@ class Config:
     yt_dlp_cookie_file: str | None = None
     cookie_mode: str = "auto"
     cookie_retry_delay: float = 1.0
+    cookie_max_age_hours: int = 720  # 30 days (0 = never treat as stale)
     log_cookie_usage: bool = True
     cors_origins: list[str] = field(default_factory=lambda: ["*"])
     unavailable_cooldown_hours: int = 168  # 7 days
@@ -85,6 +86,15 @@ class Config:
             raise ValueError(
                 f"KIKUSAN_COOKIE_RETRY_DELAY must be non-negative, got {cookie_retry_delay}"
             )
+
+        # Parse cookie max age (0 = never treat as stale)
+        cookie_max_age_hours = int(os.getenv("KIKUSAN_COOKIE_MAX_AGE_HOURS", "720"))
+        if cookie_max_age_hours < 0:
+            logger.warning(
+                "KIKUSAN_COOKIE_MAX_AGE_HOURS is negative (%d), using 0 (disabled)",
+                cookie_max_age_hours
+            )
+            cookie_max_age_hours = 0
 
         # Parse log cookie usage flag
         log_cookie_usage = os.getenv("KIKUSAN_LOG_COOKIE_USAGE", "true").lower() in (
@@ -150,6 +160,7 @@ class Config:
             yt_dlp_cookie_file=os.getenv("YT_DLP_COOKIE_FILE"),
             cookie_mode=cookie_mode,
             cookie_retry_delay=cookie_retry_delay,
+            cookie_max_age_hours=cookie_max_age_hours,
             log_cookie_usage=log_cookie_usage,
             cors_origins=cors_origins,
             unavailable_cooldown_hours=unavailable_cooldown_hours,

@@ -15,6 +15,7 @@ import logging
 import re
 import threading
 import time
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from typing import Any, Optional
 
@@ -71,6 +72,10 @@ AUTH_REQUIRED_PATTERNS = [
     # Private/unlisted with auth
     r"granted.*access",
     r"unlisted.*video",
+    # Not a real auth error, but authenticated requests are markedly less
+    # likely to hit YouTube's anti-bot format-stripping (SABR) than anonymous
+    # ones, so it's worth an automatic cookie-retry rather than failing outright.
+    r"requested format is not available",
 ]
 
 
@@ -114,6 +119,56 @@ class CookieUsageStats:
                 cls.total_requests,
                 fallback_pct,
             )
+
+
+# Only log the stale-cookie warning at most this often, so a batch of
+# downloads all hitting the same stale file doesn't spam the log.
+_STALE_COOKIE_WARNING_INTERVAL_SECONDS = 3600
+_last_stale_cookie_warning: float = 0.0
+_stale_cookie_warning_lock = threading.Lock()
+
+
+def is_cookie_file_stale(cookie_file: Optional[str], max_age_hours: int) -> bool:
+    """Check whether a cookie file is older than the configured max age.
+
+    A stale exported cookies.txt can be actively harmful rather than just
+    unhelpful: YouTube treats a replayed/expired session as more suspicious
+    than an anonymous request, which is what caused every download to fail
+    with "Requested format is not available" once, until cookies were
+    disabled. Once a file crosses this age, treat it as if it weren't
+    configured at all rather than forcing it onto every request.
+
+    Args:
+        cookie_file: Path to the cookie file, or None
+        max_age_hours: Maximum age before the file is considered stale
+            (0 disables the check entirely)
+
+    Returns:
+        True if the file exists and is older than max_age_hours
+    """
+    if not cookie_file or max_age_hours <= 0:
+        return False
+
+    try:
+        age_seconds = time.time() - Path(cookie_file).stat().st_mtime
+    except OSError:
+        return False
+
+    stale = age_seconds > max_age_hours * 3600
+    if stale:
+        global _last_stale_cookie_warning
+        with _stale_cookie_warning_lock:
+            now = time.time()
+            if now - _last_stale_cookie_warning > _STALE_COOKIE_WARNING_INTERVAL_SECONDS:
+                _last_stale_cookie_warning = now
+                logger.warning(
+                    "Cookie file is %.1f days old (max age: %d hours) - "
+                    "treating as not configured. Re-upload a fresh export "
+                    "via Settings if you need cookie authentication.",
+                    age_seconds / 86400,
+                    max_age_hours,
+                )
+    return stale
 
 
 def is_auth_error(exception: Exception) -> bool:
@@ -332,6 +387,10 @@ def extract_info_with_retry(
     cookie_mode = getattr(config, "cookie_mode", "auto")
     retry_delay = getattr(config, "cookie_retry_delay", 1.0)
     log_cookie_usage = getattr(config, "log_cookie_usage", True)
+    cookie_max_age_hours = getattr(config, "cookie_max_age_hours", 720)
+
+    if is_cookie_file_stale(cookie_file, cookie_max_age_hours):
+        cookie_file = None
 
     # Mode: always - use cookies immediately
     if cookie_mode == "always":

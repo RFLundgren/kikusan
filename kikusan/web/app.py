@@ -1393,24 +1393,38 @@ async def upload_cookies(file: UploadFile = File(...)):
 @app.get("/api/settings/cookies/status")
 async def get_cookie_status():
     """Check if cookies are configured."""
+    import time
+
     config = get_config()
     cookie_path = config.cookie_file_path
 
     if cookie_path:
         path = Path(cookie_path)
+        exists = path.exists()
+        age_hours = (time.time() - path.stat().st_mtime) / 3600 if exists else None
+        max_age_hours = config.cookie_max_age_hours
+        is_stale = (
+            exists and max_age_hours > 0 and age_hours is not None and age_hours > max_age_hours
+        )
         return {
             "configured": True,
             "source": "uploaded" if "cookies.txt" in cookie_path and str(config.data_dir) in cookie_path else "environment",
             "path": cookie_path,
-            "exists": path.exists(),
-            "size": path.stat().st_size if path.exists() else 0
+            "exists": exists,
+            "size": path.stat().st_size if exists else 0,
+            "age_hours": age_hours,
+            "max_age_hours": max_age_hours,
+            "is_stale": is_stale,
         }
     else:
         return {
             "configured": False,
             "source": None,
             "path": None,
-            "exists": False
+            "exists": False,
+            "age_hours": None,
+            "max_age_hours": config.cookie_max_age_hours,
+            "is_stale": False,
         }
 
 

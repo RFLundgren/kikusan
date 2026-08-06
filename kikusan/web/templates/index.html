@@ -2106,8 +2106,16 @@
           const text = cookieStatus.querySelector(".status-text");
 
           if (data.configured && data.exists) {
-            indicator.className = "status-indicator status-success";
-            text.textContent = `Cookie file configured (${data.source})`;
+            const ageDays = data.age_hours != null ? Math.floor(data.age_hours / 24) : null;
+            const ageText = ageDays != null ? ` — uploaded ${ageDays === 0 ? "today" : ageDays === 1 ? "1 day ago" : `${ageDays} days ago`}` : "";
+
+            if (data.is_stale) {
+              indicator.className = "status-indicator status-warning";
+              text.textContent = `Cookie file is stale (${ageDays} days old) and is being ignored — re-upload a fresh export`;
+            } else {
+              indicator.className = "status-indicator status-success";
+              text.textContent = `Cookie file configured (${data.source})${ageText}`;
+            }
             deleteCookieBtn.style.display =
               data.source === "uploaded" ? "inline-block" : "none";
           } else if (data.configured && !data.exists) {
