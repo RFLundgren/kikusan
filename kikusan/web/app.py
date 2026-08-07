@@ -1075,7 +1075,27 @@ async def list_queue_jobs():
         raise HTTPException(status_code=500, detail="Queue manager not initialized")
 
     jobs = await queue_manager.list_jobs()
-    return {"jobs": [job.to_dict() for job in jobs]}
+    return {"jobs": [job.to_dict() for job in jobs], "paused": queue_manager.is_paused}
+
+
+@app.post("/api/queue/pause")
+async def pause_queue():
+    """Pause the queue - in-progress downloads finish, no new ones start."""
+    if not queue_manager:
+        raise HTTPException(status_code=500, detail="Queue manager not initialized")
+
+    queue_manager.pause()
+    return {"paused": True}
+
+
+@app.post("/api/queue/resume")
+async def resume_queue():
+    """Resume the queue."""
+    if not queue_manager:
+        raise HTTPException(status_code=500, detail="Queue manager not initialized")
+
+    queue_manager.resume()
+    return {"paused": False}
 
 
 @app.delete("/api/queue/{job_id}")
@@ -1107,10 +1127,13 @@ async def stream_queue_updates(request: Request):
 
                 # Get current jobs
                 jobs = await queue_manager.list_jobs()
-                jobs_data = [job.to_dict() for job in jobs]
+                payload = {
+                    "jobs": [job.to_dict() for job in jobs],
+                    "paused": queue_manager.is_paused,
+                }
 
                 # Send update via SSE
-                yield f"data: {json.dumps(jobs_data)}\n\n"
+                yield f"data: {json.dumps(payload)}\n\n"
 
                 # Wait before next update
                 await asyncio.sleep(0.5)

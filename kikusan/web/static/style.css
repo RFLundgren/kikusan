@@ -944,6 +944,17 @@ header p {
     border-color: var(--accent-primary);
 }
 
+.queue-paused-btn {
+    background: #e67e22;
+    color: white;
+    border-color: #e67e22;
+}
+
+.queue-paused-btn:hover {
+    background: #d35400;
+    border-color: #d35400;
+}
+
 .queue-list {
     display: flex;
     flex-direction: column;

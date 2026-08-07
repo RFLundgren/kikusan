@@ -97,6 +97,7 @@
         <div class="queue-header">
           <h2>Download Queue</h2>
           <div class="queue-header-actions">
+            <button id="pause-queue-btn" class="clear-btn">Pause</button>
             <button id="retry-all-btn" class="clear-btn">Retry All</button>
             <button id="clear-failed-btn" class="clear-btn">Clear Failed</button>
             <button id="clear-completed-btn" class="clear-btn">
@@ -1789,8 +1790,9 @@
         eventSource = new EventSource("/api/queue/stream");
 
         eventSource.onmessage = (event) => {
-          const jobs = JSON.parse(event.data);
-          updateQueueUI(jobs);
+          const data = JSON.parse(event.data);
+          updateQueueUI(data.jobs);
+          updatePauseUI(data.paused);
         };
 
         eventSource.onerror = (error) => {
@@ -1813,10 +1815,36 @@
           const response = await fetch("/api/queue/jobs");
           const data = await response.json();
           updateQueueUI(data.jobs);
+          updatePauseUI(data.paused);
         } catch (error) {
           console.error("Failed to fetch queue:", error);
         }
       }
+
+      let queueIsPaused = false;
+
+      function updatePauseUI(paused) {
+        queueIsPaused = !!paused;
+        const btn = document.getElementById("pause-queue-btn");
+        if (!btn) return;
+        btn.textContent = queueIsPaused ? "Resume" : "Pause";
+        btn.classList.toggle("queue-paused-btn", queueIsPaused);
+      }
+
+      document
+        .getElementById("pause-queue-btn")
+        .addEventListener("click", async () => {
+          const endpoint = queueIsPaused
+            ? "/api/queue/resume"
+            : "/api/queue/pause";
+          try {
+            const response = await fetch(endpoint, { method: "POST" });
+            const data = await response.json();
+            updatePauseUI(data.paused);
+          } catch (error) {
+            console.error("Failed to toggle queue pause state:", error);
+          }
+        });
 
       let previousJobStatuses = {};
       let latestJobsById = {};

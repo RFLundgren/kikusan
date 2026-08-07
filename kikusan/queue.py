@@ -31,6 +31,25 @@ class QueueManager:
         self._jobs_lock = asyncio.Lock()  # Protect concurrent access to self.jobs
         self._cancelled_job_ids: set[str] = set()
         self.max_history = max_history
+        # Set = not paused. The worker waits on this before pulling the next
+        # job, so pausing never interrupts a download already in progress.
+        self._pause_event = asyncio.Event()
+        self._pause_event.set()
+
+    def pause(self) -> None:
+        """Stop the worker from picking up any new jobs (in-progress downloads finish)."""
+        self._pause_event.clear()
+        logger.info("Queue paused")
+
+    def resume(self) -> None:
+        """Resume picking up new jobs."""
+        self._pause_event.set()
+        logger.info("Queue resumed")
+
+    @property
+    def is_paused(self) -> bool:
+        """Whether the queue is currently paused."""
+        return not self._pause_event.is_set()
 
     async def start(self):
         """Start the background worker."""
@@ -108,6 +127,13 @@ class QueueManager:
         logger.info("Worker started")
         while self._running:
             try:
+                # Block here (not before dequeuing) so a job already pulled
+                # off the queue still finishes even if paused mid-iteration.
+                try:
+                    await asyncio.wait_for(self._pause_event.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    continue
+
                 # Get job from queue with timeout
                 try:
                     job = await asyncio.wait_for(self.queue.get(), timeout=1.0)

@@ -23,7 +23,7 @@
 - **Quick Download**: Search and download first match with a single command
 - **Automatic Lyrics**: Fetch and embed synchronized lyrics from lrclib.net (LRC format)
 - **Web Interface**: Modern web UI with search, download, theme toggle, and format selection
-- **Download Queue Management**: Retry individual or all failed downloads, and clear failed/completed jobs independently
+- **Download Queue Management**: Retry individual or all failed downloads, clear failed/completed jobs independently, and pause/resume the queue (in-progress downloads finish, queued ones wait)
 - **Clean, Reliable Metadata**: Downloaded titles have video-descriptor suffixes and duplicate artist prefixes stripped automatically, and album/artist/year/track-number are taken from the reliable search/browse data rather than YouTube's often-inconsistent per-video metadata
 - **Optional Lyrics**: Skip fetching lyrics entirely via a Settings toggle, if you don't want `.lrc` files
 - **Docker Support**: Easy deployment with Docker and docker-compose
@@ -40,7 +40,7 @@ This repository builds on [dadav/kikusan](https://github.com/dadav/kikusan) (now
 - **Artists tab**: Search for an artist by name and browse their full discography — the underlying fetch follows YouTube Music's pagination to return the complete list of albums/singles, not just the short preview shown on the artist page.
 - **Batch selection & download**: Checkboxes on both the Songs and Albums tabs let you select several tracks or albums and queue them all with one "Download Selected" action, with "Select All"/"Deselect All" for large result sets (e.g. a 200-track playlist), instead of clicking Download individually.
 - **Already-downloaded status on search results**: A badge next to each track shows whether it's already downloaded, or was downloaded before and the file has since been removed — backed by a lightweight index recorded on every successful download (single track, album, or playlist).
-- **Download queue management**: A per-job "Retry" button for failed downloads, plus queue-wide "Retry All" and "Clear Failed" actions (separate from "Clear Completed", which now only affects completed jobs).
+- **Download queue management**: A per-job "Retry" button for failed downloads, plus queue-wide "Retry All", "Clear Failed", and "Clear Completed" actions, and a "Pause"/"Resume" toggle that stops the queue from starting new downloads without interrupting one already in progress.
 - **Album folder naming**: Album mode now organizes files as `Artist/Album (Year)/Track.ext` (matching Navidrome's expected layout) rather than `Artist/Year - Album/Track.ext`.
 - **Clean titles**: Video-descriptor suffixes (`(Official Music Video)`, `(Official Audio)`, `[Lyric Video]`, etc.) and a duplicated artist prefix (e.g. `Rick Astley - Never Gonna Give You Up` → `Never Gonna Give You Up`) are stripped from the saved filename and tags — conservatively, so genuine info like `(Live)` or `(Remastered)` is left alone.
 - **Reliable album/artist/year/track-number metadata**: YouTube's own per-video metadata is often inconsistent — one track in an album might report the right album/artist and another might not (or report it under a differently-named uploader channel), which used to split a single album or artist across multiple, wrongly-named folders and left tracks unsorted in players. These fields are now taken from the reliable search/browse data and forced onto both the output path and the embedded tags, so an album downloads into one consistently-named folder with correct track-order tags every time.
