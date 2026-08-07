@@ -41,6 +41,7 @@ class Config:
     multi_user: bool = False
     replaygain: bool = False
     allow_ugc: bool = False
+    pot_provider_url: str | None = None
 
     def effective_playlist_name(self, remote_user: str | None) -> str | None:
         """Return the playlist name, optionally prefixed with the remote user."""
@@ -168,6 +169,7 @@ class Config:
             multi_user=multi_user,
             replaygain=replaygain,
             allow_ugc=allow_ugc,
+            pot_provider_url=os.getenv("KIKUSAN_POT_PROVIDER_URL") or None,
         )
 
     @property

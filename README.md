@@ -47,6 +47,8 @@ This repository builds on [dadav/kikusan](https://github.com/dadav/kikusan) (now
 - **Skip Lyrics option**: A checkbox in Settings to skip fetching/embedding lyrics entirely, for anyone who doesn't want `.lrc` files.
 - **Cookie freshness tracking**: An uploaded `cookies.txt` older than `KIKUSAN_COOKIE_MAX_AGE_HOURS` (default 30 days) is automatically treated as unconfigured rather than forced onto every request — a stale exported session can read as more suspicious to YouTube than an anonymous request, which previously caused every download to fail at once. The Settings UI also shows the file's age and flags it once stale.
 - **Broader automatic cookie fallback**: `auto` cookie mode now also retries with cookies on YouTube's "Requested format is not available" error (a bot-detection symptom), not just literal sign-in-required messages.
+- **PO Token provider support**: Age-restricted/bot-flagged videos can still fail with valid cookies alone, since YouTube also checks for a PO token. A `bgutil-ytdlp-pot-provider` sidecar is now included in `docker-compose.yml` by default and wired in via `KIKUSAN_POT_PROVIDER_URL`.
+- **Download Queue Pause/Resume**: A "Pause"/"Resume" toggle in the Download Queue header stops the queue from starting new downloads without interrupting one already in progress.
 - **`KIKUSAN_ORGANIZATION_MODE` and `KIKUSAN_COOKIE_MODE` wired through `.env`** in the example `docker-compose.yml`, rather than requiring a compose-file edit to change them.
 - **Bug fix**: albums containing bonus/preview tracks with no real video no longer fail the whole album — that one track is skipped instead.
 - Assorted fixes: broadened the image proxy's allowed hosts so artist thumbnails and album art from `yt3.googleusercontent.com`/`gstatic.com` actually load, and kept the `publish.yml` workflow and Docker image pointed at this repository's own namespace.
@@ -419,6 +421,7 @@ docker compose up -d
 | `KIKUSAN_COOKIE_RETRY_DELAY`         | `1.0`                             | Delay in seconds before retrying with cookies                   |
 | `KIKUSAN_COOKIE_MAX_AGE_HOURS`       | `720`                             | Treat an uploaded cookie file as unconfigured past this age (0 = never) |
 | `KIKUSAN_LOG_COOKIE_USAGE`           | `true`                            | Log cookie usage statistics (true, false)                       |
+| `KIKUSAN_POT_PROVIDER_URL`           | `None`                            | Base URL of a [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) server for PO tokens (optional, see below) |
 | `GOTIFY_URL`                         | `None`                            | Gotify server URL for notifications (optional)                  |
 | `GOTIFY_TOKEN`                       | `None`                            | Gotify application token (optional)                             |
 | `NAVIDROME_URL`                      | `None`                            | Navidrome server URL for protection (optional)                  |
@@ -450,7 +453,16 @@ Kikusan supports two methods for providing cookies to yt-dlp:
 
 - Chrome/Edge: Install "Get cookies.txt LOCALLY" extension
 - Firefox: Install "cookies.txt" extension
+- Export from a browser profile you don't keep using afterward — YouTube rotates session tokens on active use, which invalidates an already-exported file within minutes
 - See [yt-dlp FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for detailed instructions
+
+### PO Token Provider (age-restricted videos)
+
+Even with valid, fresh cookies, YouTube can still strip audio formats from age-restricted or bot-flagged requests ("Requested format is not available"), because it also checks for a PO (Proof of Origin) token, not just cookies. The included `docker-compose.yml` runs a [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) sidecar for this by default — no setup needed beyond `docker compose up -d`.
+
+- Configured via `KIKUSAN_POT_PROVIDER_URL` (default: `http://bgutil-pot-provider:4416`, matching the sidecar service name)
+- Set it to an empty value in `.env` to disable if you're not running the sidecar
+- If you're not using Docker, run the provider yourself (`docker run -d --init brainicism/bgutil-ytdlp-pot-provider`) and point `KIKUSAN_POT_PROVIDER_URL` at it
 
 ### File Organization
 
@@ -564,6 +576,7 @@ These options apply to all commands:
 | `--cookie-retry-delay`   | `KIKUSAN_COOKIE_RETRY_DELAY`            | Delay in seconds before retrying with cookies. Default: `1.0`                   |
 | `--no-log-cookie-usage`  | (inverse of `KIKUSAN_LOG_COOKIE_USAGE`) | Disable logging of cookie usage statistics                                      |
 | `--unavailable-cooldown` | `KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS`    | Hours to wait before retrying unavailable videos (0 = disabled). Default: `168` |
+| `--pot-provider-url`     | `KIKUSAN_POT_PROVIDER_URL`              | Base URL of a bgutil-ytdlp-pot-provider server for PO tokens. Unset by default  |
 | `--version`              | -                                       | Show version and exit                                                           |
 
 ### kikusan search

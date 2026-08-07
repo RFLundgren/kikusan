@@ -208,6 +208,21 @@ def _get_ydl_opts(
             (MetadataParserPP.Actions.REPLACE, "title", artist_prefix_pattern, "")
         )
 
+    # PO tokens let yt-dlp prove non-bot origin to YouTube; without one, YouTube
+    # increasingly strips formats from age-restricted/bot-suspicious requests
+    # even with valid cookies. Only added when a provider (e.g. bgutil-ytdlp-pot-provider)
+    # is actually configured, since most requests don't need it.
+    extractor_args = {
+        # Docker/minimal environments may cause yt-dlp to choose a narrower default
+        # YouTube client set. Pin a broader, cookie-free client mix for consistency.
+        "youtube": {
+            "player_client": ["android", "web", "web_safari"],
+        }
+    }
+    pot_provider_url = getattr(get_config(), "pot_provider_url", None)
+    if pot_provider_url:
+        extractor_args["youtubepot-bgutilhttp"] = {"base_url": [pot_provider_url]}
+
     opts = {
         "format": f"bestaudio[ext={audio_format}]/bestaudio[acodec*={audio_format}]/bestaudio/best",
         "outtmpl": output_path,
@@ -239,13 +254,7 @@ def _get_ydl_opts(
             "http": lambda n: min(2**n, 30),  # Cap at 30s
             "fragment": lambda n: min(2**n, 30),
         },
-        # Docker/minimal environments may cause yt-dlp to choose a narrower default
-        # YouTube client set. Pin a broader, cookie-free client mix for consistency.
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "web", "web_safari"],
-            }
-        },
+        "extractor_args": extractor_args,
         "remote_components": ["ejs:github"],
     }
 

@@ -281,6 +281,7 @@ All domain models that cross serialization boundaries (JSON persistence, API res
   - `_extract_video_id_from_url()`: Extracts video ID from YouTube URLs for error recording
   - All download paths (`download()`, `_download_single()`, `download_url()`, `_download_playlist()`) record unavailable errors
   - **Format Selection Optimization**: `_get_ydl_opts()` uses intelligent format selector `bestaudio[ext={format}]/bestaudio[acodec*={format}]/bestaudio/best` to prefer audio streams that already match the desired codec (e.g., native opus from YouTube Music), avoiding unnecessary transcoding and preserving quality (inspired by guillevc/yubal@f5d7ee9)
+  - **PO Token provider**: `_get_ydl_opts()` adds an `extractor_args["youtubepot-bgutilhttp"]["base_url"]` entry when `config.pot_provider_url` is set, pointing yt-dlp's `bgutil-ytdlp-pot-provider` plugin at a running provider server. Fixes age-restricted/bot-flagged videos still failing with "Requested format is not available" even with valid, fresh cookies — YouTube checks for a PO (Proof of Origin) token independently of cookie auth. `docker-compose.yml`/`docker-compose.cron.yml` run the provider as a `bgutil-pot-provider` sidecar service by default; disable by setting `KIKUSAN_POT_PROVIDER_URL` to empty in `.env`
 - `kikusan/unavailable.py`: Unavailable video cooldown management
   - Tracks video IDs that returned "Video unavailable" errors
   - JSON persistence in `.kikusan/unavailable.json` with atomic writes
@@ -355,6 +356,7 @@ All major configuration variables have corresponding CLI flags:
 - `--no-log-cookie-usage`: Disable cookie usage logging
 - `--unavailable-cooldown`: Hours to wait before retrying unavailable videos (0 = disabled, default: 168)
 - `--lyrics-cache-hours`: Hours to cache negative lyrics lookups (0 = no expiry, default: 168)
+- `--pot-provider-url`: Base URL of a bgutil-ytdlp-pot-provider server for PO tokens (env: `KIKUSAN_POT_PROVIDER_URL`, unset by default)
 - `--data-dir`: Data directory for state/cache/metadata (env: `KIKUSAN_DATA_DIR`, default: `<download_dir>/.kikusan` for backward compatibility)
   - Migration behavior: when `--data-dir` is explicitly set, CLI attempts one-time migration from legacy `<download_dir>/.kikusan` into the new data dir if legacy exists and target dir is empty/absent.
   - Migration is cross-filesystem safe (handles Docker volume boundaries by copy+delete fallback instead of rename-only move).

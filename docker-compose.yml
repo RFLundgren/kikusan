@@ -15,10 +15,17 @@ services:
       - KIKUSAN_WEB_PLAYLIST=web-downloads
       - KIKUSAN_ORGANIZATION_MODE=${KIKUSAN_ORGANIZATION_MODE:-flat}  # Set to "album" in .env for Artist/Album (Year)/Track.ext
       - KIKUSAN_COOKIE_MODE=${KIKUSAN_COOKIE_MODE:-auto}  # Set to "always" in .env to force cookies on every request
+      - KIKUSAN_POT_PROVIDER_URL=${KIKUSAN_POT_PROVIDER_URL:-http://bgutil-pot-provider:4416}  # PO tokens for age-restricted/bot-flagged videos; set to empty in .env to disable
       # - YT_DLP_COOKIE_FILE=/cookies/cookies.txt  # Optional: use env var instead of web upload
       # - KIKUSAN_CORS_ORIGINS=*  # Optional: CORS allowed origins (default: *)
       # - KIKUSAN_REPLAYGAIN=true  # Optional: Apply ReplayGain/R128 loudness normalization tags
       # - KIKUSAN_DATA_DIR=/downloads
       # - GOTIFY_URL=  # Optional: Gotify server URL
       # - GOTIFY_TOKEN=  # Optional: Gotify app token
+    depends_on:
+      - bgutil-pot-provider
+    restart: unless-stopped
+
+  bgutil-pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
     restart: unless-stopped

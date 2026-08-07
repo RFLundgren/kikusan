@@ -34,6 +34,9 @@ services:
       # Optional: Change data dir where all the configs/caches are saved
       # - KIKUSAN_DATA_DIR=/downloads
 
+      # PO tokens for age-restricted/bot-flagged videos; set to empty in .env to disable
+      - KIKUSAN_POT_PROVIDER_URL=${KIKUSAN_POT_PROVIDER_URL:-http://bgutil-pot-provider:4416}
+
       # Optional: Gotify notifications
       # - GOTIFY_URL=  # Gotify server URL
       # - GOTIFY_TOKEN=  # Gotify app token
@@ -44,6 +47,9 @@ services:
       - NAVIDROME_PASSWORD=${NAVIDROME_PASSWORD}
       - NAVIDROME_KEEP_PLAYLIST=${NAVIDROME_KEEP_PLAYLIST:-keep}
 
+    depends_on:
+      - bgutil-pot-provider
+
     restart: unless-stopped
 
     # Optional: Health check
@@ -52,6 +58,12 @@ services:
     #   interval: 5m
     #   timeout: 10s
     #   retries: 3
+
+  # Provides PO tokens so YouTube stops stripping formats from
+  # age-restricted/bot-flagged requests, even with valid cookies.
+  bgutil-pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    restart: unless-stopped
 
   # Optional: Run web UI alongside cron service
   # Uncomment the section below to enable the web interface

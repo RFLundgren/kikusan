@@ -163,6 +163,16 @@ def main_callback(
             help="Data directory for state, cache, and metadata files. Default: <download-dir>/.kikusan",
         ),
     ] = None,
+    pot_provider_url: Annotated[
+        str | None,
+        typer.Option(
+            "--pot-provider-url",
+            envvar="KIKUSAN_POT_PROVIDER_URL",
+            help="Base URL of a bgutil-ytdlp-pot-provider server (e.g. http://bgutil-pot-provider:4416), "
+            "used to obtain PO tokens so YouTube stops stripping formats from age-restricted/bot-suspicious "
+            "requests. Unset by default.",
+        ),
+    ] = None,
     version: Annotated[
         bool | None,
         typer.Option(
@@ -186,6 +196,8 @@ def main_callback(
         os.environ["KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS"] = str(unavailable_cooldown)
     if lyrics_cache_hours is not None:
         os.environ["KIKUSAN_LYRICS_CACHE_HOURS"] = str(lyrics_cache_hours)
+    if pot_provider_url is not None:
+        os.environ["KIKUSAN_POT_PROVIDER_URL"] = pot_provider_url
     if data_dir is not None:
         try:
             _migrate_legacy_data_dir(data_dir)
