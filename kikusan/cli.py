@@ -173,6 +173,16 @@ def main_callback(
             "requests. Unset by default.",
         ),
     ] = None,
+    browser_impersonate: Annotated[
+        str | None,
+        typer.Option(
+            "--browser-impersonate",
+            envvar="KIKUSAN_BROWSER_IMPERSONATE",
+            help="Browser to impersonate at the network level (e.g. chrome, firefox, safari) so YouTube "
+            "doesn't flag requests from cookies exported elsewhere as a hijacked/mismatched session. "
+            "Set to empty string to disable. Default: chrome",
+        ),
+    ] = None,
     version: Annotated[
         bool | None,
         typer.Option(
@@ -198,6 +208,8 @@ def main_callback(
         os.environ["KIKUSAN_LYRICS_CACHE_HOURS"] = str(lyrics_cache_hours)
     if pot_provider_url is not None:
         os.environ["KIKUSAN_POT_PROVIDER_URL"] = pot_provider_url
+    if browser_impersonate is not None:
+        os.environ["KIKUSAN_BROWSER_IMPERSONATE"] = browser_impersonate
     if data_dir is not None:
         try:
             _migrate_legacy_data_dir(data_dir)

@@ -42,6 +42,7 @@ class Config:
     replaygain: bool = False
     allow_ugc: bool = False
     pot_provider_url: str | None = None
+    browser_impersonate: str | None = "chrome"
 
     def effective_playlist_name(self, remote_user: str | None) -> str | None:
         """Return the playlist name, optionally prefixed with the remote user."""
@@ -170,6 +171,7 @@ class Config:
             replaygain=replaygain,
             allow_ugc=allow_ugc,
             pot_provider_url=os.getenv("KIKUSAN_POT_PROVIDER_URL") or None,
+            browser_impersonate=os.getenv("KIKUSAN_BROWSER_IMPERSONATE", "chrome") or None,
         )
 
     @property

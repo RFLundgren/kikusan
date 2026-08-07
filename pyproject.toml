@@ -17,6 +17,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "billboard.py>=7.1.0",
     "bgutil-ytdlp-pot-provider>=1.0.0",
+    "curl-cffi>=0.13.0,<0.16.0",  # yt-dlp's impersonation support currently caps out at 0.15.x
 ]
 
 [project.scripts]

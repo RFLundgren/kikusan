@@ -48,6 +48,8 @@ This repository builds on [dadav/kikusan](https://github.com/dadav/kikusan) (now
 - **Cookie freshness tracking**: An uploaded `cookies.txt` older than `KIKUSAN_COOKIE_MAX_AGE_HOURS` (default 30 days) is automatically treated as unconfigured rather than forced onto every request — a stale exported session can read as more suspicious to YouTube than an anonymous request, which previously caused every download to fail at once. The Settings UI also shows the file's age and flags it once stale.
 - **Broader automatic cookie fallback**: `auto` cookie mode now also retries with cookies on YouTube's "Requested format is not available" error (a bot-detection symptom), not just literal sign-in-required messages.
 - **PO Token provider support**: Age-restricted/bot-flagged videos can still fail with valid cookies alone, since YouTube also checks for a PO token. A `bgutil-ytdlp-pot-provider` sidecar is now included in `docker-compose.yml` by default and wired in via `KIKUSAN_POT_PROVIDER_URL`.
+- **Browser impersonation**: yt-dlp now impersonates a real browser's network fingerprint by default (`KIKUSAN_BROWSER_IMPERSONATE`, via curl_cffi), since Google can force-rotate cookies the moment they're used from a mismatched fingerprint — which could invalidate a freshly exported cookies.txt on its very first use.
+- **JS challenge solver runtime**: Deno is now installed in the Docker image so yt-dlp can actually decode signature/n-parameter obfuscated formats; previously the image had no JS runtime at all, silently degrading extraction quality.
 - **Download Queue Pause/Resume**: A "Pause"/"Resume" toggle in the Download Queue header stops the queue from starting new downloads without interrupting one already in progress.
 - **`KIKUSAN_ORGANIZATION_MODE` and `KIKUSAN_COOKIE_MODE` wired through `.env`** in the example `docker-compose.yml`, rather than requiring a compose-file edit to change them.
 - **Bug fix**: albums containing bonus/preview tracks with no real video no longer fail the whole album — that one track is skipped instead.
@@ -422,6 +424,7 @@ docker compose up -d
 | `KIKUSAN_COOKIE_MAX_AGE_HOURS`       | `720`                             | Treat an uploaded cookie file as unconfigured past this age (0 = never) |
 | `KIKUSAN_LOG_COOKIE_USAGE`           | `true`                            | Log cookie usage statistics (true, false)                       |
 | `KIKUSAN_POT_PROVIDER_URL`           | `None`                            | Base URL of a [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) server for PO tokens (optional, see below) |
+| `KIKUSAN_BROWSER_IMPERSONATE`        | `chrome`                          | Browser to impersonate at the network level to avoid cookie "hijack" rotation (empty to disable, see below) |
 | `GOTIFY_URL`                         | `None`                            | Gotify server URL for notifications (optional)                  |
 | `GOTIFY_TOKEN`                       | `None`                            | Gotify application token (optional)                             |
 | `NAVIDROME_URL`                      | `None`                            | Navidrome server URL for protection (optional)                  |
@@ -454,6 +457,7 @@ Kikusan supports two methods for providing cookies to yt-dlp:
 - Chrome/Edge: Install "Get cookies.txt LOCALLY" extension
 - Firefox: Install "cookies.txt" extension
 - Export from a browser profile you don't keep using afterward — YouTube rotates session tokens on active use, which invalidates an already-exported file within minutes
+- Even a completely untouched export can be force-rotated the moment yt-dlp presents it from a different machine's network fingerprint than the browser it came from — see Browser Impersonation below, which mitigates this
 - See [yt-dlp FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for detailed instructions
 
 ### PO Token Provider (age-restricted videos)
@@ -463,6 +467,16 @@ Even with valid, fresh cookies, YouTube can still strip audio formats from age-r
 - Configured via `KIKUSAN_POT_PROVIDER_URL` (default: `http://bgutil-pot-provider:4416`, matching the sidecar service name)
 - Set it to an empty value in `.env` to disable if you're not running the sidecar
 - If you're not using Docker, run the provider yourself (`docker run -d --init brainicism/bgutil-ytdlp-pot-provider`) and point `KIKUSAN_POT_PROVIDER_URL` at it
+
+### Browser Impersonation (cookie "hijack" protection)
+
+Google can force-rotate a session's cookies (`SID`/`SIDTS` family) the moment they're presented from a network/TLS fingerprint that doesn't match the browser they were issued to — which is exactly what happens when cookies are exported from your browser and then used by yt-dlp running on a server or in a container. This can invalidate a cookies.txt on its very first use, even if you never touched the browser again.
+
+Kikusan mitigates this by having yt-dlp impersonate a real browser's network fingerprint (via [curl_cffi](https://github.com/lexiforest/curl_cffi)) for all requests, enabled by default.
+
+- Configured via `KIKUSAN_BROWSER_IMPERSONATE` (default: `chrome`)
+- Set it to an empty value in `.env` to disable
+- Other supported values: `firefox`, `safari`, `edge` (see `yt-dlp --list-impersonate-targets` for the full list available in your image)
 
 ### File Organization
 
@@ -577,6 +591,7 @@ These options apply to all commands:
 | `--no-log-cookie-usage`  | (inverse of `KIKUSAN_LOG_COOKIE_USAGE`) | Disable logging of cookie usage statistics                                      |
 | `--unavailable-cooldown` | `KIKUSAN_UNAVAILABLE_COOLDOWN_HOURS`    | Hours to wait before retrying unavailable videos (0 = disabled). Default: `168` |
 | `--pot-provider-url`     | `KIKUSAN_POT_PROVIDER_URL`              | Base URL of a bgutil-ytdlp-pot-provider server for PO tokens. Unset by default  |
+| `--browser-impersonate`  | `KIKUSAN_BROWSER_IMPERSONATE`           | Browser to impersonate at the network level (chrome, firefox, safari, etc). Default: `chrome` |
 | `--version`              | -                                       | Show version and exit                                                           |
 
 ### kikusan search

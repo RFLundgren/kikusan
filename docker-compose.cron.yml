@@ -37,6 +37,9 @@ services:
       # PO tokens for age-restricted/bot-flagged videos; set to empty in .env to disable
       - KIKUSAN_POT_PROVIDER_URL=${KIKUSAN_POT_PROVIDER_URL:-http://bgutil-pot-provider:4416}
 
+      # Avoids cookie "hijack" rotation from a mismatched network fingerprint; set to empty in .env to disable
+      - KIKUSAN_BROWSER_IMPERSONATE=${KIKUSAN_BROWSER_IMPERSONATE:-chrome}
+
       # Optional: Gotify notifications
       # - GOTIFY_URL=  # Gotify server URL
       # - GOTIFY_TOKEN=  # Gotify app token

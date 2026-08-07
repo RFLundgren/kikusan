@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import yt_dlp
+from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 
 from kikusan.config import DEFAULT_FILENAME_TEMPLATE, MAX_FILENAME_BYTES, get_config
@@ -178,6 +179,18 @@ def _get_output_path(
     return str(Path(*path_parts) / filename)
 
 
+def _impersonate_opts() -> dict:
+    """Build the yt-dlp 'impersonate' opt from config, if configured and valid."""
+    target = getattr(get_config(), "browser_impersonate", None)
+    if not target:
+        return {}
+    try:
+        return {"impersonate": ImpersonateTarget.from_str(target.lower())}
+    except Exception:
+        logger.warning("Invalid KIKUSAN_BROWSER_IMPERSONATE value %r, ignoring", target)
+        return {}
+
+
 def _get_ydl_opts(
     output_dir: Path,
     audio_format: str,
@@ -224,6 +237,10 @@ def _get_ydl_opts(
         extractor_args["youtubepot-bgutilhttp"] = {"base_url": [pot_provider_url]}
 
     opts = {
+        # Presenting a real browser's TLS/HTTP fingerprint (via curl_cffi) avoids
+        # Google's anti-hijack cookie rotation, which can invalidate a freshly
+        # exported cookies.txt the moment it's used from a mismatched fingerprint.
+        **_impersonate_opts(),
         "format": f"bestaudio[ext={audio_format}]/bestaudio[acodec*={audio_format}]/bestaudio/best",
         "outtmpl": output_path,
         "color": "never",
